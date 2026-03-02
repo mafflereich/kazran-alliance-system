@@ -9,7 +9,7 @@ interface AdminUser {
 }
 
 export default function SinglePasswordUpdate() {
-  const { t } = useTranslation(['translation', 'admin']);
+  const { t } = useTranslation(['admin', 'translation']);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [selectedUsername, setSelectedUsername] = useState<string>('');
   const [newPassword, setNewPassword] = useState('');

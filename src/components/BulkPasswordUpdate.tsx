@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Download, Upload, FileUp, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function BulkPasswordUpdate() {
-  const { t } = useTranslation(['translation', 'admin']);
+  const { t } = useTranslation(['admin', 'translation']);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [status, setStatus] = useState<{ message: string; type: 'success' | 'error' | null }>({

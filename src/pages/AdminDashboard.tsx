@@ -14,7 +14,7 @@ import { Reorder } from "motion/react";
 import { useTranslation } from 'react-i18next';
 
 export default function AdminDashboard() {
-  const { t } = useTranslation(['translation', 'admin']);
+  const { t } = useTranslation(['admin', 'translation']);
   const { db, setDb, setCurrentView, currentUser, setCurrentUser, fetchAllMembers } = useAppContext();
   const [activeTab, setActiveTab] = useState<'guilds' | 'costumes' | 'backup' | 'tools' | 'passwords' | 'archived' | 'settings'>('guilds');
 
@@ -99,7 +99,7 @@ export default function AdminDashboard() {
 }
 
 function ToolsManager() {
-  const { t } = useTranslation(['translation', 'admin']);
+  const { t } = useTranslation(['admin', 'translation']);
   const { db, addMember, deleteMember, updateMember, fetchAllMembers, restoreData, archiveMember, showToast } = useAppContext();
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -403,7 +403,7 @@ function TabButton({ active, onClick, icon, label }: { active: boolean, onClick:
 }
 
 function GuildsManager() {
-  const { t } = useTranslation(['translation', 'admin']);
+  const { t } = useTranslation(['admin', 'translation']);
   const { db, addGuild, updateGuild, deleteGuild, fetchAllMembers, showToast } = useAppContext();
   const [newGuildName, setNewGuildName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -632,7 +632,7 @@ function GuildsManager() {
 }
 
 function GuildMembersManager({ guildId, onBack }: { guildId: string, onBack: () => void }) {
-  const { t } = useTranslation(['translation', 'admin']);
+  const { t } = useTranslation(['admin', 'translation']);
   const { db, addMember, deleteMember, updateMember, fetchMembers, archiveMember, showToast: showGlobalToast } = useAppContext();
   const [selectedGuildId, setSelectedGuildId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -1140,7 +1140,7 @@ function GuildMembersManager({ guildId, onBack }: { guildId: string, onBack: () 
 }
 
 function CostumesManager() {
-  const { t, i18n } = useTranslation(['translation', 'admin']);
+  const { t, i18n } = useTranslation(['admin', 'translation']);
   const { db, addCharacter, updateCharacter, deleteCharacter, addCostume, updateCostume, deleteCostume, updateCharactersOrder, updateCostumesOrder, showToast } = useAppContext();
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [selectedCostumeId, setSelectedCostumeId] = useState<string | null>(null);
@@ -1564,7 +1564,7 @@ function CostumesManager() {
 }
 
 function BackupManager() {
-  const { t } = useTranslation(['translation', 'admin']);
+  const { t } = useTranslation(['admin', 'translation']);
   const { db, restoreData, showToast } = useAppContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1613,7 +1613,7 @@ function BackupManager() {
     <div className="space-y-6">
       <h2 className="text-2xl font-bold mb-6 text-stone-800 flex items-center gap-2">
         <Save className="w-6 h-6 text-amber-600" />
-        {t('nav.backup')}
+        {t('nav.backup_restore')}
       </h2>
       <div className="grid md:grid-cols-2 gap-6">
         <div className="bg-stone-50 p-8 rounded-2xl border border-stone-200 flex flex-col items-center justify-center text-center">
@@ -1665,7 +1665,7 @@ function BackupManager() {
 }
 
 function SettingsManager() {
-  const { t } = useTranslation(['translation', 'admin']);
+  const { t } = useTranslation(['admin', 'translation']);
   const { db, updateSetting, showToast } = useAppContext();
   
   const firstSettingId = db.settings && Object.keys(db.settings).length > 0 ? Object.keys(db.settings)[0] : 'default';

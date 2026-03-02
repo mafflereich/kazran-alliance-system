@@ -21,6 +21,7 @@ i18n
         nonExplicitSupportedLngs: true, // 允許非精確匹配（如 zh-HK 匹配 zh）
         ns: ['translation'],
         defaultNS: 'translation',
+        fallbackNS: 'translation',
         backend: {
             loadPath: `${import.meta.env.BASE_URL}locales/{{lng}}/{{ns}}.json`,
         },
