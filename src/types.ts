@@ -49,6 +49,11 @@ export interface User {
   role: 'creator' | 'admin' | 'manager';
 }
 
+export interface Setting {
+  id: string;
+  bgmUrl?: string;
+}
+
 export interface Database {
   guilds: Record<string, Guild>;
   guildOrder?: string[];
@@ -56,6 +61,7 @@ export interface Database {
   characters: Record<string, Character>;
   costumes: Record<string, Costume>;
   users: Record<string, User>;
+  settings: Record<string, Setting>;
 }
 export interface ArchiveHistory {
   id: string;

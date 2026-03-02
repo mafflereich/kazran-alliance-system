@@ -10,9 +10,6 @@ export default function Footer() {
         <div className="space-y-1">
           <p>{t('footer.copyright')}</p>
           <p>{t('footer.disclaimer')}</p>
-          <p className="mt-2">
-            Music track: Lineage by Alegend Source: <a href="https://freetouse.com/music" target="_blank" rel="noopener noreferrer" className="hover:text-stone-600 underline">https://freetouse.com/music</a> No Copyright Vlog Music for Videos
-          </p>
         </div>
       </div>
     </footer>

@@ -140,6 +140,9 @@ export default function Header() {
   const isCostumeListActive = currentView?.type === 'guild';
   const isAdminActive = currentView?.type === 'admin';
 
+  const firstSettingId = db.settings && Object.keys(db.settings).length > 0 ? Object.keys(db.settings)[0] : 'default';
+  const hasBgm = !!db.settings?.[firstSettingId]?.bgmUrl;
+
   return (
     <>
       <header className="bg-stone-900 text-white p-4 shadow-md shrink-0 sticky top-0 z-[100]">
@@ -194,11 +197,12 @@ export default function Header() {
 
             <div className="flex items-center gap-4 border-l border-stone-800 pl-4">
               <button
-                onClick={() => setIsMuted(!isMuted)}
-                className="flex items-center justify-center hover:text-amber-400 transition-colors p-1"
-                title={isMuted ? t('common.unmute') : t('common.mute')}
+                onClick={() => hasBgm && setIsMuted(!isMuted)}
+                disabled={!hasBgm}
+                className={`flex items-center justify-center transition-colors p-1 ${hasBgm ? 'hover:text-amber-400' : 'text-stone-600 cursor-not-allowed'}`}
+                title={!hasBgm ? t('common.no_bgm', '無背景音樂') : isMuted ? t('common.unmute') : t('common.mute')}
               >
-                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                {isMuted || !hasBgm ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
               </button>
 
               <div className="relative">

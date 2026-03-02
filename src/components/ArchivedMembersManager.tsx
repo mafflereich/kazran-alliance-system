@@ -8,7 +8,7 @@ import { ArchivedMember, ArchiveHistory } from '../types';
 import { useTranslation } from 'react-i18next';
 
 export default function ArchivedMembersManager() {
-  const { t } = useTranslation();
+  const { t } = useTranslation(['translation', 'admin']);
   const { db, unarchiveMember, showToast } = useAppContext();
   const [archivedMembers, setArchivedMembers] = useState<ArchivedMember[]>([]);
   const [loading, setLoading] = useState(true);

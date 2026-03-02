@@ -15,7 +15,8 @@ const defaultData: Database = {
     "creator": { username: "creator", role: "creator" },
     "admin": { username: "admin", role: "admin" },
     "manager": { username: "manager", role: "manager" }
-  }
+  },
+  settings: {}
 };
 
 type ViewState = { type: 'admin' } | { type: 'guild', guildId: string } | null;
@@ -61,6 +62,9 @@ interface AppContextType {
   updateUserRole: (username: string, role: User['role']) => Promise<void>;
   addUser: (user: User) => Promise<void>;
   deleteUser: (username: string) => Promise<void>;
+
+  // Settings functions
+  updateSetting: (id: string, value: string) => Promise<void>;
 
   // Data management
   restoreData: (data: Partial<Database>) => Promise<void>;
@@ -164,22 +168,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [guildsRes, charactersRes, costumesRes, usersRes] = await Promise.all([
+        const [guildsRes, charactersRes, costumesRes, usersRes, settingsRes] = await Promise.all([
           supabase.from('guilds').select('*'),
           supabase.from('characters').select('*'),
           supabase.from('costumes').select('*'),
           supabase.from('admin_users').select('*'),
+          supabase.from('settings').select('*'),
         ]);
 
         if (guildsRes.error) throw guildsRes.error;
         if (charactersRes.error) throw charactersRes.error;
         if (costumesRes.error) throw costumesRes.error;
         if (usersRes.error) throw usersRes.error;
+        if (settingsRes.error) throw settingsRes.error;
 
         const guilds = guildsRes.data.reduce((acc, guild) => ({ ...acc, [guild.id]: toCamel(guild) }), {});
         const characters = charactersRes.data.reduce((acc, char) => ({ ...acc, [char.id]: toCamel(char) }), {});
         const costumes = costumesRes.data.reduce((acc, costume) => ({ ...acc, [costume.id]: toCamel(costume) }), {});
         const users = usersRes.data.reduce((acc, user) => ({ ...acc, [user.username]: toCamel(user) }), {});
+        const settings = settingsRes.data.reduce((acc, setting) => ({ ...acc, [setting.id]: toCamel(setting) }), {});
 
         setDbState(prev => ({
           ...prev,
@@ -187,6 +194,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           characters,
           costumes,
           users,
+          settings,
         }));
 
         setLoadedStates({ global: true, guilds: true, costumes: true, characters: true, users: true });
@@ -799,6 +807,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateSetting = async (id: string, value: string) => {
+    if (isOffline) return;
+
+    const { error } = await supabaseUpsert('settings', { id, bgm_url: value });
+    if (error) throw error;
+
+    setDbState(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        [id]: { id, bgmUrl: value }
+      }
+    }));
+  };
+
   if (!isLoaded) {
     return <div className="min-h-screen flex items-center justify-center bg-stone-100 text-stone-500">{t('common.loading')}</div>;
   }
@@ -810,7 +833,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addGuild, updateGuild, deleteGuild,
       addCharacter, updateCharacter, deleteCharacter, updateCharactersOrder,
       addCostume, updateCostume, deleteCostume, updateCostumesOrder,
-      updateUserPassword, updateUserRole, addUser, deleteUser,
+      updateUserPassword, updateUserRole, addUser, deleteUser, updateSetting,
       restoreData, toasts, showToast, removeToast,
       isMuted, setIsMuted
     }}>

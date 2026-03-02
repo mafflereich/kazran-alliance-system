@@ -31,18 +31,24 @@ const AppContent = () => {
   return <GuildDashboard guildId={currentView.guildId} />;
 };
 
-const BGM_URL = "https://bybjhpiusfnjlbhiesrp.supabase.co/storage/v1/object/public/bgm/Lineage.mp3";
 const CACHE_NAME = 'bgm-cache-v1';
 
 const AppContentWrapper = () => {
-  const { isMuted } = useAppContext();
+  const { isMuted, db } = useAppContext();
   const audioRef = React.useRef<HTMLAudioElement>(null);
   const [audioSrc, setAudioSrc] = React.useState<string>("");
+  
+  const firstSettingId = db.settings && Object.keys(db.settings).length > 0 ? Object.keys(db.settings)[0] : 'default';
+  const BGM_URL = db.settings?.[firstSettingId]?.bgmUrl || "";
+
+  React.useEffect(() => {
+    setAudioSrc("");
+  }, [BGM_URL]);
 
   React.useEffect(() => {
     const loadAudio = async () => {
       // Only download if we are unmuted and haven't loaded yet
-      if (isMuted || audioSrc) return;
+      if (isMuted || audioSrc || !BGM_URL) return;
       
       try {
         const cache = await caches.open(CACHE_NAME);
@@ -70,7 +76,7 @@ const AppContentWrapper = () => {
     };
 
     loadAudio();
-  }, [isMuted, audioSrc]);
+  }, [isMuted, audioSrc, BGM_URL]);
 
   React.useEffect(() => {
     if (audioRef.current) {

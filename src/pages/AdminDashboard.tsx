@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAppContext } from '../store';
-import { LogOut, Users, Shield, Sword, Plus, Edit2, Trash2, ArrowUp, ArrowDown, Save, X, ChevronLeft, Lock, User as UserIcon, AlertCircle, Download, Upload, FileText, RefreshCw, Wand2, GripVertical, Check, Key, Archive } from 'lucide-react';
+import { LogOut, Users, Shield, Sword, Plus, Edit2, Trash2, ArrowUp, ArrowDown, Save, X, ChevronLeft, Lock, User as UserIcon, AlertCircle, Download, Upload, FileText, RefreshCw, Wand2, GripVertical, Check, Key, Archive, Settings } from 'lucide-react';
 import { Role, Guild, Member, Costume, User, Character } from '../types';
 import { getTierColor, getTierBorderHoverClass, getImageUrl } from '../utils';
 import ConfirmModal from '../components/ConfirmModal';
@@ -14,9 +14,9 @@ import { Reorder } from "motion/react";
 import { useTranslation } from 'react-i18next';
 
 export default function AdminDashboard() {
-  const { t } = useTranslation();
+  const { t } = useTranslation(['translation', 'admin']);
   const { db, setDb, setCurrentView, currentUser, setCurrentUser, fetchAllMembers } = useAppContext();
-  const [activeTab, setActiveTab] = useState<'guilds' | 'costumes' | 'backup' | 'tools' | 'passwords' | 'archived'>('guilds');
+  const [activeTab, setActiveTab] = useState<'guilds' | 'costumes' | 'backup' | 'tools' | 'passwords' | 'archived' | 'settings'>('guilds');
 
   const userRole = currentUser ? db.users[currentUser]?.role : null;
 
@@ -46,6 +46,7 @@ export default function AdminDashboard() {
               <TabButton active={activeTab === 'passwords'} onClick={() => setActiveTab('passwords')} icon={<Key />} label={t('nav.change_password')} />
               <TabButton active={activeTab === 'backup'} onClick={() => setActiveTab('backup')} icon={<Save />} label={t('nav.backup_restore')} />
               <TabButton active={activeTab === 'tools'} onClick={() => setActiveTab('tools')} icon={<Wand2 />} label={t('nav.tools')} />
+              <TabButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings />} label={t('nav.settings')} />
             </>
           )}
         </div>
@@ -89,6 +90,7 @@ export default function AdminDashboard() {
           )}
           {activeTab === 'backup' && userRole !== 'manager' && <BackupManager />}
           {activeTab === 'tools' && userRole !== 'manager' && <ToolsManager />}
+          {activeTab === 'settings' && userRole !== 'manager' && <SettingsManager />}
         </div>
       </main>
       <Footer />
@@ -97,7 +99,7 @@ export default function AdminDashboard() {
 }
 
 function ToolsManager() {
-  const { t } = useTranslation();
+  const { t } = useTranslation(['translation', 'admin']);
   const { db, addMember, deleteMember, updateMember, fetchAllMembers, restoreData, archiveMember, showToast } = useAppContext();
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -401,7 +403,7 @@ function TabButton({ active, onClick, icon, label }: { active: boolean, onClick:
 }
 
 function GuildsManager() {
-  const { t } = useTranslation();
+  const { t } = useTranslation(['translation', 'admin']);
   const { db, addGuild, updateGuild, deleteGuild, fetchAllMembers, showToast } = useAppContext();
   const [newGuildName, setNewGuildName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -630,7 +632,7 @@ function GuildsManager() {
 }
 
 function GuildMembersManager({ guildId, onBack }: { guildId: string, onBack: () => void }) {
-  const { t } = useTranslation();
+  const { t } = useTranslation(['translation', 'admin']);
   const { db, addMember, deleteMember, updateMember, fetchMembers, archiveMember, showToast: showGlobalToast } = useAppContext();
   const [selectedGuildId, setSelectedGuildId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -1138,7 +1140,7 @@ function GuildMembersManager({ guildId, onBack }: { guildId: string, onBack: () 
 }
 
 function CostumesManager() {
-  const { t, i18n } = useTranslation();
+  const { t, i18n } = useTranslation(['translation', 'admin']);
   const { db, addCharacter, updateCharacter, deleteCharacter, addCostume, updateCostume, deleteCostume, updateCharactersOrder, updateCostumesOrder, showToast } = useAppContext();
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [selectedCostumeId, setSelectedCostumeId] = useState<string | null>(null);
@@ -1562,7 +1564,7 @@ function CostumesManager() {
 }
 
 function BackupManager() {
-  const { t } = useTranslation();
+  const { t } = useTranslation(['translation', 'admin']);
   const { db, restoreData, showToast } = useAppContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1655,6 +1657,74 @@ function BackupManager() {
             <p className="text-sm text-amber-700">
               {t('backup.important_desc')}
             </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsManager() {
+  const { t } = useTranslation(['translation', 'admin']);
+  const { db, updateSetting, showToast } = useAppContext();
+  
+  const firstSettingId = db.settings && Object.keys(db.settings).length > 0 ? Object.keys(db.settings)[0] : 'default';
+  const [bgmUrl, setBgmUrl] = useState(db.settings?.[firstSettingId]?.bgmUrl || '');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (db.settings && Object.keys(db.settings).length > 0) {
+      const id = Object.keys(db.settings)[0];
+      setBgmUrl(db.settings[id].bgmUrl || '');
+    }
+  }, [db.settings]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await updateSetting(firstSettingId, bgmUrl);
+      showToast(t('settings.save_success', '設定已儲存'), 'success');
+    } catch (error: any) {
+      console.error("Error saving settings:", error);
+      showToast(`${t('settings.save_failed', '設定儲存失敗')}: ${error.message}`, 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold mb-6 text-stone-800 flex items-center gap-2">
+        <Settings className="w-6 h-6 text-amber-600" />
+        {t('nav.settings')}
+      </h2>
+
+      <div className="bg-stone-50 p-6 rounded-2xl border border-stone-200">
+        <h3 className="text-lg font-bold text-stone-800 mb-4">{t('settings.bgm', '背景音樂')}</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-stone-600 mb-1">
+              {t('settings.bgm_url', '背景音樂 URL')}
+            </label>
+            <input
+              type="text"
+              value={bgmUrl}
+              onChange={(e) => setBgmUrl(e.target.value)}
+              placeholder="https://example.com/music.mp3"
+              className="w-full p-3 border border-stone-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none"
+            />
+            <p className="text-xs text-stone-500 mt-2">
+              {t('settings.bgm_hint', '請輸入背景音樂的完整網址，支援 mp3 等常見格式。')}
+            </p>
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="px-6 py-2 bg-amber-600 text-white rounded-lg font-bold hover:bg-amber-700 transition-all active:scale-95 shadow-sm disabled:opacity-50 flex items-center gap-2"
+            >
+              {isSaving ? t('common.saving', '儲存中...') : <><Save className="w-4 h-4" /> {t('common.save', '儲存')}</>}
+            </button>
           </div>
         </div>
       </div>
