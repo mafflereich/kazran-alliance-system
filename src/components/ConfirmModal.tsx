@@ -31,24 +31,24 @@ export default function ConfirmModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-stone-900/60 dark:bg-black/70 backdrop-blur-sm">
+      <div className="bg-white dark:bg-stone-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
         <div className="p-6">
           <div className="flex items-start gap-4">
-            <div className={`p-3 rounded-full ${isDanger ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
+            <div className={`p-3 rounded-full ${isDanger ? 'bg-red-100 dark:bg-red-900/30 text-red-600' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600'}`}>
               <AlertTriangle className="w-6 h-6" />
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-bold text-stone-900 mb-2">{title}</h3>
-              <div className="text-stone-600 leading-relaxed">{message}</div>
+              <h3 className="text-lg font-bold text-stone-900 dark:text-stone-100 mb-2">{title}</h3>
+              <div className="text-stone-600 dark:text-stone-400 leading-relaxed">{message}</div>
             </div>
           </div>
         </div>
 
-        <div className="bg-stone-50 px-6 py-4 flex justify-end gap-3 border-t border-stone-100">
+        <div className="bg-stone-50 dark:bg-stone-700 px-6 py-4 flex justify-end gap-3 border-t border-stone-100 dark:border-stone-600">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-stone-600 hover:bg-stone-200 rounded-lg transition-colors font-medium"
+            className="px-4 py-2 text-stone-600 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-600 rounded-lg transition-colors font-medium"
           >
             {finalCancelText}
           </button>
