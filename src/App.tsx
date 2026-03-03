@@ -34,13 +34,16 @@ const AppContent = () => {
 const CACHE_NAME = 'bgm-cache-v1';
 
 const AppContentWrapper = () => {
-  const { isMuted, db } = useAppContext();
+  const { db, userVolume } = useAppContext();
   const audioRef = React.useRef<HTMLAudioElement>(null);
   const [audioSrc, setAudioSrc] = React.useState<string>("");
   
   const firstSettingId = db.settings && Object.keys(db.settings).length > 0 ? Object.keys(db.settings)[0] : 'default';
   const BGM_URL = db.settings?.[firstSettingId]?.bgmUrl || "";
-  const BGM_VOLUME = (db.settings?.[firstSettingId]?.bgmVolume ?? 50) / 100;
+  const BGM_DEFAULT_VOLUME = (db.settings?.[firstSettingId]?.bgmDefaultVolume ?? 50) / 100;
+  
+  const EFFECTIVE_VOLUME = userVolume !== null ? userVolume / 100 : BGM_DEFAULT_VOLUME;
+  const isMuted = EFFECTIVE_VOLUME === 0;
 
   React.useEffect(() => {
     setAudioSrc("");
@@ -82,14 +85,14 @@ const AppContentWrapper = () => {
   React.useEffect(() => {
     if (audioRef.current) {
       audioRef.current.muted = isMuted;
-      audioRef.current.volume = BGM_VOLUME;
+      audioRef.current.volume = EFFECTIVE_VOLUME;
       if (!isMuted && audioSrc) {
         audioRef.current.play().catch(err => console.log("Autoplay blocked or error:", err));
       } else {
         audioRef.current.pause();
       }
     }
-  }, [isMuted, audioSrc, BGM_VOLUME]);
+  }, [isMuted, audioSrc, EFFECTIVE_VOLUME]);
 
   return (
     <div className="min-h-screen bg-stone-100 text-stone-900 font-sans">

@@ -1,5 +1,5 @@
 {
-  "name": "Kazran Alliance Manager",
-  "description": "A guild alliance management system for Brown Dust 2, tracking costume levels and exclusive weapons.",
+  "name": "Kazran Alliance System",
+  "description": "A guild alliance management system for Brown Dust 2.",
   "requestFramePermissions": []
 }

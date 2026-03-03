@@ -76,8 +76,8 @@ interface AppContextType {
   removeToast: (id: string) => void;
 
   // Music management
-  isMuted: boolean;
-  setIsMuted: (muted: boolean) => void;
+  userVolume: number | null;
+  setUserVolume: (volume: number) => void;
 
   isRoleLoading: boolean;
   isMembersLoading: boolean;
@@ -191,14 +191,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isOffline, setIsOffline] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [isMuted, setIsMutedState] = useState<boolean>(() => {
-    const saved = localStorage.getItem('isMuted');
-    return saved === null ? true : saved === 'true';
+
+  const [userVolume, setUserVolumeState] = useState<number | null>(() => {
+    const saved = localStorage.getItem('userVolume');
+    return saved !== null ? Number(saved) : 0;
   });
 
-  const setIsMuted = (muted: boolean) => {
-    setIsMutedState(muted);
-    localStorage.setItem('isMuted', muted.toString());
+  const setUserVolume = (volume: number) => {
+    setUserVolumeState(volume);
+    localStorage.setItem('userVolume', volume.toString());
   };
 
   const showToast = (message: string, type: ToastType = 'info') => {
@@ -907,7 +908,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const updates: any = { id, bgm_url: value };
     if (volume !== undefined) {
-      updates.bgm_volume = volume;
+      updates.bgm_default_volume = volume;
     }
 
     const { error } = await supabaseUpsert('settings', updates);
@@ -920,7 +921,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         [id]: { 
           id, 
           bgmUrl: value,
-          bgmVolume: volume !== undefined ? volume : prev.settings[id]?.bgmVolume
+          bgmDefaultVolume: volume !== undefined ? volume : prev.settings[id]?.bgmDefaultVolume
         }
       }
     }));
@@ -939,7 +940,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addCostume, updateCostume, deleteCostume, updateCostumesOrder,
       updateUserPassword, updateUserRole, addUser, deleteUser, updateSetting,
       restoreData, toasts, showToast, removeToast,
-      isMuted, setIsMuted, isRoleLoading, isMembersLoading
+      userVolume, setUserVolume, isRoleLoading, isMembersLoading
     }}>
       {children}
     </AppContext.Provider>

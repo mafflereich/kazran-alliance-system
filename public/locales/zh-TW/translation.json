@@ -303,7 +303,7 @@
   "settings": {
     "bgm": "背景音樂",
     "bgm_url": "背景音樂 URL",
-    "bgm_volume": "背景音樂音量",
+    "bgm_default_volume": "背景音樂預設音量",
     "bgm_hint": "請輸入背景音樂的完整網址，支援 mp3 等常見格式。",
     "save_success": "設定已儲存",
     "save_failed": "設定儲存失敗"

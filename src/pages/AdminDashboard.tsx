@@ -1589,21 +1589,21 @@ function SettingsManager() {
   const { db, updateSetting, showToast } = useAppContext();
   const firstSettingId = db.settings && Object.keys(db.settings).length > 0 ? Object.keys(db.settings)[0] : 'default';
   const [bgmUrl, setBgmUrl] = useState(db.settings?.[firstSettingId]?.bgmUrl || '');
-  const [bgmVolume, setBgmVolume] = useState(db.settings?.[firstSettingId]?.bgmVolume ?? 50);
+  const [bgmDefaultVolume, setBgmDefaultVolume] = useState(db.settings?.[firstSettingId]?.bgmDefaultVolume ?? 50);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (db.settings && Object.keys(db.settings).length > 0) {
       const id = Object.keys(db.settings)[0];
       setBgmUrl(db.settings[id].bgmUrl || '');
-      setBgmVolume(db.settings[id].bgmVolume ?? 50);
+      setBgmDefaultVolume(db.settings[id].bgmDefaultVolume ?? 50);
     }
   }, [db.settings]);
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await updateSetting(firstSettingId, bgmUrl, bgmVolume);
+      await updateSetting(firstSettingId, bgmUrl, bgmDefaultVolume);
       showToast(t('settings.save_success'), 'success');
     } catch (error: any) {
       console.error("Error saving settings:", error);
@@ -1641,14 +1641,14 @@ function SettingsManager() {
 
           <div>
             <label className="block text-sm font-medium text-stone-600 mb-1">
-              {t('settings.bgm_volume')} ({bgmVolume}%)
+              {t('settings.bgm_default_volume')} ({bgmDefaultVolume}%)
             </label>
             <input
               type="range"
               min="0"
               max="100"
-              value={bgmVolume}
-              onChange={(e) => setBgmVolume(Number(e.target.value))}
+              value={bgmDefaultVolume}
+              onChange={(e) => setBgmDefaultVolume(Number(e.target.value))}
               className="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
             />
           </div>

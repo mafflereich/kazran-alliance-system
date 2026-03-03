@@ -52,7 +52,7 @@ export interface User {
 export interface Setting {
   id: string;
   bgmUrl?: string;
-  bgmVolume?: number;
+  bgmDefaultVolume?: number;
 }
 
 export interface Database {

@@ -111,9 +111,25 @@ function LoginModal({ onClose }: { onClose: () => void }) {
 
 export default function Header() {
   const { t, i18n } = useTranslation();
-  const { db, currentUser, setCurrentUser, currentView, setCurrentView, isMuted, setIsMuted } = useAppContext();
+  const { db, currentUser, setCurrentUser, currentView, setCurrentView, userVolume, setUserVolume } = useAppContext();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
+  const [isVolumeHovered, setIsVolumeHovered] = useState(false);
+  const volumeHoverTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const handleVolumeMouseEnter = () => {
+    if (volumeHoverTimeoutRef.current) {
+      clearTimeout(volumeHoverTimeoutRef.current);
+      volumeHoverTimeoutRef.current = null;
+    }
+    setIsVolumeHovered(true);
+  };
+
+  const handleVolumeMouseLeave = () => {
+    volumeHoverTimeoutRef.current = setTimeout(() => {
+      setIsVolumeHovered(false);
+    }, 300); // 300ms delay before hiding
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -142,6 +158,17 @@ export default function Header() {
 
   const firstSettingId = db.settings && Object.keys(db.settings).length > 0 ? Object.keys(db.settings)[0] : 'default';
   const hasBgm = !!db.settings?.[firstSettingId]?.bgmUrl;
+  const bgmDefaultVolume = db.settings?.[firstSettingId]?.bgmDefaultVolume ?? 50;
+  const currentVolume = userVolume !== null ? userVolume : bgmDefaultVolume;
+  const isMuted = currentVolume === 0;
+
+  const toggleMute = () => {
+    if (isMuted) {
+      setUserVolume(bgmDefaultVolume > 0 ? bgmDefaultVolume : 50);
+    } else {
+      setUserVolume(0);
+    }
+  };
 
   return (
     <>
@@ -195,15 +222,38 @@ export default function Header() {
               </button>
             )}
 
-            <div className="flex items-center gap-4 border-l border-stone-800 pl-4">
-              <button
-                onClick={() => hasBgm && setIsMuted(!isMuted)}
-                disabled={!hasBgm}
-                className={`flex items-center justify-center transition-colors p-1 ${hasBgm ? 'hover:text-amber-400' : 'text-stone-600 cursor-not-allowed'}`}
-                title={!hasBgm ? t('common.no_bgm', '無背景音樂') : isMuted ? t('common.unmute') : t('common.mute')}
-              >
-                {isMuted || !hasBgm ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-              </button>
+            <div 
+              className="flex items-center gap-4 border-l border-stone-800 pl-4"
+              onMouseEnter={handleVolumeMouseEnter}
+              onMouseLeave={handleVolumeMouseLeave}
+            >
+              <div className="relative">
+                <button
+                  onClick={() => hasBgm && toggleMute()}
+                  disabled={!hasBgm}
+                  className={`flex items-center justify-center transition-colors p-1 ${hasBgm ? 'hover:text-amber-400' : 'text-stone-600 cursor-not-allowed'}`}
+                  title={!hasBgm ? t('common.no_bgm', '無背景音樂') : isMuted ? t('common.unmute') : t('common.mute')}
+                >
+                  {isMuted || !hasBgm ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                </button>
+
+                {isVolumeHovered && hasBgm && (
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 bg-stone-800 p-3 rounded-lg shadow-xl z-[100] flex flex-col items-center gap-2 w-10 h-32 border border-stone-700">
+                    <div className="h-24 flex items-center justify-center">
+                      <input 
+                        type="range" 
+                        min="0" 
+                        max="100" 
+                        value={currentVolume} 
+                        onChange={(e) => setUserVolume(Number(e.target.value))}
+                        className="h-20 w-1 appearance-none bg-stone-600 rounded-lg accent-amber-500 cursor-pointer"
+                        style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-stone-400 font-mono">{currentVolume}</span>
+                  </div>
+                )}
+              </div>
 
               <div className="relative">
                 <button
