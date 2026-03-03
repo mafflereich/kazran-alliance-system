@@ -1,10 +1,10 @@
 export const getTierColor = (tier: number) => {
   switch (tier) {
-    case 1: return 'bg-orange-100 text-orange-800 border-orange-200';
-    case 2: return 'bg-blue-100 text-blue-800 border-blue-200';
-    case 3: return 'bg-stone-200 text-stone-800 border-stone-300';
-    case 4: return 'bg-green-100 text-green-800 border-green-200';
-    default: return 'bg-stone-100 text-stone-800 border-stone-200';
+    case 1: return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-200 dark:border-orange-800';
+    case 2: return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800';
+    case 3: return 'bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-200 border-stone-300 dark:border-stone-600';
+    case 4: return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-200 dark:border-green-800';
+    default: return 'bg-stone-100 dark:bg-stone-800 text-stone-800 dark:text-stone-200 border-stone-200 dark:border-stone-700';
   }
 };
 
@@ -40,21 +40,21 @@ export const getTierHoverClass = (tier: number) => {
 
 export const getTierBorderHoverClass = (tier: number) => {
   switch (tier) {
-    case 1: return 'hover:border-orange-400 hover:bg-orange-50/30';
-    case 2: return 'hover:border-blue-400 hover:bg-blue-50/30';
-    case 3: return 'hover:border-stone-400 hover:bg-stone-50/30';
-    case 4: return 'hover:border-green-400 hover:bg-green-50/30';
-    default: return 'hover:border-amber-300 hover:bg-stone-100';
+    case 1: return 'hover:border-orange-400 hover:bg-orange-50/30 dark:hover:bg-orange-900/20';
+    case 2: return 'hover:border-blue-400 hover:bg-blue-50/30 dark:hover:bg-blue-900/20';
+    case 3: return 'hover:border-stone-400 hover:bg-stone-50/30 dark:hover:bg-stone-700/30';
+    case 4: return 'hover:border-green-400 hover:bg-green-50/30 dark:hover:bg-green-900/20';
+    default: return 'hover:border-amber-300 hover:bg-stone-100 dark:hover:bg-stone-800';
   }
 };
 
 export const getTierTextHoverClass = (tier: number) => {
   switch (tier) {
-    case 1: return 'group-hover:text-orange-600';
-    case 2: return 'group-hover:text-blue-600';
-    case 3: return 'group-hover:text-stone-600';
-    case 4: return 'group-hover:text-green-600';
-    default: return 'group-hover:text-amber-700';
+    case 1: return 'group-hover:text-orange-600 dark:group-hover:text-orange-400';
+    case 2: return 'group-hover:text-blue-600 dark:group-hover:text-blue-400';
+    case 3: return 'group-hover:text-stone-600 dark:group-hover:text-stone-400';
+    case 4: return 'group-hover:text-green-600 dark:group-hover:text-green-400';
+    default: return 'group-hover:text-amber-700 dark:group-hover:text-amber-400';
   }
 };
 
