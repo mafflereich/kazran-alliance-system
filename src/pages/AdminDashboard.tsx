@@ -169,7 +169,7 @@ function ToolsManager() {
 
         };
 
-        const membersToArchive = memberList.filter(member => !activeMemberList.find((memberName) => memberName == member.name));
+        const membersToArchive = memberList.filter((member) => !activeMemberList.find((memberName) => memberName == member.name) && member.status != 'archived');
 
         if (membersToArchive.length > 0) {
           const confirmArchive = window.confirm(t('tools.confirm_archive_not_in_list', { count: membersToArchive.length }));
@@ -252,7 +252,7 @@ function ToolsManager() {
       }
     });
   };
-  
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold mb-6 text-stone-800 flex items-center gap-2">
