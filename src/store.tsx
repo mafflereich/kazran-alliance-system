@@ -214,6 +214,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Subscribe to global data (costumes, users) and guilds
   useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.warn("Auth session error:", error.message);
+          // If there's an auth error (like invalid refresh token), clear local storage to stop retry loops
+          if (error.message.toLowerCase().includes('refresh token') || error.message.toLowerCase().includes('refresh_token')) {
+            await supabase.auth.signOut();
+            setCurrentUser(null);
+            setCurrentView(null);
+          }
+        } else if (!session && currentUser) {
+          // No session but we have a local user, clear it to stay in sync
+          setCurrentUser(null);
+          setCurrentView(null);
+        }
+      } catch (err) {
+        console.error("Error initializing auth:", err);
+      }
+    };
+
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setCurrentView(null);
+      }
+    });
+
     const fetchInitialData = async () => {
       try {
         const [guildsRes, charactersRes, costumesRes, settingsRes] = await Promise.all([
@@ -252,8 +282,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     fetchInitialData();
 
-    // Supabase real-time subscriptions can be added here if needed
-
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Keep track of member subscription
