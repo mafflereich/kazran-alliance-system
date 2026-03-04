@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../store';
-import { Shield, LogOut, Settings, Users, LogIn, Lock, AlertCircle, X, Globe, Volume2, VolumeX } from 'lucide-react';
+import { Shield, LogOut, Settings, Users, LogIn, User, Lock, AlertCircle, X, Globe, Volume2, VolumeX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { supabase } from '../supabase';

@@ -378,7 +378,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { data: [], total: 0 };
     }
 
-    return { data: data.map(toCamel), total: count || 0 };
+    return { data: (data as any[]).map(toCamel) as Member[], total: count || 0 };
   };
 
   // Cleanup subscription on unmount
