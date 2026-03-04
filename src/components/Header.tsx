@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../store';
-import { Shield, LogIn, LogOut, Settings, Users, User, Lock, AlertCircle, X, Globe, Volume2, VolumeX, Sun, Moon, Monitor, Layout } from 'lucide-react';
+import { Shield, LogIn, LogOut, Settings, Users, User, Lock, AlertCircle, X, Globe, Volume2, VolumeX, Sun, Moon, Monitor, Layout, Mail } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../ThemeContext';
 
@@ -222,6 +222,17 @@ export default function Header() {
                   >
                     <Settings className="w-4 h-4" />
                     <span className="hidden sm:inline">{t('header.admin_settings')}</span>
+                  </button>
+                )}
+
+                {userRole === 'creator' && (
+                  <button
+                    onClick={() => setCurrentView({ type: 'application_mailbox' })}
+                    disabled={currentView?.type === 'application_mailbox'}
+                    className={`flex items-center gap-2 transition-colors ${currentView?.type === 'application_mailbox' ? 'text-amber-500 cursor-default' : 'hover:text-amber-400'}`}
+                  >
+                    <Mail className="w-4 h-4" />
+                    <span className="hidden sm:inline">{t('header.application_mailbox', '申請信箱')}</span>
                   </button>
                 )}
 

@@ -9,6 +9,7 @@ import { AppProvider, useAppContext } from './store';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import GuildDashboard from './pages/GuildDashboard';
+import ApplicationMailbox from './pages/ApplicationMailbox';
 import ToastContainer from './components/Toast';
 
 const AppContent = () => {
@@ -27,6 +28,15 @@ const AppContent = () => {
       return <Login />;
     }
     return <AdminDashboard />;
+  }
+
+  if (currentView.type === 'application_mailbox') {
+    const userRole = currentUser ? db.users[currentUser]?.role : null;
+    if (userRole !== 'creator') {
+      setCurrentView(null);
+      return <Login />;
+    }
+    return <ApplicationMailbox />;
   }
 
   return <GuildDashboard guildId={currentView.guildId} />;

@@ -206,7 +206,26 @@
     "reports_spam": "Spam Report",
     "reports_other": "Other Report"
   },
+  "mailbox": {
+    "title": "Application Mailbox",
+    "submit_application": "Submit Application",
+    "date": "Date",
+    "subject": "Subject",
+    "content": "Content",
+    "reply": "Reply",
+    "subject_leave": "Leave",
+    "subject_tier_change": "Tier Change",
+    "subject_reserved_seat": "Reserved Seat",
+    "subject_other": "Other",
+    "status_pending": "Pending",
+    "status_acknowledged": "Acknowledged",
+    "status_rejected": "Rejected",
+    "status_discuss": "Discuss",
+    "submit_hint": "Please include your guild name and game nickname in the content for processing.",
+    "content_placeholder": "Please enter application content..."
+  },
   "header": {
+    "application_mailbox": "Application Mailbox",
     "admin_login": "Admin Login",
     "account": "Account",
     "enter_account": "Enter account",

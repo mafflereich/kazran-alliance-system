@@ -206,7 +206,26 @@
     "reports_spam": "垃圾訊息報告",
     "reports_other": "其他報告"
   },
+  "mailbox": {
+    "title": "申請信箱",
+    "submit_application": "提出申請",
+    "date": "申請日期",
+    "subject": "主題",
+    "content": "內容",
+    "reply": "回覆",
+    "subject_leave": "請假",
+    "subject_tier_change": "升降梯隊",
+    "subject_reserved_seat": "保留席",
+    "subject_other": "其他",
+    "status_pending": "待處理",
+    "status_acknowledged": "知道",
+    "status_rejected": "拒絕",
+    "status_discuss": "詳談",
+    "submit_hint": "請在內容中註明您的公會名稱和遊戲暱稱，以便管理員處理。",
+    "content_placeholder": "請輸入申請內容..."
+  },
   "header": {
+    "application_mailbox": "申請信箱",
     "admin_login": "管理員登入",
     "account": "帳號",
     "enter_account": "請輸入帳號",
