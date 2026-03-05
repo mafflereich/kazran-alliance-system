@@ -25,7 +25,7 @@ type ApplicationSubject = 'leave' | 'tier_change' | 'reserved_seat' | 'id_change
 type ApplicationStatus = 'pending' | 'acknowledged' | 'rejected' | 'discuss' | 'unclear' | 'who_are_you';
 
 export default function ApplicationMailbox() {
-  const { t } = useTranslation(['mailbox', 'common']);
+  const { t } = useTranslation(['mailbox', 'translation']);
   const { currentUser, db, fetchApplyMails, addApplyMail, updateApplyMail, deleteApplyMail, showToast } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -117,18 +117,18 @@ export default function ApplicationMailbox() {
       localStorage.setItem('last_application_submit_time', Date.now().toString());
       setIsModalOpen(false);
       setFormData({ subject: 'leave', content: '' });
-      showToast(t('common:submit_success', '提交成功'), 'success');
+      showToast(t('mailbox:submit_success', '提交成功'), 'success');
     } catch (err) {
-      showToast(t('common:submit_failed', '提交失敗'), 'error');
+      showToast(t('mailbox:submit_failed', '提交失敗'), 'error');
     }
   };
 
   const handleStatusUpdate = async (id: string, newStatus: ApplicationStatus) => {
     try {
       await updateApplyMail(id, { status: newStatus });
-      showToast(t('common:update_success', '更新成功'), 'success');
+      showToast(t('mailbox:update_success', '更新成功'), 'success');
     } catch (err) {
-      showToast(t('common:update_failed', '更新失敗'), 'error');
+      showToast(t('mailbox:update_failed', '更新失敗'), 'error');
     }
   };
 
@@ -142,11 +142,11 @@ export default function ApplicationMailbox() {
     if (!itemToDelete) return;
     try {
       await deleteApplyMail(itemToDelete);
-      showToast(t('common:delete_success', '刪除成功'), 'success');
+      showToast(t('mailbox:delete_success', '刪除成功'), 'success');
       setDeleteModalOpen(false);
       setItemToDelete(null);
     } catch (err) {
-      showToast(t('common:delete_failed', '刪除失敗'), 'error');
+      showToast(t('mailbox:delete_failed', '刪除失敗'), 'error');
     }
   };
 
@@ -228,7 +228,7 @@ export default function ApplicationMailbox() {
                     <button
                       onClick={(e) => handleDeleteClick(app.id, e)}
                       className="p-1.5 text-stone-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-                      title={t('common:delete', '刪除')}
+                      title={t('common.delete', '刪除')}
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -242,7 +242,7 @@ export default function ApplicationMailbox() {
         {/* Pagination */}
         <div className="mt-6 flex justify-between items-center">
           <div className="text-sm text-stone-500 dark:text-stone-400">
-            {t('common:page', '頁碼')} {currentPage} / {totalPages}
+            {t('common.page', '頁碼')} {currentPage} / {totalPages}
           </div>
           <div className="flex gap-2">
             <button
@@ -250,14 +250,14 @@ export default function ApplicationMailbox() {
               disabled={currentPage === 1}
               className="px-3 py-1 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded hover:bg-stone-50 dark:hover:bg-stone-700 disabled:opacity-50 transition-colors"
             >
-              {t('common:prev_page', '上一頁')}
+              {t('common.prev_page', '上一頁')}
             </button>
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
               className="px-3 py-1 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded hover:bg-stone-50 dark:hover:bg-stone-700 disabled:opacity-50 transition-colors"
             >
-              {t('common:next_page', '下一頁')}
+              {t('common.next_page', '下一頁')}
             </button>
           </div>
         </div>
@@ -327,14 +327,14 @@ export default function ApplicationMailbox() {
                   onClick={() => setIsModalOpen(false)}
                   className="px-4 py-2 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-lg transition-colors"
                 >
-                  {t('common:cancel', '取消')}
+                  {t('common.cancel', '取消')}
                 </button>
                 <button
                   type="submit"
                   className="px-6 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors flex items-center gap-2 font-medium shadow-sm"
                 >
                   <Send className="w-4 h-4" />
-                  {t('common:submit', '送出')}
+                  {t('common.submit', '送出')}
                 </button>
               </div>
             </form>
@@ -351,7 +351,7 @@ export default function ApplicationMailbox() {
                 <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
               </div>
               <h3 className="text-lg font-bold text-stone-800 dark:text-stone-200 mb-2">
-                {t('common:confirm_delete', '確認刪除')}
+                {t('common.confirm_delete', '確認刪除')}
               </h3>
               <p className="text-stone-600 dark:text-stone-400 mb-6">
                 {t('mailbox:delete_confirm_msg', '確定要刪除此申請嗎？此動作無法復原。')}
@@ -361,13 +361,13 @@ export default function ApplicationMailbox() {
                   onClick={() => setDeleteModalOpen(false)}
                   className="px-4 py-2 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-lg transition-colors"
                 >
-                  {t('common:cancel', '取消')}
+                  {t('common.cancel', '取消')}
                 </button>
                 <button
                   onClick={confirmDelete}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm"
                 >
-                  {t('common:delete', '刪除')}
+                  {t('common.delete', '刪除')}
                 </button>
               </div>
             </div>

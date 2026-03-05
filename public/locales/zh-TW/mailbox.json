@@ -1,4 +1,14 @@
 {
+  "title": "申請信箱",
+  "submit_application": "提出申請",
+  "date": "申請日期",
+  "subject": "主題",
+  "content": "內容",
+  "reply": "回覆",
+  "subject_leave": "請假",
+  "subject_tier_change": "升降梯隊",
+  "subject_reserved_seat": "保留席",
+  "subject_id_change": "ID更改/修正",
   "status_pending": "待處理",
   "status_acknowledged": "已知悉",
   "status_rejected": "拒絕",
@@ -7,6 +17,15 @@
   "status_unclear": "意義不明",
   "status_who_are_you": "你是誰？",
   "status_reapply": "不受理，請重新申請",
-  "filter_all": "全部",
-  "submit_cooldown": "請在 {{minutes}} 分鐘後再提出新的申請"
+  "submit_hint": "請在內容中註明您的公會名稱和遊戲暱稱，以便管理員處理。",
+  "submit_cooldown": "您剛剛提交了申請，請稍後再試。",
+  "content_placeholder": "請輸入申請內容...",
+  "submit_success": "提交成功",
+  "submit_failed": "提交失敗",
+  "update_success": "更新成功",
+  "update_failed": "更新失敗",
+  "delete_confirm_msg": "確定要刪除此申請嗎？此動作無法復原。",
+  "delete_success": "刪除成功",
+  "delete_failed": "刪除失敗",
+  "filter_all": "全部"
 }
