@@ -239,7 +239,7 @@ export default function AllianceRaidRecord() {
       setIsDownloadModalOpen(false);
     } catch (err) {
       console.error('Error generating image:', err);
-      alert('生成圖片失敗');
+      alert(t('alliance_raid.export_failed'));
     } finally {
       setIsGeneratingImage(false);
     }
@@ -282,7 +282,7 @@ export default function AllianceRaidRecord() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">
-                {t('header.alliance_raid_record', '聯盟成績記錄')}
+                {t('alliance_raid.title')}
               </h1>
             </div>
           </div>
@@ -293,7 +293,7 @@ export default function AllianceRaidRecord() {
               className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
             >
               <Download className="w-4 h-4" />
-              <span>下載記錄</span>
+              <span>{t('alliance_raid.download_record')}</span>
             </button>
 
             {canManage && (
@@ -306,7 +306,7 @@ export default function AllianceRaidRecord() {
                 className="flex items-center gap-2 px-4 py-2 bg-stone-800 dark:bg-stone-700 text-white rounded-lg hover:bg-stone-700 dark:hover:bg-stone-600 transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                <span>新增賽季</span>
+                <span>{t('alliance_raid.add_season')}</span>
               </button>
             )}
           </div>
@@ -326,7 +326,7 @@ export default function AllianceRaidRecord() {
             </div>
           ) : seasons.length === 0 ? (
             <div className="p-12 text-center text-stone-500 dark:text-stone-400">
-              目前沒有任何賽季記錄。
+              {t('alliance_raid.no_records')}
             </div>
           ) : (
             <div 
@@ -340,11 +340,11 @@ export default function AllianceRaidRecord() {
               <table className="w-full text-left border-collapse min-w-max">
                 <thead>
                   <tr>
-                    <th className="sticky left-0 z-20 bg-stone-100 dark:bg-stone-900/80 p-2 border-b border-r border-stone-200 dark:border-stone-700 font-bold text-stone-700 dark:text-stone-300 w-24 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] text-xs">
+                    <th className="sticky left-0 z-20 bg-stone-100 dark:bg-stone-800 p-2 border-b border-r border-stone-200 dark:border-stone-700 font-bold text-stone-700 dark:text-stone-300 w-24 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] text-xs">
                       {/* 移除 "公會名稱" */}
                     </th>
                     {seasons.map(season => (
-                      <th key={season.id} className="p-2 border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/50 w-[110px] min-w-[110px] max-w-[110px] align-top relative group">
+                      <th key={season.id} className="p-2 border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 w-[110px] min-w-[110px] max-w-[110px] align-top relative group">
                         <div className="flex flex-col gap-0.5">
                           <div className="font-bold text-stone-800 dark:text-stone-200 text-xs leading-tight">
                             S{season.season_number}
@@ -375,12 +375,18 @@ export default function AllianceRaidRecord() {
                 <tbody>
                   {sortedGuilds.map((guild, index) => {
                     const tierClasses = getTierColor(guild.tier || 0);
-                    // Extract only background classes for the row
+                    // Extract background and text classes
                     const bgClasses = tierClasses.split(' ').filter(c => c.startsWith('bg-') || c.startsWith('dark:bg-')).join(' ');
+                    const textClasses = tierClasses.split(' ').filter(c => c.startsWith('text-') || c.startsWith('dark:text-')).join(' ');
+                    
+                    // For the sticky guild column, use a solid background
+                    // In light mode, we use the tier's background (opaque)
+                    // In dark mode, we use a consistent stone-800 for better readability
+                    const guildColBg = `${bgClasses.replace(/\/30/g, '')} dark:bg-stone-800`;
                     
                     return (
                       <tr key={guild.id} className={`border-b border-stone-100 dark:border-stone-700/50 hover:brightness-95 dark:hover:brightness-110 transition-all ${bgClasses}`}>
-                        <td className={`sticky left-0 z-10 py-1 px-2 border-r border-stone-200 dark:border-stone-700 font-medium text-stone-800 dark:text-stone-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] text-xs w-24 truncate ${bgClasses}`}>
+                        <td className={`sticky left-0 z-10 py-1 px-2 border-r border-stone-200 dark:border-stone-700 font-medium shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] text-xs w-24 truncate ${guildColBg} ${textClasses}`}>
                           {guild.name}
                         </td>
                         {seasons.map(season => {
@@ -434,9 +440,11 @@ export default function AllianceRaidRecord() {
                                     }`}>
                                       {record.rank}
                                     </div>
-                                    <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
-                                      ({record.score.toLocaleString()})
-                                    </div>
+                                    {record.score > 0 && (
+                                      <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
+                                        ({record.score.toLocaleString()})
+                                      </div>
+                                    )}
                                   </>
                                 ) : (
                                   <div className="text-sm text-stone-400 dark:text-stone-600 italic">
@@ -472,7 +480,7 @@ export default function AllianceRaidRecord() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-stone-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
             <div className="flex justify-between items-center p-4 border-b border-stone-200 dark:border-stone-700">
-              <h3 className="text-lg font-bold text-stone-800 dark:text-stone-100">{editingSeasonId ? '編輯賽季' : '新增賽季'}</h3>
+              <h3 className="text-lg font-bold text-stone-800 dark:text-stone-100">{editingSeasonId ? t('alliance_raid.edit_season') : t('alliance_raid.add_season')}</h3>
               <button
                 onClick={() => setIsSeasonModalOpen(false)}
                 className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
@@ -484,7 +492,7 @@ export default function AllianceRaidRecord() {
             <form onSubmit={handleSaveSeason} className="p-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-                  賽季編號
+                  {t('alliance_raid.season_number')}
                 </label>
                 <input
                   type="number"
@@ -498,7 +506,7 @@ export default function AllianceRaidRecord() {
               
               <div>
                 <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-                  時間
+                  {t('alliance_raid.time')}
                 </label>
                 <input
                   type="text"
@@ -506,20 +514,18 @@ export default function AllianceRaidRecord() {
                   value={newSeason.period_text}
                   onChange={e => setNewSeason(prev => ({ ...prev, period_text: e.target.value }))}
                   className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100"
-                  placeholder="2026年3月"
                 />
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
-                  說明
+                  {t('alliance_raid.description')}
                 </label>
                 <input
                   type="text"
                   value={newSeason.description}
                   onChange={e => setNewSeason(prev => ({ ...prev, description: e.target.value }))}
                   className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100"
-                  placeholder="15T,超殺局"
                 />
               </div>
               
@@ -529,13 +535,13 @@ export default function AllianceRaidRecord() {
                   onClick={() => setIsSeasonModalOpen(false)}
                   className="px-4 py-2 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-lg transition-colors"
                 >
-                  取消
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-2 bg-stone-800 dark:bg-stone-600 text-white rounded-lg hover:bg-stone-700 dark:hover:bg-stone-500 transition-colors"
                 >
-                  {editingSeasonId ? '儲存' : '新增'}
+                  {editingSeasonId ? t('common.save') : t('common.add')}
                 </button>
               </div>
             </form>
@@ -548,7 +554,7 @@ export default function AllianceRaidRecord() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-stone-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
             <div className="flex justify-between items-center p-4 border-b border-stone-200 dark:border-stone-700">
-              <h3 className="text-lg font-bold text-stone-800 dark:text-stone-100">下載成績圖片</h3>
+              <h3 className="text-lg font-bold text-stone-800 dark:text-stone-100">{t('alliance_raid.download_title')}</h3>
               <button
                 onClick={() => setIsDownloadModalOpen(false)}
                 className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
@@ -569,14 +575,14 @@ export default function AllianceRaidRecord() {
                         : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
                     }`}
                   >
-                    {type === 'single' ? '單次賽季' : type === 'consecutive' ? '連續賽季' : '全部賽季'}
+                    {type === 'single' ? t('alliance_raid.single_season') : type === 'consecutive' ? t('alliance_raid.consecutive_season') : t('alliance_raid.all_seasons')}
                   </button>
                 ))}
               </div>
 
               {downloadConfig.type === 'single' && (
                 <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1 uppercase">選擇賽季</label>
+                  <label className="block text-xs font-medium text-stone-500 mb-1 uppercase">{t('alliance_raid.select_season')}</label>
                   <select
                     value={downloadConfig.singleSeasonId}
                     onChange={e => setDownloadConfig(prev => ({ ...prev, singleSeasonId: e.target.value }))}
@@ -592,7 +598,7 @@ export default function AllianceRaidRecord() {
               {downloadConfig.type === 'consecutive' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-stone-500 mb-1 uppercase">開始賽季</label>
+                    <label className="block text-xs font-medium text-stone-500 mb-1 uppercase">{t('alliance_raid.start_season')}</label>
                     <select
                       value={downloadConfig.startSeasonId}
                       onChange={e => setDownloadConfig(prev => ({ ...prev, startSeasonId: e.target.value }))}
@@ -604,7 +610,7 @@ export default function AllianceRaidRecord() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-stone-500 mb-1 uppercase">結束賽季</label>
+                    <label className="block text-xs font-medium text-stone-500 mb-1 uppercase">{t('alliance_raid.end_season')}</label>
                     <select
                       value={downloadConfig.endSeasonId}
                       onChange={e => setDownloadConfig(prev => ({ ...prev, endSeasonId: e.target.value }))}
@@ -627,12 +633,12 @@ export default function AllianceRaidRecord() {
                   {isGeneratingImage ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>生成中...</span>
+                      <span>{t('alliance_raid.generating')}</span>
                     </>
                   ) : (
                     <>
                       <Download className="w-5 h-5" />
-                      <span>開始下載圖片</span>
+                      <span>{t('alliance_raid.start_download')}</span>
                     </>
                   )}
                 </button>
@@ -653,17 +659,17 @@ export default function AllianceRaidRecord() {
             <div className="flex items-center gap-4">
               <Trophy className="w-12 h-12 text-amber-500" />
               <div>
-                <h1 className="text-4xl font-black tracking-tighter uppercase italic">Alliance Raid History</h1>
+                <h1 className="text-4xl font-black tracking-tighter uppercase italic">{t('alliance_raid.history_title')}</h1>
                 <p className="text-stone-500 font-mono text-sm tracking-widest uppercase">
                   {selectedSeasonsForExport.length === 1 
-                    ? `Season ${selectedSeasonsForExport[0].season_number}` 
-                    : `Seasons ${selectedSeasonsForExport[0]?.season_number} - ${selectedSeasonsForExport[selectedSeasonsForExport.length - 1]?.season_number}`}
+                    ? `${t('alliance_raid.season_label')} ${selectedSeasonsForExport[0].season_number}` 
+                    : `${t('alliance_raid.seasons_label')} ${selectedSeasonsForExport[0]?.season_number} - ${selectedSeasonsForExport[selectedSeasonsForExport.length - 1]?.season_number}`}
                 </p>
               </div>
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-stone-400">KAZRAN</div>
-              <div className="text-xs text-stone-600 uppercase tracking-widest">Generated at {new Date().toLocaleDateString()}</div>
+              <div className="text-xs text-stone-600 uppercase tracking-widest">{t('alliance_raid.generated_at')} {new Date().toLocaleDateString()}</div>
             </div>
           </div>
 
@@ -696,7 +702,7 @@ export default function AllianceRaidRecord() {
                                         ? 'bg-gradient-to-r from-amber-400 to-orange-600 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(245,158,11,0.6)] scale-110 transform origin-right'
                                         : 'text-amber-500'
                                     }`}>{record?.rank || '-'}</div>
-                                    {record && <div className="text-[10px] text-stone-400 font-mono">({record.score.toLocaleString()})</div>}
+                                    {record && record.score > 0 && <div className="text-[10px] text-stone-400 font-mono">({record.score.toLocaleString()})</div>}
                                   </div>
                                 </div>
                               );
@@ -738,7 +744,7 @@ export default function AllianceRaidRecord() {
                                         ? 'bg-gradient-to-r from-amber-400 to-orange-600 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(245,158,11,0.6)] scale-110 transform origin-right'
                                         : 'text-amber-500'
                                     }`}>{record?.rank || '-'}</div>
-                                    {record && <div className="text-[10px] text-stone-400 font-mono">({record.score.toLocaleString()})</div>}
+                                    {record && record.score > 0 && <div className="text-[10px] text-stone-400 font-mono">({record.score.toLocaleString()})</div>}
                                   </div>
                                 </div>
                               );

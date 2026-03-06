@@ -286,7 +286,8 @@
     "search_hint": "Enter name to search for members",
     "include_archived": "Include Archived Members",
     "member_archived": "Member is archived",
-    "archived": "Archived"
+    "archived": "Archived",
+    "click_to_edit": "Click name to edit"
   },
   "guilds": {
     "add_guild": "Add Guild",
@@ -305,6 +306,30 @@
     "delete_success": "Guild deleted successfully",
     "delete_failed": "Failed to delete guild",
     "auth_account_notice": "After creating a new guild using the system, you need to create an account in Supabase Auth"
+  },
+  "alliance_raid": {
+    "title": "Alliance Raid Record",
+    "download_record": "Download Record",
+    "add_season": "Add Season",
+    "edit_season": "Edit Season",
+    "season_number": "Season Number",
+    "time": "Time",
+    "description": "Description",
+    "download_title": "Download Record Image",
+    "single_season": "Single Season",
+    "consecutive_season": "Consecutive Season",
+    "all_seasons": "All Seasons",
+    "select_season": "Select Season",
+    "start_season": "Start Season",
+    "end_season": "End Season",
+    "start_download": "Start Download Image",
+    "generating": "Generating...",
+    "no_records": "No season records available.",
+    "export_failed": "Failed to generate image",
+    "history_title": "Alliance Raid History",
+    "season_label": "Season",
+    "seasons_label": "Seasons",
+    "generated_at": "Generated at"
   },
   "errors": {
     "unknown": "Unknown error occurred",

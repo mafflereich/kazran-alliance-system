@@ -339,11 +339,16 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
                             className="p-3 font-semibold sticky top-0 left-0 bg-stone-50 dark:bg-stone-700 z-30 border-r border-b-2 border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c] cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-600 transition-colors"
                             onClick={() => handleSort('member')}
                           >
-                            <div className="flex items-center gap-2">
-                              {t('common.member')}
-                              {sortConfig.key === 'member' && (
-                                sortConfig.order === 'asc' ? <ArrowDownNarrowWide className="w-4 h-4" /> : <ArrowDownWideNarrow className="w-4 h-4" />
-                              )}
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-2">
+                                {t('common.member')}
+                                {sortConfig.key === 'member' && (
+                                  sortConfig.order === 'asc' ? <ArrowDownNarrowWide className="w-4 h-4" /> : <ArrowDownWideNarrow className="w-4 h-4" />
+                                )}
+                              </div>
+                              <div className="text-[10px] font-normal text-amber-600 dark:text-amber-400 mt-0.5">
+                                {t('dashboard.click_to_edit')}
+                              </div>
                             </div>
                           </th>
                           {costumes.map(c => (
@@ -376,13 +381,15 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
                               </div>
                             </th>
                           ))}
-                          <th className="p-3 font-semibold text-center sticky top-0 right-0 bg-stone-50 dark:bg-stone-700 z-30 border-l border-b-2 border-stone-200 dark:border-stone-600 shadow-[-1px_0_0_0_#e7e5e4] dark:shadow-[-1px_0_0_0_#44403c]">{t('common.edit')}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {members.map(([id, member]: [string, any]) => (
                           <tr key={id} className="border-b border-stone-100 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-700 transition-colors group">
-                            <td className="p-3 font-medium text-stone-800 dark:text-stone-200 sticky left-0 bg-white dark:bg-stone-800 group-hover:bg-stone-50 dark:group-hover:bg-stone-700 border-r border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c] transition-colors">
+                            <td 
+                              className="p-3 font-medium text-stone-800 dark:text-stone-200 sticky left-0 bg-white dark:bg-stone-800 group-hover:bg-stone-50 dark:group-hover:bg-stone-700 border-r border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c] transition-colors cursor-pointer"
+                              onClick={() => handleEditClick(id, member.name)}
+                            >
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-2">
                                   <span title={member.name}>{getTruncatedName(member.name, member.role)}</span>
@@ -435,20 +442,11 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
                                 </td>
                               );
                             })}
-                            <td className="p-3 text-center sticky right-0 bg-white dark:bg-stone-800 group-hover:bg-stone-50 dark:group-hover:bg-stone-700 border-l border-stone-200 dark:border-stone-600 shadow-[-1px_0_0_0_#e7e5e4] dark:shadow-[-1px_0_0_0_#44403c] transition-colors">
-                              <button
-                                onClick={() => handleEditClick(id, member.name)}
-                                className="flex items-center justify-center p-2 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900/50 rounded-lg transition-colors mx-auto"
-                                title={t('common.edit')}
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                            </td>
                           </tr>
                         ))}
                         {members.length === 0 && (
                           <tr>
-                            <td colSpan={costumes.length + 2} className="p-8 text-center text-stone-500 dark:text-stone-400">
+                            <td colSpan={costumes.length + 1} className="p-8 text-center text-stone-500 dark:text-stone-400">
                               {t('dashboard.no_members')}
                             </td>
                           </tr>
