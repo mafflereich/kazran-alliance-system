@@ -391,12 +391,12 @@ export default function AllianceRaidRecord() {
                           <td key={season.id} className="py-1 px-2 relative group border-r border-stone-200 dark:border-stone-700/50 w-[110px] min-w-[110px] max-w-[110px] align-middle">
                             {isEditing ? (
                               <div className="flex flex-col gap-1">
-                                <div className="flex gap-1">
+                                <div className="flex gap-1 w-full">
                                   <input
                                     type="text"
                                     value={editRecordData.rank}
                                     onChange={e => setEditRecordData(prev => ({ ...prev, rank: e.target.value }))}
-                                    className="w-12 px-1 py-0.5 text-xs border border-stone-300 dark:border-stone-600 rounded bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100"
+                                    className="w-10 min-w-0 px-1 py-0.5 text-xs border border-stone-300 dark:border-stone-600 rounded bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100"
                                     placeholder="Rank"
                                   />
                                   <input
@@ -404,7 +404,7 @@ export default function AllianceRaidRecord() {
                                     max="1000000"
                                     value={editRecordData.score}
                                     onChange={e => setEditRecordData(prev => ({ ...prev, score: e.target.value ? Number(e.target.value) : '' }))}
-                                    className="flex-1 px-1 py-0.5 text-xs border border-stone-300 dark:border-stone-600 rounded bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100"
+                                    className="flex-1 min-w-0 px-1 py-0.5 text-xs border border-stone-300 dark:border-stone-600 rounded bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100"
                                     placeholder="Score"
                                   />
                                 </div>
@@ -427,7 +427,11 @@ export default function AllianceRaidRecord() {
                               <div className="flex items-center gap-1.5 min-h-[20px] relative pr-6">
                                 {record ? (
                                   <>
-                                    <div className="text-sm font-bold text-amber-600 dark:text-amber-400 leading-tight">
+                                    <div className={`text-sm font-bold leading-tight ${
+                                      !record.rank.includes('%')
+                                        ? 'bg-gradient-to-r from-amber-400 to-orange-600 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(245,158,11,0.5)] scale-110 transform origin-left'
+                                        : 'text-amber-600 dark:text-amber-400'
+                                    }`}>
                                       {record.rank}
                                     </div>
                                     <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
@@ -687,7 +691,11 @@ export default function AllianceRaidRecord() {
                                 <div key={season.id} className="text-right w-[100px] min-w-[100px] max-w-[100px]">
                                   <div className="text-[10px] text-stone-500 uppercase font-bold">S{season.season_number}</div>
                                   <div className="flex items-center justify-end gap-1.5 mt-0.5">
-                                    <div className="text-amber-500 font-black text-lg leading-none">{record?.rank || '-'}</div>
+                                    <div className={`font-black text-lg leading-none ${
+                                      record?.rank && !record.rank.includes('%')
+                                        ? 'bg-gradient-to-r from-amber-400 to-orange-600 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(245,158,11,0.6)] scale-110 transform origin-right'
+                                        : 'text-amber-500'
+                                    }`}>{record?.rank || '-'}</div>
                                     {record && <div className="text-[10px] text-stone-400 font-mono">({record.score.toLocaleString()})</div>}
                                   </div>
                                 </div>
@@ -725,7 +733,11 @@ export default function AllianceRaidRecord() {
                                 <div key={season.id} className="text-right w-[100px] min-w-[100px] max-w-[100px]">
                                   <div className="text-[10px] text-stone-500 uppercase font-bold">S{season.season_number}</div>
                                   <div className="flex items-center justify-end gap-1.5 mt-0.5">
-                                    <div className="text-amber-500 font-black text-lg leading-none">{record?.rank || '-'}</div>
+                                    <div className={`font-black text-lg leading-none ${
+                                      record?.rank && !record.rank.includes('%')
+                                        ? 'bg-gradient-to-r from-amber-400 to-orange-600 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(245,158,11,0.6)] scale-110 transform origin-right'
+                                        : 'text-amber-500'
+                                    }`}>{record?.rank || '-'}</div>
                                     {record && <div className="text-[10px] text-stone-400 font-mono">({record.score.toLocaleString()})</div>}
                                   </div>
                                 </div>
