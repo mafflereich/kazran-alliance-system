@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../supabase';
+import { useAppContext } from '../../store';
 import { Gamepad2, Timer, AlertTriangle, RotateCcw, Play, Medal, ArrowLeft, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { logEvent } from '../../analytics';
@@ -82,6 +83,8 @@ const getRefiningPrediction = (isPerfect: boolean) => {
 
 export default function SpeedRefining() {
   const { t } = useTranslation('arcade');
+  const { showToast } = useAppContext();
+  
   // State
   const [playerName, setPlayerName] = useState('');
   const [gameState, setGameState] = useState<'start' | 'playing' | 'end'>('start');
@@ -192,9 +195,12 @@ export default function SpeedRefining() {
     setPrediction(pred);
 
     // Save to DB
+    const { data: { user } } = await supabase.auth.getUser();
+    
     const insertData = { 
       player_name: playerName, 
-      total_time: parseFloat((finalTime).toFixed(3)) 
+      total_time: parseFloat((finalTime).toFixed(3)),
+      user_id: user?.id
     };
     console.log('Attempting to save score:', insertData);
 
@@ -205,7 +211,7 @@ export default function SpeedRefining() {
       
     if (error) {
       console.error('Error saving score:', error);
-      alert(t('speedRefining.save_failed', { error: error.message }));
+      showToast(t('speedRefining.save_failed', { error: error.message }), 'error');
     } else {
       console.log('Score saved successfully:', data);
     }
@@ -410,7 +416,7 @@ export default function SpeedRefining() {
                 </div>
               ))
             ) : (
-              <div className="text-center text-stone-500 py-4 italic">No records yet</div>
+              <div className="text-center text-stone-500 py-4 italic">{t('speedRefining.no_records', 'No records yet')}</div>
             )}
           </div>
         </div>

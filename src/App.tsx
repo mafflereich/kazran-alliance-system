@@ -6,12 +6,12 @@
 import React from 'react';
 import { ThemeProvider } from './ThemeContext';
 import { AppProvider, useAppContext } from './store';
-import Login from './pages/Login';
-import AdminDashboard from './pages/AdminDashboard';
-import GuildDashboard from './pages/GuildDashboard';
-import ApplicationMailbox from './pages/ApplicationMailbox';
-import Arcade from './pages/Arcade';
-import AllianceRaidRecord from './pages/AllianceRaidRecord';
+const Login = React.lazy(() => import('./pages/Login'));
+const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
+const GuildDashboard = React.lazy(() => import('./pages/GuildDashboard'));
+const ApplicationMailbox = React.lazy(() => import('./pages/ApplicationMailbox'));
+const Arcade = React.lazy(() => import('./pages/Arcade'));
+const AllianceRaidRecord = React.lazy(() => import('./pages/AllianceRaidRecord'));
 import ToastContainer from './components/Toast';
 import { initGA, logPageView } from './analytics';
 
@@ -126,6 +126,7 @@ const AppContentWrapper = () => {
       // Only download if we are unmuted and haven't loaded yet
       if (isMuted || audioSrc || !BGM_URL) return;
       
+      let currentUrl = "";
       try {
         const cache = await caches.open(CACHE_NAME);
         const cachedResponse = await cache.match(BGM_URL);
@@ -133,7 +134,8 @@ const AppContentWrapper = () => {
         if (cachedResponse) {
           console.log("Loading BGM from cache...");
           const blob = await cachedResponse.blob();
-          setAudioSrc(URL.createObjectURL(blob));
+          currentUrl = URL.createObjectURL(blob);
+          setAudioSrc(currentUrl);
         } else {
           console.log("Downloading BGM for the first time...");
           const response = await fetch(BGM_URL);
@@ -141,7 +143,8 @@ const AppContentWrapper = () => {
             const responseToCache = response.clone();
             await cache.put(BGM_URL, responseToCache);
             const blob = await response.blob();
-            setAudioSrc(URL.createObjectURL(blob));
+            currentUrl = URL.createObjectURL(blob);
+            setAudioSrc(currentUrl);
           }
         }
       } catch (error) {
@@ -149,9 +152,18 @@ const AppContentWrapper = () => {
         // Fallback to direct URL if cache fails
         setAudioSrc(BGM_URL);
       }
+
+      return () => {
+        if (currentUrl && currentUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(currentUrl);
+        }
+      };
     };
 
-    loadAudio();
+    const cleanup = loadAudio();
+    return () => {
+      cleanup.then(fn => fn && fn());
+    };
   }, [isMuted, audioSrc, BGM_URL]);
 
   React.useEffect(() => {

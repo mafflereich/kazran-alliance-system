@@ -123,7 +123,7 @@ export default function AllianceRaidRecord() {
       setEditingSeasonId(null);
       setNewSeason({ season_number: (seasons[0]?.season_number || 0) + 1, period_text: '', description: '' });
     } catch (err: any) {
-      alert(`Error saving season: ${err.message}`);
+      setError(`Error saving season: ${err.message}`);
     }
   };
 
@@ -157,7 +157,7 @@ export default function AllianceRaidRecord() {
       }
       setEditingCell(null);
     } catch (err: any) {
-      alert(`Error saving record: ${err.message}`);
+      setError(`Error saving record: ${err.message}`);
     }
   };
 
@@ -183,9 +183,9 @@ export default function AllianceRaidRecord() {
       });
   }, [db.guilds]);
 
-  const getRecord = (guild_id: string, season_id: string) => {
+  const getRecord = useMemo(() => (guild_id: string, season_id: string) => {
     return records.find(r => r.guild_id === guild_id && r.season_id === season_id);
-  };
+  }, [records]);
 
   // Drag to scroll logic
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -239,7 +239,7 @@ export default function AllianceRaidRecord() {
       setIsDownloadModalOpen(false);
     } catch (err) {
       console.error('Error generating image:', err);
-      alert(t('alliance_raid.export_failed'));
+      setError(t('alliance_raid.export_failed'));
     } finally {
       setIsGeneratingImage(false);
     }

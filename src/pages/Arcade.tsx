@@ -101,7 +101,7 @@ export default function Arcade() {
             <h2 className="text-xl font-bold text-stone-800 dark:text-stone-100 mb-2 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
               {t('refine_simulator', 'Refine Simulator')}
             </h2>
-            <p className="text-stone-600 dark:text-stone-400 text-sm line-clamp-2">
+            <p className="text-stone-600 dark:text-stone-400 text-sm">
               {t('refine_simulator_desc', 'Good Luck')}
             </p>
             <div className="mt-4 flex items-center text-xs font-medium text-amber-600 dark:text-amber-400">

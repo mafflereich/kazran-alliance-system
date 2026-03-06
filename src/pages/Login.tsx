@@ -78,14 +78,50 @@ export default function Login() {
     }
   };
 
-  const sortedGuilds = (Object.entries(db.guilds) as [string, any][]).sort((a, b) => {
-    const tierA = a[1].tier || 99;
-    const tierB = b[1].tier || 99;
-    if (tierA !== tierB) return tierA - tierB;
-    const orderA = a[1].orderNum || 99;
-    const orderB = b[1].orderNum || 99;
-    return orderA - orderB;
-  });
+  const sortedGuilds = React.useMemo(() => {
+    return (Object.entries(db.guilds) as [string, any][]).sort((a, b) => {
+      const tierA = a[1].tier || 99;
+      const tierB = b[1].tier || 99;
+      if (tierA !== tierB) return tierA - tierB;
+      const orderA = a[1].orderNum || 99;
+      const orderB = b[1].orderNum || 99;
+      return orderA - orderB;
+    });
+  }, [db.guilds]);
+
+  const newCostume = React.useMemo(() => {
+    return Object.values(db.costumes).find((costume) => costume.isNew);
+  }, [db.costumes]);
+
+  const guildStats = React.useMemo(() => {
+    const stats: Record<string, { rate: number; is100: boolean; count: number }> = {};
+    
+    if (!newCostume) return stats;
+
+    Object.entries(db.guilds).forEach(([id, guild]) => {
+      const membersInGuild = Object.values(db.members).filter((member) => member.guildId === id && member.status === "active");
+      
+      if (membersInGuild.length === 0) {
+        stats[id] = { rate: 0, is100: false, count: 0 };
+        return;
+      }
+
+      const ownedCount = membersInGuild.filter((member) =>
+        member.records && member.records[newCostume.id] && (+member.records[newCostume.id].level) >= 0
+      ).length;
+
+      const rate = Math.round((ownedCount / membersInGuild.length) * 100);
+      stats[id] = {
+        rate,
+        is100: rate === 100,
+        count: membersInGuild.length
+      };
+    });
+
+    return stats;
+  }, [db.guilds, db.members, newCostume]);
+
+  const indexPercentType = db.settings && Object.values(db.settings)[0]?.indexPercentType;
 
   return (
     <div className="flex flex-col min-h-screen bg-stone-200 dark:bg-stone-950">
@@ -130,21 +166,12 @@ export default function Login() {
                         <h3 className={`font-bold text-center py-2 rounded-lg border ${getTierColor(tier)}`}>{t('guilds.tier')} {tier}</h3>
                         {tierGuilds.map(([id, guild]: [string, any]) => {
                           const isDisabled = currentUser && !canSeeAllGuilds && id !== userGuildId;
-                          const newCostume = Object.values(db.costumes).find((costume) => costume.isNew);
-                          const membersInGuild = Object.values(db.members).filter((member) => member.guildId == guild.id && member.status == "active");
-
-                          const newCostumeRate = (newCostume && membersInGuild.length > 0) 
-                            ? Math.round((membersInGuild.filter((member) =>
-                                member.records && Object.entries(member.records).find(([id, record]) => id == newCostume.id && (+record.level) >= 0)
-                              ).length / membersInGuild.length) * 100)
-                            : 0;
-                          const is100 = newCostumeRate === 100;
-                          const newCostumeRateText = membersInGuild.length ? `(${newCostumeRate.toFixed(0)}%)` : ``;
+                          const stats = guildStats[id] || { rate: 0, is100: false, count: 0 };
+                          const { rate: newCostumeRate, is100 } = stats;
 
                           // Determine classes based on state and tier
                           let buttonClasses = "w-full flex items-center justify-between p-4 bg-white dark:bg-stone-800 border rounded-xl transition-all group overflow-hidden relative disabled:opacity-50";
                           
-                          const indexPercentType = Object.values(db.settings)[0]?.indexPercentType;
                           const showPercent = currentUser && indexPercentType === 'new_costumes_owned';
                           
                           let textClasses = (showPercent && is100) ? getTierTextColor(tier) : `font-medium transition-colors ${getTierTextHoverClass(tier)}`;
