@@ -231,7 +231,7 @@
     "costume_list": "Costume List",
     "admin_settings": "Admin Settings",
     "arcade": "Arcade Games",
-    "toolbox": "Toolbox",
+    "toolbox_title": "Toolbox",
     "alliance_raid_record": "Alliance Raid Record",
     "logout": "Logout ({{user}})",
     "login_btn": "Login",

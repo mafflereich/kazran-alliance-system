@@ -275,7 +275,7 @@ export default function Header() {
                 className={`flex items-center gap-2 transition-colors ${currentView?.type === 'toolbox' ? 'text-amber-500 cursor-default' : 'hover:text-amber-400'}`}
               >
                 <Wrench className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('header.toolbox')}</span>
+                <span className="hidden sm:inline">{t('header.toolbox_title')}</span>
               </button>
             )}
 

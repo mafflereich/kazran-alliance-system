@@ -231,7 +231,7 @@
     "costume_list": "服裝列表",
     "admin_settings": "後台設定",
     "arcade": "街機遊戲",
-    "toolbox": "小工具",
+    "toolbox_title": "小工具",
     "alliance_raid_record": "聯盟成績記錄",
     "logout": "登出({{user}})",
     "login_btn": "登入",

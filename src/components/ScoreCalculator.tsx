@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Calculator, AlertCircle } from 'lucide-react';
+import { logEvent } from '../analytics';
 
 interface CalculationResult {
   difficulty: number;
@@ -17,6 +18,17 @@ const ScoreCalculator: React.FC<ScoreCalculatorProps> = ({ label, enableDefenseS
   const { t } = useTranslation(['toolbox', 'translation']);
   const [targetScore, setTargetScore] = useState<number | ''>('');
   const [defenseScore, setDefenseScore] = useState<number | ''>(450);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (targetScore && typeof targetScore === 'number') {
+        const calculatorType = label ? `Score Calculator ${label}` : 'Score Calculator';
+        logEvent('Toolbox', 'Calculate', calculatorType, targetScore);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [targetScore, label]);
 
   const results = useMemo(() => {
     if (!targetScore || typeof targetScore !== 'number') return [];
