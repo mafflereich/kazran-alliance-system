@@ -16,7 +16,7 @@ export default function AccessControlManager() {
     { id: 'application_mailbox', label: t('header.application_mailbox'), icon: <Mail className="w-5 h-5" /> },
     { id: 'arcade', label: t('header.arcade'), icon: <Gamepad2 className="w-5 h-5" /> },
     { id: 'alliance_raid_record', label: t('header.alliance_raid_record'), icon: <Trophy className="w-5 h-5" /> },
-    { id: 'toolbox', label: t('header.toolbox_title', '小工具'), icon: <Wrench className="w-5 h-5" /> },
+    { id: 'toolbox', label: t('header.toolbox', '小工具'), icon: <Wrench className="w-5 h-5" /> },
   ];
 
   const getDefaultRoles = (pageId: string): ('member' | 'manager' | 'admin' | 'creator')[] => {
