@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '@/store';
-import { Shield, LogIn, LogOut, Settings, Users, User, Lock, AlertCircle, X, Globe, Volume2, VolumeX, Sun, Moon, Monitor, Layout, Mail, Gamepad2, Trophy, BookUser, Wrench } from 'lucide-react';
+import { 
+  Shield, LogIn, LogOut, Settings, Users, User, Lock, 
+  AlertCircle, X, Globe, Volume2, VolumeX, Sun, Moon, 
+  Monitor, Layout, Mail, Gamepad2, Trophy, BookUser, 
+  Wrench, Menu, ChevronDown, ChevronUp 
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/app/providers/ThemeContext';
 import { logEvent } from '@/analytics';
+import { motion, AnimatePresence } from 'motion/react';
 
 import { supabase } from '@/shared/api/supabase';
 
@@ -18,7 +24,7 @@ function LoginModal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleAdminLogin = async (e: React.SubmitEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
@@ -47,8 +53,19 @@ function LoginModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-stone-900/60 dark:bg-black/70 backdrop-blur-sm">
-      <div className="bg-white dark:bg-stone-800 rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-stone-900/60 dark:bg-black/70 backdrop-blur-sm"
+    >
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        className="bg-white dark:bg-stone-800 rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden"
+      >
         <div className="bg-stone-50 dark:bg-stone-700 px-6 py-4 border-b border-stone-200 dark:border-stone-600 flex justify-between items-center">
           <h2 className="text-xl font-bold flex items-center gap-2 text-stone-800 dark:text-stone-200">
             <Shield className="w-6 h-6 text-amber-600" /> {t('header.admin_login')}
@@ -108,8 +125,8 @@ function LoginModal({ onClose }: { onClose: () => void }) {
             </div>
           </form>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -117,22 +134,21 @@ export default function Header() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { db, currentUser, setCurrentUser, currentView, setCurrentView, userVolume, setUserVolume } = useAppContext();
+  const { db, currentUser, setCurrentUser, userVolume, setUserVolume } = useAppContext();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { preference, cycleTheme } = useTheme();
-  const volumeHoverTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-  const volumeContainerRef = React.useRef<HTMLDivElement>(null);
+  const volumeContainerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (volumeContainerRef.current && !volumeContainerRef.current.contains(event.target as Node)) {
         setIsVolumeHovered(false);
-        if (volumeHoverTimeoutRef.current) {
-          clearTimeout(volumeHoverTimeoutRef.current);
-          volumeHoverTimeoutRef.current = null;
-        }
+      }
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
       }
     };
 
@@ -142,19 +158,10 @@ export default function Header() {
     };
   }, []);
 
-  const handleVolumeMouseEnter = () => {
-    if (volumeHoverTimeoutRef.current) {
-      clearTimeout(volumeHoverTimeoutRef.current);
-      volumeHoverTimeoutRef.current = null;
-    }
-    setIsVolumeHovered(true);
-  };
-
-  const handleVolumeMouseLeave = () => {
-    volumeHoverTimeoutRef.current = setTimeout(() => {
-      setIsVolumeHovered(false);
-    }, 300); // 300ms delay before hiding
-  };
+  // Close menu on route change
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     logEvent('User', 'Logout', currentUser || 'unknown');
@@ -174,7 +181,6 @@ export default function Header() {
 
   const userRole = currentUser ? db.users[currentUser]?.role : null;
   const canSeeAllGuilds = userRole === 'admin' || userRole === 'creator' || userRole === 'manager';
-  const canAccessAdmin = userRole === 'admin' || userRole === 'creator';
 
   const getDefaultRoles = (pageId: string): ('member' | 'manager' | 'admin' | 'creator')[] => {
     switch (pageId) {
@@ -194,16 +200,17 @@ export default function Header() {
   };
 
   const userGuildId = !canSeeAllGuilds && currentUser ? Object.entries(db.guilds).find(([_, g]) => g.username === currentUser)?.[0] : null;
-
   const topGuildId = canSeeAllGuilds ? (sortedGuilds.length > 0 ? sortedGuilds[0][0] : null) : userGuildId;
 
-  const isCostumeListActive = location.pathname.startsWith('/guild');
-  const isAdminActive = location.pathname === '/admin';
-  const isMailboxActive = location.pathname === '/mailbox';
-  const isArcadeActive = location.pathname === '/arcade';
-  const isMemberBoardActive = location.pathname === '/team';
-  const isToolboxActive = location.pathname === '/toolbox';
-  const isRaidActive = location.pathname === '/raid';
+  const navItems = [
+    { id: 'costume_list', icon: Users, label: t('header.costume_list'), path: topGuildId ? `/guild/${topGuildId}` : null, active: location.pathname.startsWith('/guild') },
+    { id: 'application_mailbox', icon: Mail, label: t('header.application_mailbox'), path: '/mailbox', active: location.pathname === '/mailbox' },
+    { id: 'arcade', icon: Gamepad2, label: t('header.arcade'), path: '/arcade', active: location.pathname === '/arcade' },
+    { id: 'member_board', icon: BookUser, label: t('header.member_board', "Team Assign Board"), path: '/team', active: location.pathname === '/team' },
+    { id: 'toolbox', icon: Wrench, label: t('header.toolbox_title'), path: '/toolbox', active: location.pathname === '/toolbox' },
+    { id: 'alliance_raid_record', icon: Trophy, label: t('header.alliance_raid_record'), path: '/raid', active: location.pathname === '/raid' },
+    { id: 'admin_settings', icon: Settings, label: t('header.admin_settings'), path: '/admin', active: location.pathname === '/admin' },
+  ];
 
   const firstSettingId = db.settings && Object.keys(db.settings).length > 0 ? Object.keys(db.settings)[0] : 'default';
   const hasBgm = !!db.settings?.[firstSettingId]?.bgmUrl;
@@ -212,231 +219,226 @@ export default function Header() {
   const isMuted = currentVolume === 0;
 
   const toggleMute = () => {
-    if (isMuted) {
-      setUserVolume(bgmDefaultVolume > 0 ? bgmDefaultVolume : 50);
-    } else {
-      setUserVolume(0);
+    setUserVolume(isMuted ? (bgmDefaultVolume > 0 ? bgmDefaultVolume : 50) : 0);
+  };
+
+  const containerVariants: any = {
+    hidden: { height: 0, opacity: 0 },
+    visible: { 
+      height: 'auto', 
+      opacity: 1,
+      transition: { 
+        duration: 0.4, 
+        ease: [0.23, 1, 0.32, 1],
+        when: "beforeChildren",
+        staggerChildren: 0.05
+      }
+    },
+    exit: { 
+      height: 0, 
+      opacity: 0,
+      transition: { 
+        duration: 0.3, 
+        ease: [0.23, 1, 0.32, 1],
+        when: "afterChildren"
+      }
     }
+  };
+
+  const itemVariants: any = {
+    hidden: { y: 10, opacity: 0 },
+    visible: { y: 0, opacity: 1 },
+    exit: { y: 10, opacity: 0 }
   };
 
   return (
     <>
-      <header className="bg-stone-900 text-white p-4 shadow-md shrink-0 sticky top-0 z-[100]">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <h1
-            className="text-xl font-bold flex items-center gap-2 cursor-pointer hover:text-amber-400 transition-colors"
+      <header className="bg-stone-950/80 backdrop-blur-md text-white border-b border-stone-800 shrink-0 sticky top-0 z-[100]" ref={menuRef}>
+        <div className="max-w-6xl mx-auto px-4 h-16 flex justify-between items-center">
+          <div 
+            className="flex items-center gap-3 cursor-pointer group"
             onClick={() => navigate('/')}
           >
-            <Shield className="w-6 h-6 text-amber-500" />
-            <span className="hidden sm:inline">{t('header.system_title')}</span>
-          </h1>
-          <div className="flex items-center gap-6 text-sm font-medium">
-            <button
-              onClick={() => {
-                if (topGuildId) {
-                  logEvent('Navigation', 'Click', 'Costume List');
-                  navigate(`/guild/${topGuildId}`);
-                }
-              }}
-              disabled={isCostumeListActive || !topGuildId}
-              className={`flex items-center gap-2 transition-colors ${isCostumeListActive ? 'text-amber-500 cursor-default' : 'hover:text-amber-400 disabled:opacity-50 disabled:cursor-not-allowed'} ${!canAccessPage('costume_list') ? 'hidden' : ''}`}
-            >
-              <Users className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('header.costume_list')}</span>
-            </button>
-
-            {canAccessPage('application_mailbox') && (
-              <button
-                onClick={() => {
-                  logEvent('Navigation', 'Click', 'Application Mailbox');
-                  navigate('/mailbox');
-                }}
-                disabled={isMailboxActive}
-                className={`flex items-center gap-2 transition-colors ${isMailboxActive ? 'text-amber-500 cursor-default' : 'hover:text-amber-400'}`}
-              >
-                <Mail className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('header.application_mailbox')}</span>
-              </button>
-            )}
-
-            {canAccessPage('arcade') && (
-              <button
-                onClick={() => {
-                  logEvent('Navigation', 'Click', 'Arcade');
-                  navigate('/arcade');
-                }}
-                disabled={isArcadeActive}
-                className={`flex items-center gap-2 transition-colors ${isArcadeActive ? 'text-amber-500 cursor-default' : 'hover:text-amber-400'}`}
-              >
-                <Gamepad2 className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('header.arcade')}</span>
-              </button>
-            )}
-
-            {canAccessPage('member_board') && (
-              <button
-                onClick={() => {
-                  logEvent('Navigation', 'Click', 'Team Assign Board');
-                  navigate('/team');
-                }}
-                disabled={isMemberBoardActive}
-                className={`flex items-center gap-2 transition-colors ${isMemberBoardActive ? 'text-amber-500 cursor-default' : 'hover:text-amber-400'}`}
-              >
-                <BookUser className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('header.member_board', "Team Assign Board")}</span>
-              </button>
-            )}
-
-            {canAccessPage('toolbox') && (
-              <button
-                onClick={() => {
-                  logEvent('Navigation', 'Click', 'Toolbox');
-                  navigate('/toolbox');
-                }}
-                disabled={isToolboxActive}
-                className={`flex items-center gap-2 transition-colors ${isToolboxActive ? 'text-amber-500 cursor-default' : 'hover:text-amber-400'}`}
-              >
-                <Wrench className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('header.toolbox_title')}</span>
-              </button>
-            )}
-
-            {currentUser ? (
-              <div className="flex items-center gap-6">
-                {canAccessPage('alliance_raid_record') && (
-                  <button
-                    onClick={() => {
-                      logEvent('Navigation', 'Click', 'Alliance Raid Record');
-                      navigate('/raid');
-                    }}
-                    disabled={isRaidActive}
-                    className={`flex items-center gap-2 transition-colors ${isRaidActive ? 'text-amber-500 cursor-default' : 'hover:text-amber-400'}`}
-                  >
-                    <Trophy className="w-4 h-4" />
-                    <span className="hidden sm:inline">{t('header.alliance_raid_record')}</span>
-                  </button>
-                )}
-
-                {canAccessAdmin && (
-                  <button
-                    onClick={() => {
-                      logEvent('Navigation', 'Click', 'Admin Settings');
-                      navigate('/admin');
-                    }}
-                    disabled={isAdminActive}
-                    className={`flex items-center gap-2 transition-colors ${isAdminActive ? 'text-amber-500 cursor-default' : 'hover:text-amber-400'}`}
-                  >
-                    <Settings className="w-4 h-4" />
-                    <span className="hidden sm:inline">{t('header.admin_settings')}</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 hover:text-amber-400 transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('header.logout', { user: currentUser })}</span>
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setIsLoginModalOpen(true)}
-                className="flex items-center gap-2 hover:text-amber-400 transition-colors"
-              >
-                <LogIn className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('header.login_btn')}</span>
-              </button>
-            )}
-
-            <div className="flex items-center gap-4 border-l border-stone-800 pl-4">
-              <div className="relative">
-                <button
-                  onClick={cycleTheme}
-                  className="flex items-center justify-center hover:text-amber-400 transition-colors p-1"
-                  title={preference === 'system' ? t('header.theme_system') : preference === 'light' ? t('header.theme_light') : t('header.theme_dark')}
-                >
-                  {preference === 'light' && <Sun className="w-4 h-4" />}
-                  {preference === 'dark' && <Moon className="w-4 h-4" />}
-                  {preference === 'system' && <Monitor className="w-4 h-4" />}
-                </button>
-              </div>
-              <div className="relative" ref={volumeContainerRef}>
-                <button
-                  onMouseEnter={handleVolumeMouseEnter}
-                  onMouseLeave={handleVolumeMouseLeave}
-                  onClick={() => hasBgm && toggleMute()}
-                  disabled={!hasBgm}
-                  className={`flex items-center justify-center transition-colors p-1 ${hasBgm ? 'hover:text-amber-400' : 'text-stone-600 cursor-not-allowed'}`}
-                  title={!hasBgm ? t('common.no_bgm') : isMuted ? t('common.unmute') : t('common.mute')}
-                >
-                  {isMuted || !hasBgm ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                </button>
-
-                {isVolumeHovered && hasBgm && (
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 bg-stone-800 p-3 rounded-lg shadow-xl z-[100] flex flex-col items-center gap-2 w-10 h-32 border border-stone-700">
-                    <div className="h-24 flex items-center justify-center">
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={currentVolume}
-                        onChange={(e) => setUserVolume(Number(e.target.value))}
-                        className="h-20 w-1 appearance-none bg-stone-600 rounded-lg accent-amber-500 cursor-pointer"
-                        style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
-                      />
-                    </div>
-                    <span className="text-[10px] text-stone-400 font-mono">{currentVolume}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="relative">
-                <button
-                  onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)}
-                  className="flex items-center justify-center hover:text-amber-400 transition-colors p-1"
-                  title={t('footer.language')}
-                >
-                  <Globe className="w-4 h-4" />
-                </button>
-
-                {isLangDropdownOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-[90]"
-                      onClick={() => setIsLangDropdownOpen(false)}
-                    />
-                    <div className="absolute right-0 mt-2 w-32 bg-stone-800 border border-stone-700 rounded-lg shadow-xl z-[100] overflow-hidden">
-                      <button
-                        onClick={() => {
-                          i18n.changeLanguage('zh-TW');
-                          setIsLangDropdownOpen(false);
-                        }}
-                        className={`w-full text-left px-4 py-2 text-xs hover:bg-stone-700 transition-colors ${i18n.language === 'zh-TW' ? 'text-amber-500 font-bold' : 'text-stone-300'}`}
-                      >
-                        繁體中文
-                      </button>
-                      <button
-                        onClick={() => {
-                          i18n.changeLanguage('en');
-                          setIsLangDropdownOpen(false);
-                        }}
-                        className={`w-full text-left px-4 py-2 text-xs hover:bg-stone-700 transition-colors ${i18n.language === 'en' ? 'text-amber-500 font-bold' : 'text-stone-300'}`}
-                      >
-                        English
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+            <div className="p-2 bg-amber-500/10 rounded-lg group-hover:bg-amber-500/20 transition-colors">
+              <Shield className="w-6 h-6 text-amber-500" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-lg font-bold tracking-tight leading-none">{t('header.system_title')}</span>
+              <span className="text-[10px] text-stone-500 uppercase tracking-widest font-mono">Alliance OS v2.0</span>
             </div>
           </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${
+                isMenuOpen ? 'bg-amber-500 text-stone-950 shadow-[0_0_20px_rgba(245,158,11,0.3)]' : 'bg-stone-900 hover:bg-stone-800 text-stone-300'
+              }`}
+            >
+              <Menu className={`w-5 h-5 transition-transform duration-500 ${isMenuOpen ? 'rotate-90' : ''}`} />
+              <span className="text-sm font-bold uppercase tracking-wider hidden sm:inline">
+                {isMenuOpen ? t('common.close', 'Close') : t('common.menu', 'Menu')}
+              </span>
+              {isMenuOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+
+            {!currentUser && (
+              <button
+                onClick={() => setIsLoginModalOpen(true)}
+                className="p-2 bg-stone-900 hover:bg-stone-800 rounded-lg text-stone-300 transition-colors"
+                title={t('header.login_btn')}
+              >
+                <LogIn className="w-5 h-5" />
+              </button>
+            )}
+          </div>
         </div>
+
+        <AnimatePresence>
+          {isMenuOpen && (
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="overflow-hidden bg-stone-950 border-t border-stone-800 shadow-2xl"
+            >
+              <div className="max-w-6xl mx-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-8">
+                {/* Navigation Section */}
+                <motion.div variants={itemVariants} className="space-y-4">
+                  <h3 className="text-[10px] font-bold text-stone-500 uppercase tracking-[0.2em] border-b border-stone-800 pb-2">
+                    {t('common.navigation', 'Navigation')}
+                  </h3>
+                  <div className="grid gap-1">
+                    {navItems.map((item) => {
+                      const hasAccess = canAccessPage(item.id);
+                      if (!hasAccess || !item.path) return null;
+
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            navigate(item.path!);
+                            setIsMenuOpen(false);
+                          }}
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group ${
+                            item.active 
+                              ? 'bg-amber-500/10 text-amber-500' 
+                              : 'text-stone-400 hover:bg-stone-900 hover:text-white'
+                          }`}
+                        >
+                          <item.icon className={`w-5 h-5 ${item.active ? 'text-amber-500' : 'text-stone-500 group-hover:text-amber-400'}`} />
+                          <span className="text-sm font-medium">{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+
+                {/* User & Settings Section */}
+                <motion.div variants={itemVariants} className="space-y-4">
+                  <h3 className="text-[10px] font-bold text-stone-500 uppercase tracking-[0.2em] border-b border-stone-800 pb-2">
+                    {t('common.account_settings', 'Account & Settings')}
+                  </h3>
+                  <div className="space-y-3">
+                    {currentUser ? (
+                      <div className="p-4 bg-stone-900 rounded-xl border border-stone-800">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-stone-950 font-bold">
+                            {currentUser[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-white">{currentUser}</div>
+                            <div className="text-[10px] text-stone-500 uppercase tracking-wider">{userRole}</div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center justify-center gap-2 py-2 bg-stone-800 hover:bg-red-900/20 hover:text-red-400 text-stone-300 rounded-lg transition-all text-sm font-medium"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          {t('header.logout_simple', 'Logout')}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setIsLoginModalOpen(true);
+                          setIsMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-3 bg-amber-500 text-stone-950 rounded-lg font-bold hover:bg-amber-400 transition-all text-sm"
+                      >
+                        <LogIn className="w-5 h-5" />
+                        {t('header.login_btn')}
+                      </button>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={cycleTheme}
+                        className="flex items-center justify-center gap-2 py-3 bg-stone-900 hover:bg-stone-800 rounded-lg text-stone-400 transition-all border border-stone-800"
+                      >
+                        {preference === 'light' && <Sun className="w-4 h-4" />}
+                        {preference === 'dark' && <Moon className="w-4 h-4" />}
+                        {preference === 'system' && <Monitor className="w-4 h-4" />}
+                        <span className="text-xs font-medium">Theme</span>
+                      </button>
+                      <div className="relative" ref={volumeContainerRef}>
+                        <button
+                          onClick={() => hasBgm && toggleMute()}
+                          className={`w-full flex items-center justify-center gap-2 py-3 bg-stone-900 rounded-lg transition-all border border-stone-800 ${
+                            hasBgm ? 'hover:bg-stone-800 text-stone-400' : 'opacity-50 cursor-not-allowed'
+                          }`}
+                        >
+                          {isMuted || !hasBgm ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                          <span className="text-xs font-medium">Audio</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Language Section */}
+                <motion.div variants={itemVariants} className="space-y-4">
+                  <h3 className="text-[10px] font-bold text-stone-500 uppercase tracking-[0.2em] border-b border-stone-800 pb-2">
+                    {t('footer.language')}
+                  </h3>
+                  <div className="grid gap-2">
+                    <button
+                      onClick={() => i18n.changeLanguage('zh-TW')}
+                      className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${
+                        i18n.language === 'zh-TW' 
+                          ? 'bg-amber-500/10 border-amber-500/50 text-amber-500' 
+                          : 'bg-stone-900 border-stone-800 text-stone-400 hover:border-stone-700'
+                      }`}
+                    >
+                      <span className="text-sm font-medium">繁體中文</span>
+                      <Globe className="w-4 h-4 opacity-50" />
+                    </button>
+                    <button
+                      onClick={() => i18n.changeLanguage('en')}
+                      className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${
+                        i18n.language === 'en' 
+                          ? 'bg-amber-500/10 border-amber-500/50 text-amber-500' 
+                          : 'bg-stone-900 border-stone-800 text-stone-400 hover:border-stone-700'
+                      }`}
+                    >
+                      <span className="text-sm font-medium">English</span>
+                      <Globe className="w-4 h-4 opacity-50" />
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
-      {isLoginModalOpen && (
-        <LoginModal onClose={() => setIsLoginModalOpen(false)} />
-      )}
+      <AnimatePresence>
+        {isLoginModalOpen && (
+          <LoginModal onClose={() => setIsLoginModalOpen(false)} />
+        )}
+      </AnimatePresence>
     </>
   );
 }

@@ -248,7 +248,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [userVolume, setUserVolumeState] = useState<number | null>(() => {
     const saved = localStorage.getItem('userVolume');
-    return saved !== null ? Number(saved) : 0;
+    return saved !== null ? Number(saved) : null;
   });
 
   const setUserVolume = (volume: number) => {
