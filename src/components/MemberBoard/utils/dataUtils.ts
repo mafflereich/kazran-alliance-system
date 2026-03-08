@@ -1,0 +1,41 @@
+import type { Member, Guild, GuildWithMembers, TieredData } from '../types';
+
+export function buildTieredData(members: Member[], guilds: Guild[]): TieredData[] {
+    const guildMap = new Map<string, Guild>(guilds.map(g => [g.id!, g]));
+
+    const tierMap = new Map<number, { guild: Guild; members: Member[] }[]>();
+
+    members.forEach(m => {
+        const guild = guildMap.get(m.guildId);
+        if (!guild?.tier) return;
+
+        if (!tierMap.has(guild.tier)) {
+            tierMap.set(guild.tier, []);
+        }
+
+        const tierEntries = tierMap.get(guild.tier)!;
+        let guildEntry = tierEntries.find(e => e.guild.id === guild.id);
+
+        if (!guildEntry) {
+            guildEntry = { guild, members: [] };
+            tierEntries.push(guildEntry);
+        }
+
+        guildEntry.members.push(m);
+    });
+
+    // 轉成 TieredData[] 格式
+    const result: TieredData[] = Array.from(tierMap.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([tier, entries]) => ({
+            tier,
+            guilds: entries
+                .sort((a, b) => (a.guild.orderNum ?? 999) - (b.guild.orderNum ?? 999))
+                .map(e => ({
+                    ...e.guild,
+                    members: e.members.sort((a, b) => a.name.localeCompare(b.name)),
+                })) as GuildWithMembers[],
+        }));
+
+    return result;
+}

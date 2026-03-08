@@ -13,9 +13,19 @@ if (!supabaseUrl || !supabaseKey) {
 const rawSupabase = createClient(supabaseUrl, supabaseKey);
 
 // 轉換工具
-export const toCamel = <T>(data: any): T => camelcaseKeys(data, { deep: false }) as T;
+export const toCamel = <T>(data: any): T => {
+    if (Array.isArray(data)) {
+        return data.map(item => camelcaseKeys(item, { deep: false })) as unknown as T;
+    }
+    return camelcaseKeys(data, { deep: false }) as T;
+};
 
-export const toSnake = (data: any) => snakecaseKeys(data, { deep: false, exclude: ['_'] });  // 保留 _ 开头的字段（如 __typename）
+export const toSnake = (data: any): any => {
+    if (Array.isArray(data)) {
+        return data.map(item => snakecaseKeys(item, { deep: false, exclude: ['_'] }));
+    }
+    return snakecaseKeys(data, { deep: false, exclude: ['_'] });
+};
 
 export async function supabaseInsert<T>(
     table: string,

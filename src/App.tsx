@@ -12,6 +12,7 @@ const GuildDashboard = React.lazy(() => import('./pages/GuildDashboard'));
 const ApplicationMailbox = React.lazy(() => import('./pages/ApplicationMailbox'));
 const Arcade = React.lazy(() => import('./pages/Arcade'));
 const AllianceRaidRecord = React.lazy(() => import('./pages/AllianceRaidRecord'));
+const MemberBoard = React.lazy(() => import('./pages/TeamManagementPage'));
 import ToastContainer from './components/Toast';
 import { initGA, logPageView } from './analytics';
 
@@ -27,6 +28,7 @@ const AppContent = () => {
       case 'application_mailbox': return ['member', 'manager', 'admin', 'creator'];
       case 'arcade': return ['manager', 'admin', 'creator'];
       case 'alliance_raid_record': return ['creator'];
+      case 'member_board': return ['manager', 'admin', 'creator'];
       default: return ['creator', 'admin'];
     }
   };
@@ -41,6 +43,7 @@ const AppContent = () => {
   const canAccessMailbox = canAccessPage('application_mailbox');
   const canAccessAllianceRaidRecord = canAccessPage('alliance_raid_record');
   const canAccessCostumeList = canAccessPage('costume_list');
+  const canAccessMemberBoard = canAccessPage('member_board');
 
   React.useEffect(() => {
     let path = '/login';
@@ -57,6 +60,8 @@ const AppContent = () => {
         path = '/alliance_raid_record';
       } else if (currentView.type === 'guild') {
         path = `/guild/${currentView.guildId}`;
+      } else if (currentView.type === 'member_board') {
+        path = '/member_board';
       }
     }
     logPageView(path);
@@ -78,7 +83,10 @@ const AppContent = () => {
     if (currentView?.type === 'guild' && !canAccessCostumeList) {
       setCurrentView(null);
     }
-  }, [currentView, canAccessAdmin, canAccessMailbox, canAccessArcade, canAccessAllianceRaidRecord, canAccessCostumeList, setCurrentView]);
+    if (currentView?.type === 'member_board' && !canAccessMemberBoard) {
+      setCurrentView(null);
+    }
+  }, [currentView, canAccessAdmin, canAccessMailbox, canAccessArcade, canAccessAllianceRaidRecord, canAccessCostumeList, canAccessMemberBoard, setCurrentView]);
 
   if (!currentView || !currentUser) {
     return <Login />;
@@ -100,7 +108,20 @@ const AppContent = () => {
     return canAccessAllianceRaidRecord ? <AllianceRaidRecord /> : <Login />;
   }
 
-  return canAccessCostumeList ? <GuildDashboard guildId={currentView.guildId} /> : <Login />;
+  if (currentView.type === 'member_board') {
+    return canAccessMemberBoard ? <MemberBoard /> : <Login />;
+  }
+
+  if (currentView.type === 'guild') {
+    if (!currentView.guildId) {
+      // Handle corrupted localStorage state
+      setTimeout(() => setCurrentView(null), 0);
+      return <Login />;
+    }
+    return canAccessCostumeList ? <GuildDashboard guildId={currentView.guildId} /> : <Login />;
+  }
+
+  return <Login />;
 };
 
 const CACHE_NAME = 'bgm-cache-v1';
@@ -109,11 +130,11 @@ const AppContentWrapper = () => {
   const { db, userVolume } = useAppContext();
   const audioRef = React.useRef<HTMLAudioElement>(null);
   const [audioSrc, setAudioSrc] = React.useState<string>("");
-  
+
   const firstSettingId = db.settings && Object.keys(db.settings).length > 0 ? Object.keys(db.settings)[0] : 'default';
   const BGM_URL = db.settings?.[firstSettingId]?.bgmUrl || "";
   const BGM_DEFAULT_VOLUME = (db.settings?.[firstSettingId]?.bgmDefaultVolume ?? 50) / 100;
-  
+
   const EFFECTIVE_VOLUME = userVolume !== null ? userVolume / 100 : BGM_DEFAULT_VOLUME;
   const isMuted = EFFECTIVE_VOLUME === 0;
 
@@ -125,12 +146,12 @@ const AppContentWrapper = () => {
     const loadAudio = async () => {
       // Only download if we are unmuted and haven't loaded yet
       if (isMuted || audioSrc || !BGM_URL) return;
-      
+
       let currentUrl = "";
       try {
         const cache = await caches.open(CACHE_NAME);
         const cachedResponse = await cache.match(BGM_URL);
-        
+
         if (cachedResponse) {
           console.log("Loading BGM from cache...");
           const blob = await cachedResponse.blob();

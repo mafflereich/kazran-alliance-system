@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../store';
-import { Lock, Check, Shield, Users, Mail, Gamepad2, Trophy, AlertCircle } from 'lucide-react';
+import { Lock, Check, Shield, Users, Mail, Gamepad2, Trophy, AlertCircle, BookUser } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { AccessControl } from '../types';
 
@@ -10,12 +10,13 @@ export default function AccessControlManager() {
   const [isSaving, setIsSaving] = useState<string | null>(null);
 
   const roles: ('member' | 'manager' | 'admin' | 'creator')[] = ['member', 'manager', 'admin', 'creator'];
-  
+
   const pages = [
     { id: 'costume_list', label: t('header.costume_list'), icon: <Users className="w-5 h-5" /> },
     { id: 'application_mailbox', label: t('header.application_mailbox'), icon: <Mail className="w-5 h-5" /> },
     { id: 'arcade', label: t('header.arcade'), icon: <Gamepad2 className="w-5 h-5" /> },
     { id: 'alliance_raid_record', label: t('header.alliance_raid_record'), icon: <Trophy className="w-5 h-5" /> },
+    { id: 'member_board', label: t('header.member_board', "Team Assign Board"), icon: <BookUser className="w-5 h-5" /> },
   ];
 
   const getDefaultRoles = (pageId: string): ('member' | 'manager' | 'admin' | 'creator')[] => {
@@ -24,6 +25,7 @@ export default function AccessControlManager() {
       case 'application_mailbox': return ['member', 'manager', 'admin', 'creator'];
       case 'arcade': return ['manager', 'admin', 'creator'];
       case 'alliance_raid_record': return ['creator'];
+      case 'member_board': return ['manager', 'admin', 'creator'];
       default: return ['creator', 'admin'];
     }
   };
@@ -101,11 +103,10 @@ export default function AccessControlManager() {
                           <button
                             onClick={() => handleToggle(page.id, role)}
                             disabled={isSaving === page.id}
-                            className={`w-6 h-6 rounded border flex items-center justify-center transition-all ${
-                              isChecked
-                                ? 'bg-amber-600 border-amber-600 text-white'
-                                : 'border-stone-300 dark:border-stone-600 hover:border-amber-500'
-                            } ${isSaving === page.id ? 'animate-pulse' : ''}`}
+                            className={`w-6 h-6 rounded border flex items-center justify-center transition-all ${isChecked
+                              ? 'bg-amber-600 border-amber-600 text-white'
+                              : 'border-stone-300 dark:border-stone-600 hover:border-amber-500'
+                              } ${isSaving === page.id ? 'animate-pulse' : ''}`}
                           >
                             {isChecked && <Check className="w-4 h-4" />}
                           </button>

@@ -204,7 +204,27 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
     });
   }, [db.costumes, db.characters]);
 
-  if (!guild) return <div>{t('errors.guild_not_found')}</div>;
+  if (!guild) {
+    return (
+      <div className="h-screen flex flex-col">
+        <Header />
+        <div className="flex-1 flex items-center justify-center bg-stone-100 dark:bg-stone-900">
+          <div className="text-center p-8 bg-white dark:bg-stone-800 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-700 max-w-md">
+            <Shield className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('errors.guild_not_found')}</h2>
+            <p className="text-stone-500 dark:text-stone-400 mb-6">{t('dashboard.guild_not_found_desc', '該公會不存在或已被刪除。')}</p>
+            <button
+              onClick={() => setCurrentView(null)}
+              className="px-6 py-2 bg-stone-800 dark:bg-stone-600 text-white rounded-lg hover:bg-stone-700 dark:hover:bg-stone-500 transition-colors"
+            >
+              {t('dashboard.return_to_list', '返回公會列表')}
+            </button>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   const formatDate = (timestamp: number) => {
     const d = new Date(timestamp);

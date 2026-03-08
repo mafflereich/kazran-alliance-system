@@ -21,7 +21,13 @@ const defaultData: Database = {
   accessControl: {}
 };
 
-type ViewState = { type: 'admin' } | { type: 'guild', guildId: string } | { type: 'application_mailbox' } | { type: 'arcade' } | { type: 'alliance_raid_record' } | null;
+type ViewState = { type: 'admin' } |
+{ type: 'guild', guildId: string } |
+{ type: 'application_mailbox' } |
+{ type: 'arcade' } |
+{ type: 'alliance_raid_record' } |
+{ type: 'member_board' } |
+  null;
 
 interface AppContextType {
   db: Database;
@@ -345,7 +351,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   // Function to fetch members for a specific guild
-  const fetchMembers = async (guildId: string, columns: string = 'id, name, guild_id, role, records, exclusive_weapons, updated_at, status, archive_remark') => {
+  const fetchMembers = async (guildId: string, columns: string = 'id, name, guild_id, role, records, exclusive_weapons, note, color, total_score, updated_at, status, archive_remark') => {
     if (isOffline) return;
 
     // Check if we already have members for this guild
@@ -411,7 +417,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     let queryBuilder = supabase
       .from('members')
-      .select('id, name, guild_id, role, records, exclusive_weapons, updated_at, status, archive_remark', { count: 'exact' })
+      .select('id, name, guild_id, role, records, exclusive_weapons, note, color, total_score, updated_at, status, archive_remark', { count: 'exact' })
       .ilike('name', `%${query}%`)
       .order('status', { ascending: true }) // active comes before archived
       .order('name', { ascending: true })

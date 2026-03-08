@@ -22,6 +22,8 @@ export interface Member {
   records: Record<string, CostumeRecord>;
   exclusiveWeapons?: Record<string, boolean>; // characterId: boolean
   note?: string;
+  color?: string;
+  totalScore?: number;
   updatedAt?: number;
   status?: string;
   archiveRemark?: string;

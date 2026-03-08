@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../store';
-import { Shield, LogIn, LogOut, Settings, Users, User, Lock, AlertCircle, X, Globe, Volume2, VolumeX, Sun, Moon, Monitor, Layout, Mail, Gamepad2, Trophy } from 'lucide-react';
+import { Shield, LogIn, LogOut, Settings, Users, User, Lock, AlertCircle, X, Globe, Volume2, VolumeX, Sun, Moon, Monitor, Layout, Mail, Gamepad2, Trophy, BookUser } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../ThemeContext';
 import { logEvent } from '../analytics';
@@ -261,6 +261,20 @@ export default function Header() {
               >
                 <Gamepad2 className="w-4 h-4" />
                 <span className="hidden sm:inline">{t('header.arcade')}</span>
+              </button>
+            )}
+
+            {canAccessPage('member_board') && (
+              <button
+                onClick={() => {
+                  logEvent('Navigation', 'Click', 'Team Assign Board');
+                  setCurrentView({ type: 'member_board' });
+                }}
+                disabled={currentView?.type === 'member_board'}
+                className={`flex items-center gap-2 transition-colors ${currentView?.type === 'member_board' ? 'text-amber-500 cursor-default' : 'hover:text-amber-400'}`}
+              >
+                <BookUser className="w-4 h-4" />
+                <span className="hidden sm:inline">{t('header.member_board', "Team Assign Board")}</span>
               </button>
             )}
 
