@@ -183,7 +183,7 @@ export default function ArchivedMembersManager() {
                       <td className="p-4 text-stone-500 dark:text-stone-400 text-sm">
                         {latestHistory ? formatDate(latestHistory.archivedAt) : '-'}
                       </td>
-                      <td className="p-4 text-center text-stone-600">
+                      <td className="p-4 text-center text-stone-600 dark:text-stone-300">
                         <span className="bg-stone-100 dark:bg-stone-700 px-2 py-1 rounded-full text-xs font-medium">
                           {member.membersArchiveHistory.length}
                         </span>
@@ -317,7 +317,7 @@ export default function ArchivedMembersManager() {
                   {t('archived.select_target_guild')}
                 </label>
                 <select
-                  className="w-full p-2.5 border border-stone-300 dark:border-stone-600 rounded-lg bg-white dark:bg-stone-700 dark:text-stone-100 focus:ring-2 focus:ring-green-500 outline-none"
+                  className="w-full p-2.5 border border-stone-300 dark:border-stone-600 rounded-lg bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100 focus:ring-2 focus:ring-green-500 outline-none"
                   value={unarchiveModal.targetGuildId}
                   onChange={(e) => setUnarchiveModal(prev => ({ ...prev, targetGuildId: e.target.value }))}
                 >

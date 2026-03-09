@@ -21,7 +21,7 @@ function App() {
 
 function AppContent() {
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-950 text-white">
+    <div className="flex min-h-screen flex-col bg-stone-100 dark:bg-zinc-950 text-stone-800 dark:text-white">
       <BgmPlayer />
       <Header />
       <main className="flex-1">

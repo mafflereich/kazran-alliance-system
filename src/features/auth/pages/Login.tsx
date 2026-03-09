@@ -173,12 +173,15 @@ export default function Login() {
 
                           const showPercent = currentUser && indexPercentType === 'new_costumes_owned';
 
-                          let textClasses = (showPercent && is100) ? getTierTextColor(tier) : `font-medium transition-colors ${getTierTextHoverClass(tier)}`;
+                          let textClasses = (showPercent && is100) ? getTierTextColor(tier) : `font-medium transition-colors text-stone-800 dark:text-stone-200 ${getTierTextHoverClass(tier)}`;
                           let iconClasses = `w-5 h-5 transition-colors ${isDisabled ? 'text-stone-300 dark:text-stone-600' : getTierTextHoverClass(tier)}`;
 
                           if (isDisabled) {
-                            buttonClasses += " border-stone-200 dark:border-stone-700 opacity-30 grayscale cursor-not-allowed";
-                            textClasses = "font-medium text-stone-400 dark:text-stone-500";
+                            buttonClasses += " border-stone-200 dark:border-stone-700 opacity-30 cursor-not-allowed";
+                            if (!(showPercent && is100)) {
+                              buttonClasses += " grayscale";
+                              textClasses = "font-medium text-stone-400 dark:text-stone-500";
+                            }
                           } else {
                             // Enabled state - apply tier colors
                             buttonClasses += ` ${getTierBorderHoverClass(tier)}`;
@@ -198,14 +201,14 @@ export default function Login() {
                               disabled={isVerifying || isDisabled}
                               className={`${buttonClasses} group/btn`}
                             >
-                              {/* Progress Background Overlay - Only show if logged in AND enabled in settings */}
+                              {/* Progress Background Overlay - Only show if enabled in settings */}
                               {showPercent && (
                                 <div
-                                  className={`absolute left-0 top-0 bottom-0 transition-all duration-1000 ${isDisabled
-                                    ? 'bg-stone-300 dark:bg-stone-600 opacity-20'
-                                    : is100
+                                  className={`absolute left-0 top-0 bottom-0 transition-all duration-1000 ${is100
                                       ? 'bg-amber-500 opacity-10 dark:opacity-20'
-                                      : 'bg-stone-400 opacity-10 dark:opacity-20'
+                                      : isDisabled
+                                        ? 'bg-stone-300 dark:bg-stone-600 opacity-20'
+                                        : 'bg-stone-400 opacity-10 dark:opacity-20'
                                     }`}
                                   style={{ width: `${newCostumeRate}%` }}
                                 />
@@ -213,12 +216,12 @@ export default function Login() {
 
                               <div className="relative z-10 flex flex-col items-start">
                                 <span className={textClasses}>{guild.name}</span>
-                                {showPercent && is100 && !isDisabled && <span className="text-[9px] uppercase tracking-widest font-bold text-amber-600 dark:text-amber-400">Complete</span>}
+                                {showPercent && is100 && <span className="text-[9px] uppercase tracking-widest font-bold text-amber-600 dark:text-amber-400">Complete</span>}
                               </div>
 
                               <div className="relative z-10 flex items-center gap-2">
                                 {showPercent && (
-                                  <span className={`text-sm font-black ${isDisabled ? 'text-stone-300 dark:text-stone-600' : is100 ? 'text-amber-500' : 'text-stone-400'}`}>
+                                  <span className={`text-sm font-black ${is100 ? 'text-amber-500' : isDisabled ? 'text-stone-300 dark:text-stone-600' : 'text-stone-400'}`}>
                                     {newCostumeRate}%
                                   </span>
                                 )}
@@ -257,7 +260,7 @@ export default function Login() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400 dark:text-stone-500" />
                     <input
                       type="password"
-                      className="w-full pl-10 pr-4 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-stone-700 dark:text-stone-100"
+                      className="w-full pl-10 pr-4 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
                       value={guildPassword}
                       onChange={e => setGuildPassword(e.target.value)}
                       placeholder={t('login.enter_password')}

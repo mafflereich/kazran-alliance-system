@@ -16,12 +16,12 @@ import { logEvent } from '@/analytics';
 export default function AdminDashboard() {
   const { t } = useTranslation(['admin', 'translation']);
   const { db, currentUser } = useAppContext();
-  const [activeTab, setActiveTab] = useState<'guilds' | 'costumes' | 'backup' | 'tools' | 'passwords' | 'archived' | 'settings' | 'access'>('guilds');
+  const [activeTab, setActiveTab] = useState<'guilds' | 'costumes' | 'tools' | 'passwords' | 'archived' | 'settings' | 'access'>('guilds');
 
   const userRole = currentUser ? db.users[currentUser]?.role : null;
 
 
-  const handleTabChange = (tab: 'guilds' | 'costumes' | 'backup' | 'tools' | 'passwords' | 'archived' | 'settings' | 'access') => {
+  const handleTabChange = (tab: 'guilds' | 'costumes' | 'tools' | 'passwords' | 'archived' | 'settings' | 'access') => {
     logEvent('AdminDashboard', 'Switch Tab', tab);
     setActiveTab(tab);
   };
@@ -43,7 +43,6 @@ export default function AdminDashboard() {
           {userRole !== 'manager' && (
             <>
               <TabButton active={activeTab === 'passwords'} onClick={() => handleTabChange('passwords')} icon={<Key />} label={t('nav.change_password')} />
-              <TabButton active={activeTab === 'backup'} onClick={() => handleTabChange('backup')} icon={<Save />} label={t('nav.backup_restore')} />
               <TabButton active={activeTab === 'tools'} onClick={() => handleTabChange('tools')} icon={<Wand2 />} label={t('nav.tools')} />
               <TabButton active={activeTab === 'access'} onClick={() => handleTabChange('access')} icon={<Lock />} label={t('nav.access_control')} />
               <TabButton active={activeTab === 'settings'} onClick={() => handleTabChange('settings')} icon={<Settings />} label={t('nav.settings')} />
@@ -88,7 +87,6 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
-          {activeTab === 'backup' && userRole !== 'manager' && <BackupManager />}
           {activeTab === 'tools' && userRole !== 'manager' && <ToolsManager />}
           {activeTab === 'access' && userRole !== 'manager' && <AccessControlManager />}
           {activeTab === 'settings' && userRole !== 'manager' && <SettingsManager />}
@@ -100,7 +98,8 @@ export default function AdminDashboard() {
 
 function ToolsManager() {
   const { t } = useTranslation(['admin', 'translation']);
-  const { db, addMember, deleteMember, updateMember, fetchAllMembers, archiveMember, showToast } = useAppContext();
+  const { db, addMember, deleteMember, updateMember, fetchAllMembers, archiveMember, restoreData, showToast } = useAppContext();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
@@ -167,7 +166,7 @@ function ToolsManager() {
           if (!member && !memberName.match(/Vacancy/) && memberName) {
             added.push({ name: memberName, toGuild: guildName, role, toGuildId: guildId });
           } else if (member && guildId !== member.guildId) {
-            const fromGuildName = guildListInDB.find(g => g.id === member.guildId)?.name || 'Unknown';
+            const fromGuildName = guildListInDB.find(g => g.id === member.guildId)?.name || t('common.unknown');
             migrated.push({ id: member.id, name: memberName, fromGuild: fromGuildName, toGuild: guildName, role, toGuildId: guildId });
           }
 
@@ -180,7 +179,7 @@ function ToolsManager() {
       const membersToArchive = memberList.filter((member) => !activeMemberList.includes(member.name) && member.status !== 'archived');
 
       for (const member of membersToArchive) {
-        const fromGuildName = guildListInDB.find(g => g.id === member.guildId)?.name || 'Unknown';
+        const fromGuildName = guildListInDB.find(g => g.id === member.guildId)?.name || t('common.unknown');
         archived.push({ id: member.id, name: member.name, fromGuild: fromGuildName, fromGuildId: member.guildId });
       }
 
@@ -288,48 +287,144 @@ function ToolsManager() {
     });
   };
 
+  const handleBackup = () => {
+    try {
+      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+        JSON.stringify(db, null, 2)
+      )}`;
+      const link = document.createElement("a");
+      link.href = jsonString;
+      link.download = `kazran_backup_${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+    } catch (error) {
+      console.error("Backup failed:", error);
+      showToast(t('backup.backup_failed'), 'error');
+    }
+  };
+
+  const handleRestore = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result;
+        if (typeof text === 'string') {
+          const restoredDb = JSON.parse(text);
+          // Basic validation
+          if (restoredDb.guilds && restoredDb.members && restoredDb.costumes) {
+            await restoreData(restoredDb);
+            showToast(t('backup.restore_success'), 'success');
+          } else {
+            showToast(t('backup.invalid_format'), 'error');
+          }
+        }
+      } catch (error) {
+        console.error("Restore failed:", error);
+        showToast(t('backup.restore_failed'), 'error');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold mb-6 text-stone-800 dark:text-stone-200 flex items-center gap-2">
-        <Wand2 className="w-6 h-6 text-amber-600" />
-        {t('nav.tools')}
-      </h2>
+    <div className="space-y-12">
+      <section>
+        <h2 className="text-2xl font-bold mb-6 text-stone-800 dark:text-stone-200 flex items-center gap-2">
+          <Wand2 className="w-6 h-6 text-amber-600" />
+          {t('nav.tools')}
+        </h2>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-stone-50 dark:bg-stone-700 p-8 rounded-2xl border border-stone-200 dark:border-stone-600 flex flex-col items-center justify-center text-center">
-          <div className="p-4 bg-amber-100 dark:bg-amber-900/50 rounded-full text-amber-600 mb-4">
-            <RefreshCw className="w-8 h-8" />
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="bg-stone-50 dark:bg-stone-700 p-8 rounded-2xl border border-stone-200 dark:border-stone-600 flex flex-col items-center justify-center text-center">
+            <div className="p-4 bg-amber-100 dark:bg-amber-900/50 rounded-full text-amber-600 mb-4">
+              <RefreshCw className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('tools.auto_transfer')}</h3>
+            <p className="text-stone-500 dark:text-stone-400 mb-6 max-w-md">
+              {t('tools.auto_transfer_desc')}
+            </p>
+            <button
+              onClick={handleAutoTransfer}
+              disabled={isProcessing}
+              className="px-8 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 transition-all active:scale-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isProcessing ? t('common.processing') : t('tools.start_auto_transfer')}
+            </button>
           </div>
-          <h3 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('tools.auto_transfer')}</h3>
-          <p className="text-stone-500 dark:text-stone-400 mb-6 max-w-md">
-            {t('tools.auto_transfer_desc')}
-          </p>
-          <button
-            onClick={handleAutoTransfer}
-            disabled={isProcessing}
-            className="px-8 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 transition-all active:scale-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isProcessing ? t('common.processing') : t('tools.start_auto_transfer')}
-          </button>
-        </div>
 
-        <div className="bg-stone-50 dark:bg-stone-700 p-8 rounded-2xl border border-stone-200 dark:border-stone-600 flex flex-col items-center justify-center text-center">
-          <div className="p-4 bg-red-100 dark:bg-red-900/50 rounded-full text-red-600 mb-4">
-            <Trash2 className="w-8 h-8" />
+          <div className="bg-stone-50 dark:bg-stone-700 p-8 rounded-2xl border border-stone-200 dark:border-stone-600 flex flex-col items-center justify-center text-center">
+            <div className="p-4 bg-red-100 dark:bg-red-900/50 rounded-full text-red-600 mb-4">
+              <Trash2 className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('tools.remove_duplicates')}</h3>
+            <p className="text-stone-500 dark:text-stone-400 mb-6 max-w-md">
+              {t('tools.remove_duplicates_desc')}
+            </p>
+            <button
+              onClick={handleRemoveDuplicates}
+              disabled={isProcessing}
+              className="px-8 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all active:scale-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isProcessing ? t('common.processing') : t('tools.start_remove')}
+            </button>
           </div>
-          <h3 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('tools.remove_duplicates')}</h3>
-          <p className="text-stone-500 dark:text-stone-400 mb-6 max-w-md">
-            {t('tools.remove_duplicates_desc')}
-          </p>
-          <button
-            onClick={handleRemoveDuplicates}
-            disabled={isProcessing}
-            className="px-8 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all active:scale-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isProcessing ? t('common.processing') : t('tools.start_remove')}
-          </button>
         </div>
+      </section>
 
+      <div className="border-t border-stone-100 dark:border-stone-700 pt-12">
+        <section>
+          <h2 className="text-2xl font-bold mb-6 text-stone-800 dark:text-stone-200 flex items-center gap-2">
+            <Save className="w-6 h-6 text-amber-600" />
+            {t('nav.backup_restore')}
+          </h2>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="bg-stone-50 dark:bg-stone-700 p-8 rounded-2xl border border-stone-200 dark:border-stone-600 flex flex-col items-center justify-center text-center">
+              <div className="p-4 bg-blue-100 dark:bg-blue-900/50 rounded-full text-blue-600 mb-4">
+                <Download className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('backup.download_backup')}</h3>
+              <p className="text-stone-500 dark:text-stone-400 mb-6 max-w-md">
+                {t('backup.download_desc')}
+              </p>
+              <button
+                onClick={handleBackup}
+                className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md"
+              >
+                {t('backup.download_btn')}
+              </button>
+            </div>
+
+            <div className="bg-stone-50 dark:bg-stone-700 p-8 rounded-2xl border border-stone-200 dark:border-stone-600 flex flex-col items-center justify-center text-center">
+              <div className="p-4 bg-green-100 dark:bg-green-900/50 rounded-full text-green-600 mb-4">
+                <Upload className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('backup.restore_from_file')}</h3>
+              <p className="text-stone-500 dark:text-stone-400 mb-6 max-w-md">
+                {t('backup.restore_desc')}
+              </p>
+              <input type="file" accept=".json" onChange={handleRestore} ref={fileInputRef} className="hidden" />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="px-8 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-all active:scale-95 shadow-md"
+              >
+                {t('backup.restore_btn')}
+              </button>
+            </div>
+          </div>
+          <div className="mt-6 bg-amber-50 dark:bg-amber-900/30 border-l-4 border-amber-400 dark:border-amber-600 p-4 rounded-r-lg">
+            <div className="flex">
+              <div className="py-1"><AlertCircle className="h-5 w-5 text-amber-500 mr-3" /></div>
+              <div>
+                <p className="font-bold text-amber-800 dark:text-amber-200">{t('backup.important_notice')}</p>
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  {t('backup.important_desc')}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
 
       <ConfirmModal
@@ -488,7 +583,6 @@ function TabButton({ active, onClick, icon, label }: { active: boolean, onClick:
 function GuildsManager() {
   const { t } = useTranslation(['admin', 'translation']);
   const { db, addGuild, updateGuild, deleteGuild, fetchAllMembers, showToast } = useAppContext();
-  const [newGuildName, setNewGuildName] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [selectedGuildId, setSelectedGuildId] = useState<string | null>(null);
   const [editingGuildId, setEditingGuildId] = useState<string | null>(null);
@@ -496,6 +590,12 @@ function GuildsManager() {
   const [editGuildTier, setEditGuildTier] = useState<number>(1);
   const [editGuildOrder, setEditGuildOrder] = useState<number>(1);
   const [editGuildIsDisplay, setEditGuildIsDisplay] = useState<boolean>(true);
+
+  // Add Guild Modal State
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newGuildName, setNewGuildName] = useState('');
+  const [newGuildTier, setNewGuildTier] = useState<number>(1);
+  const [newGuildOrder, setNewGuildOrder] = useState<number>(1);
 
   useEffect(() => {
     fetchAllMembers();
@@ -517,12 +617,54 @@ function GuildsManager() {
 
   const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
+  const sortedGuilds = (Object.entries(db.guilds) as [string, any][]).sort((a, b) => {
+    const tierA = a[1].tier || 99;
+    const tierB = b[1].tier || 99;
+    if (tierA !== tierB) return tierA - tierB;
+    const orderA = a[1].orderNum || 99;
+    const orderB = b[1].orderNum || 99;
+    return orderA - orderB;
+  });
+
+  const handleOpenAddModal = () => {
+    setNewGuildName('');
+    setNewGuildTier(1);
+    
+    // Find the next order number for tier 1
+    const tier1Guilds = sortedGuilds.filter(g => (g[1].tier || 1) === 1);
+    const nextOrder = tier1Guilds.length > 0 
+      ? Math.max(...tier1Guilds.map(g => g[1].orderNum || 1)) + 1 
+      : 1;
+    
+    setNewGuildOrder(nextOrder);
+    setIsAddModalOpen(true);
+  };
+
+  const handleTierChange = (tier: number) => {
+    setNewGuildTier(tier);
+    // Find the next order number for the selected tier
+    const tierGuilds = sortedGuilds.filter(g => (g[1].tier || 1) === tier);
+    const nextOrder = tierGuilds.length > 0 
+      ? Math.max(...tierGuilds.map(g => g[1].orderNum || 1)) + 1 
+      : 1;
+    setNewGuildOrder(nextOrder);
+  };
+
   const handleAddGuild = async () => {
     if (!newGuildName.trim()) return;
     setIsSaving(true);
     try {
-      await addGuild(newGuildName.trim());
-      setNewGuildName('');
+      // Add guild with name, then update it with tier and order
+      const newGuildId = await addGuild(newGuildName.trim());
+      if (newGuildId) {
+        await updateGuild(newGuildId, {
+          name: newGuildName.trim(),
+          tier: newGuildTier,
+          orderNum: newGuildOrder,
+          isDisplay: true
+        });
+      }
+      setIsAddModalOpen(false);
       showToast(t('guilds.add_success'), 'success');
     } catch (error: any) {
       console.error("Error adding guild:", error);
@@ -584,15 +726,6 @@ function GuildsManager() {
     });
   };
 
-  const sortedGuilds = (Object.entries(db.guilds) as [string, any][]).sort((a, b) => {
-    const tierA = a[1].tier || 99;
-    const tierB = b[1].tier || 99;
-    if (tierA !== tierB) return tierA - tierB;
-    const orderA = a[1].orderNum || 99;
-    const orderB = b[1].orderNum || 99;
-    return orderA - orderB;
-  });
-
   const handleBackFromMembers = () => {
     setSelectedGuildId(null);
     fetchAllMembers();
@@ -606,25 +739,8 @@ function GuildsManager() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-stone-800 dark:text-stone-200">{t('nav.guild_management')}</h2>
-        <button
-          onClick={() => fetchAllMembers()}
-          className="p-2 text-stone-500 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-600 rounded-full transition-colors"
-          title={t('common.reset')}
-        >
-          <RefreshCw className="w-5 h-5" />
-        </button>
-      </div>
-
-      <div className="flex gap-2 mb-6">
-        <input
-          type="text"
-          placeholder={t('guilds.guild_name')}
-          className="flex-1 p-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none dark:bg-stone-700 dark:text-stone-100"
-          value={newGuildName}
-          onChange={e => setNewGuildName(e.target.value)}
-        />
-        <button onClick={handleAddGuild} disabled={isSaving} className="px-4 py-2 bg-stone-800 text-white rounded-lg hover:bg-stone-700 flex items-center gap-2 disabled:opacity-50">
-          {isSaving ? t('common.loading') : <><Plus className="w-5 h-5" /> {t('guilds.add_guild')}</>}
+        <button onClick={handleOpenAddModal} className="px-4 py-2 bg-stone-800 text-white rounded-lg hover:bg-stone-700 flex items-center gap-2">
+          <Plus className="w-5 h-5" /> {t('guilds.add_guild')}
         </button>
       </div>
 
@@ -645,7 +761,7 @@ function GuildsManager() {
                     <div className="flex flex-col gap-2">
                       <input
                         type="text"
-                        className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none dark:bg-stone-700 dark:text-stone-100"
+                        className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
                         value={editGuildName}
                         onChange={e => setEditGuildName(e.target.value)}
                         onClick={e => e.stopPropagation()}
@@ -654,7 +770,7 @@ function GuildsManager() {
                       />
                       <div className="flex gap-2">
                         <select
-                          className="flex-1 p-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none dark:bg-stone-700 dark:text-stone-100"
+                          className="flex-1 p-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
                           value={editGuildTier}
                           onChange={e => setEditGuildTier(Number(e.target.value))}
                           onClick={e => e.stopPropagation()}
@@ -666,7 +782,7 @@ function GuildsManager() {
                         </select>
                         <input
                           type="number"
-                          className="w-20 p-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none dark:bg-stone-700 dark:text-stone-100"
+                          className="w-20 p-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
                           value={editGuildOrder}
                           onChange={e => setEditGuildOrder(Number(e.target.value))}
                           onClick={e => e.stopPropagation()}
@@ -674,7 +790,7 @@ function GuildsManager() {
                           min={1}
                         />
                         <select
-                          className="w-24 p-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none dark:bg-stone-700 dark:text-stone-100"
+                          className="w-24 p-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
                           value={editGuildIsDisplay ? 'true' : 'false'}
                           onChange={e => setEditGuildIsDisplay(e.target.value === 'true')}
                           onClick={e => e.stopPropagation()}
@@ -712,6 +828,77 @@ function GuildsManager() {
           );
         })}
       </div>
+
+      {/* Add Guild Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-stone-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-6 border-b border-stone-200 dark:border-stone-700">
+              <h3 className="text-xl font-bold text-stone-800 dark:text-stone-200">{t('guilds.add_guild')}</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                  {t('guilds.guild_name')}
+                </label>
+                <input
+                  type="text"
+                  className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
+                  value={newGuildName}
+                  onChange={e => setNewGuildName(e.target.value)}
+                  placeholder={t('guilds.guild_name')}
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                    {t('common.tier')}
+                  </label>
+                  <select
+                    className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
+                    value={newGuildTier}
+                    onChange={e => handleTierChange(Number(e.target.value))}
+                  >
+                    <option value={1}>{t('common.tier')} 1</option>
+                    <option value={2}>{t('common.tier')} 2</option>
+                    <option value={3}>{t('common.tier')} 3</option>
+                    <option value={4}>{t('common.tier')} 4</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                    {t('common.order')}
+                  </label>
+                  <input
+                    type="number"
+                    className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
+                    value={newGuildOrder}
+                    onChange={e => setNewGuildOrder(Number(e.target.value))}
+                    min={1}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-stone-200 dark:border-stone-700 flex justify-end gap-3 bg-stone-50 dark:bg-stone-800/50">
+              <button
+                onClick={() => setIsAddModalOpen(false)}
+                className="px-4 py-2 rounded-lg font-medium text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={handleAddGuild}
+                disabled={isSaving || !newGuildName.trim()}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                {t('common.save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ConfirmModal
         isOpen={confirmModal.isOpen}
@@ -971,7 +1158,7 @@ function GuildMembersManager({ guildId, onBack }: { guildId: string, onBack: () 
         <div className="bg-stone-50 dark:bg-stone-700 p-4 rounded-xl border border-stone-200 dark:border-stone-600 mb-6 flex flex-col gap-4">
           <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 whitespace-pre-line">{t('members.batch_add_placeholder')}</label>
           <textarea
-            className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none min-h-[100px] dark:bg-stone-700 dark:text-stone-100"
+            className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none min-h-[100px] bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
             placeholder="Player1, Master, Note1&#10;Player2, Member&#10;Player3"
             value={batchInput}
             onChange={e => setBatchInput(e.target.value)}
@@ -991,7 +1178,7 @@ function GuildMembersManager({ guildId, onBack }: { guildId: string, onBack: () 
             <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">{t('common.name')}</label>
             <input
               type="text"
-              className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg dark:bg-stone-700 dark:text-stone-100"
+              className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
             />
@@ -999,7 +1186,7 @@ function GuildMembersManager({ guildId, onBack }: { guildId: string, onBack: () 
           <div className="flex-1 min-w-[150px]">
             <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">{t('common.role')}</label>
             <select
-              className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg dark:bg-stone-700 dark:text-stone-100"
+              className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
               value={formData.role}
               onChange={e => setFormData({ ...formData, role: e.target.value as Role })}
             >
@@ -1018,7 +1205,7 @@ function GuildMembersManager({ guildId, onBack }: { guildId: string, onBack: () 
             <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">{t('common.note')}</label>
             <input
               type="text"
-              className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg dark:bg-stone-700 dark:text-stone-100"
+              className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
               value={formData.note}
               onChange={e => setFormData({ ...formData, note: e.target.value })}
               placeholder={t('common.note')}
@@ -1053,7 +1240,7 @@ function GuildMembersManager({ guildId, onBack }: { guildId: string, onBack: () 
                     <td className="p-2">
                       <input
                         type="text"
-                        className="w-full p-1.5 border border-stone-300 dark:border-stone-600 rounded bg-white dark:bg-stone-700 dark:text-stone-100 text-sm"
+                        className="w-full p-1.5 border border-stone-300 dark:border-stone-600 rounded bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100 text-sm"
                         value={formData.name}
                         onChange={e => setFormData({ ...formData, name: e.target.value })}
                         autoFocus
@@ -1061,7 +1248,7 @@ function GuildMembersManager({ guildId, onBack }: { guildId: string, onBack: () 
                     </td>
                     <td className="p-2">
                       <select
-                        className="w-full p-1.5 border border-stone-300 dark:border-stone-600 rounded bg-white dark:bg-stone-700 dark:text-stone-100 text-sm"
+                        className="w-full p-1.5 border border-stone-300 dark:border-stone-600 rounded bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100 text-sm"
                         value={formData.role}
                         onChange={e => setFormData({ ...formData, role: e.target.value as Role })}
                       >
@@ -1073,7 +1260,7 @@ function GuildMembersManager({ guildId, onBack }: { guildId: string, onBack: () 
                     <td className="p-2">
                       <div className="flex flex-col gap-1">
                         <select
-                          className="w-full p-1.5 border border-stone-300 dark:border-stone-600 rounded bg-white dark:bg-stone-700 dark:text-stone-100 text-xs mb-1"
+                          className="w-full p-1.5 border border-stone-300 dark:border-stone-600 rounded bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100 text-xs mb-1"
                           value={formData.targetGuildId}
                           onChange={(e) => setFormData({ ...formData, targetGuildId: e.target.value })}
                         >
@@ -1083,7 +1270,7 @@ function GuildMembersManager({ guildId, onBack }: { guildId: string, onBack: () 
                         </select>
                         <input
                           type="text"
-                          className="w-full p-1.5 border border-stone-300 dark:border-stone-600 rounded bg-white dark:bg-stone-700 dark:text-stone-100 text-sm"
+                          className="w-full p-1.5 border border-stone-300 dark:border-stone-600 rounded bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100 text-sm"
                           value={formData.note}
                           onChange={e => setFormData({ ...formData, note: e.target.value })}
                           placeholder={t('common.note')}
@@ -1202,7 +1389,7 @@ function GuildMembersManager({ guildId, onBack }: { guildId: string, onBack: () 
                 </label>
                 <input
                   type="text"
-                  className="w-full p-2.5 border border-stone-300 dark:border-stone-600 rounded-lg bg-white dark:bg-stone-700 dark:text-stone-100 focus:ring-2 focus:ring-amber-500 outline-none"
+                  className="w-full p-2.5 border border-stone-300 dark:border-stone-600 rounded-lg bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100 focus:ring-2 focus:ring-amber-500 outline-none"
                   placeholder={t('common.note')}
                   value={archiveModal.reason}
                   onChange={(e) => setArchiveModal(prev => ({ ...prev, reason: e.target.value }))}
@@ -1583,19 +1770,19 @@ function CostumesManager() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">{t('costumes.costume_name')}</label>
-                <input type="text" value={editCostumeName} onChange={e => setEditCostumeName(e.target.value)} className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg dark:bg-stone-700 dark:text-stone-100" />
+                <input type="text" value={editCostumeName} onChange={e => setEditCostumeName(e.target.value)} className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">{t('costumes.costume_name')} (EN)</label>
-                <input type="text" value={editCostumeNameE} onChange={e => setEditCostumeNameE(e.target.value)} className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg dark:bg-stone-700 dark:text-stone-100" />
+                <input type="text" value={editCostumeNameE} onChange={e => setEditCostumeNameE(e.target.value)} className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">{t('costumes.order')}</label>
-                <input type="number" value={editCostumeOrder} onChange={e => setEditCostumeOrder(Number(e.target.value))} className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg dark:bg-stone-700 dark:text-stone-100" />
+                <input type="number" value={editCostumeOrder} onChange={e => setEditCostumeOrder(Number(e.target.value))} className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">{t('costumes.image_name')}</label>
-                <input type="text" value={editCostumeImageName} onChange={e => setEditCostumeImageName(e.target.value)} className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg dark:bg-stone-700 dark:text-stone-100" />
+                <input type="text" value={editCostumeImageName} onChange={e => setEditCostumeImageName(e.target.value)} className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100" />
               </div>
               <div className="flex items-center">
                 <input type="checkbox" id="isNew" checked={editCostumeIsNew} onChange={e => setEditCostumeIsNew(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500" />
@@ -1618,15 +1805,15 @@ function CostumesManager() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">{t('costumes.character_name')}</label>
-                <input type="text" value={editCharacterName} onChange={e => setEditCharacterName(e.target.value)} className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg dark:bg-stone-700 dark:text-stone-100" />
+                <input type="text" value={editCharacterName} onChange={e => setEditCharacterName(e.target.value)} className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">{t('costumes.character_name')} (EN)</label>
-                <input type="text" value={editCharacterNameE} onChange={e => setEditCharacterNameE(e.target.value)} className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg dark:bg-stone-700 dark:text-stone-100" />
+                <input type="text" value={editCharacterNameE} onChange={e => setEditCharacterNameE(e.target.value)} className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">{t('costumes.order')}</label>
-                <input type="number" value={editCharacterOrder} onChange={e => setEditCharacterOrder(Number(e.target.value))} className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg dark:bg-stone-700 dark:text-stone-100" />
+                <input type="number" value={editCharacterOrder} onChange={e => setEditCharacterOrder(Number(e.target.value))} className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100" />
               </div>
               <div className="flex gap-2">
                 <button onClick={handleUpdateCharacter} className="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700">{t('costumes.save_character')}</button>
@@ -1653,107 +1840,6 @@ function CostumesManager() {
         onConfirm={inputModal.onConfirm}
         onCancel={closeInputModal}
       />
-    </div>
-  );
-}
-
-function BackupManager() {
-  const { t } = useTranslation(['admin', 'translation']);
-  const { db, restoreData, showToast } = useAppContext();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleBackup = () => {
-    try {
-      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
-        JSON.stringify(db, null, 2)
-      )}`;
-      const link = document.createElement("a");
-      link.href = jsonString;
-      link.download = `kazran_backup_${new Date().toISOString().split('T')[0]}.json`;
-      link.click();
-    } catch (error) {
-      console.error("Backup failed:", error);
-      showToast(t('backup.backup_failed'), 'error');
-    }
-  };
-
-  const handleRestore = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const text = e.target?.result;
-        if (typeof text === 'string') {
-          const restoredDb = JSON.parse(text);
-          // Basic validation
-          if (restoredDb.guilds && restoredDb.members && restoredDb.costumes) {
-            await restoreData(restoredDb);
-            showToast(t('backup.restore_success'), 'success');
-          } else {
-            showToast(t('backup.invalid_format'), 'error');
-          }
-        }
-      } catch (error) {
-        console.error("Restore failed:", error);
-        showToast(t('backup.restore_failed'), 'error');
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold mb-6 text-stone-800 dark:text-stone-200 flex items-center gap-2">
-        <Save className="w-6 h-6 text-amber-600" />
-        {t('nav.backup_restore')}
-      </h2>
-      <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-stone-50 dark:bg-stone-700 p-8 rounded-2xl border border-stone-200 dark:border-stone-600 flex flex-col items-center justify-center text-center">
-          <div className="p-4 bg-blue-100 dark:bg-blue-900/50 rounded-full text-blue-600 mb-4">
-            <Download className="w-8 h-8" />
-          </div>
-          <h3 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('backup.download_backup')}</h3>
-          <p className="text-stone-500 dark:text-stone-400 mb-6 max-w-md">
-            {t('backup.download_desc')}
-          </p>
-          <button
-            onClick={handleBackup}
-            className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md"
-          >
-            {t('backup.download_btn')}
-          </button>
-        </div>
-
-        <div className="bg-stone-50 dark:bg-stone-700 p-8 rounded-2xl border border-stone-200 dark:border-stone-600 flex flex-col items-center justify-center text-center">
-          <div className="p-4 bg-green-100 dark:bg-green-900/50 rounded-full text-green-600 mb-4">
-            <Upload className="w-8 h-8" />
-          </div>
-          <h3 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('backup.restore_from_file')}</h3>
-          <p className="text-stone-500 dark:text-stone-400 mb-6 max-w-md">
-            {t('backup.restore_desc')}
-          </p>
-          <input type="file" accept=".json" onChange={handleRestore} ref={fileInputRef} className="hidden" />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="px-8 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-all active:scale-95 shadow-md"
-          >
-            {t('backup.restore_btn')}
-          </button>
-        </div>
-      </div>
-      <div className="bg-amber-50 dark:bg-amber-900/30 border-l-4 border-amber-400 dark:border-amber-600 p-4 rounded-r-lg">
-        <div className="flex">
-          <div className="py-1"><AlertCircle className="h-5 w-5 text-amber-500 mr-3" /></div>
-          <div>
-            <p className="font-bold text-amber-800 dark:text-amber-200">{t('backup.important_notice')}</p>
-            <p className="text-sm text-amber-700 dark:text-amber-300">
-              {t('backup.important_desc')}
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -1828,7 +1914,7 @@ function SettingsManager() {
             <select
               value={indexPercentType}
               onChange={(e) => setIndexPercentType(e.target.value as 'empty' | 'new_costumes_owned')}
-              className="w-full p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none dark:bg-stone-700 dark:text-stone-100"
+              className="w-full p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
             >
               <option value="empty">{t('settings.none')}</option>
               <option value="new_costumes_owned">{t('settings.new_costume_ownership_rate')}</option>
@@ -1843,7 +1929,7 @@ function SettingsManager() {
               value={indexMessage}
               onChange={(e) => setIndexMessage(e.target.value)}
               placeholder={t('settings.message_placeholder')}
-              className="w-full p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none dark:bg-stone-700 dark:text-stone-100 min-h-[100px]"
+              className="w-full p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100 min-h-[100px]"
             />
           </div>
         </div>
@@ -1861,7 +1947,7 @@ function SettingsManager() {
               value={bgmUrl}
               onChange={(e) => setBgmUrl(e.target.value)}
               placeholder="https://example.com/music.mp3"
-              className="w-full p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none dark:bg-stone-700 dark:text-stone-100"
+              className="w-full p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
             />
             <p className="text-xs text-stone-500 dark:text-stone-400 mt-2">
               {t('settings.bgm_hint')}

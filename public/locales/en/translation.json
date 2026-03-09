@@ -65,7 +65,6 @@
     "value": "Value",
     "count": "Count",
     "total": "Total",
-    "page": "Page",
     "rowsPerPage": "Rows per page",
     "noData": "No data",
     "noResults": "No results",
@@ -214,7 +213,8 @@
     "submit_failed": "Submission failed",
     "update_success": "Updated successfully",
     "update_failed": "Update failed",
-    "submit": "Submit"
+    "submit": "Submit",
+    "restore": "Restore"
   },
   "header": {
     "application_mailbox": "Application Mailbox",

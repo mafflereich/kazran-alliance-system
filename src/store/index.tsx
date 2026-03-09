@@ -51,7 +51,7 @@ interface AppContextType {
   updateMemberExclusiveWeapon: (memberId: string, characterId: string, hasWeapon: boolean) => Promise<void>;
 
   // Guild functions
-  addGuild: (name: string) => Promise<void>;
+  addGuild: (name: string) => Promise<string | null>;
   updateGuild: (guildId: string, data: Partial<Guild>) => Promise<void>;
   deleteGuild: (guildId: string) => Promise<void>;
 
@@ -604,10 +604,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { data, error } = await supabaseInsert('guilds', newGuild);
     if (error) {
       console.error('Error adding guild:', error);
+      return null;
     } else if (data) {
       const addedGuild = data[0] as Guild;
       setDbState(prev => ({ ...prev, guilds: { ...prev.guilds, [addedGuild.id!]: addedGuild } }));
+      return addedGuild.id;
     }
+    return null;
   };
 
   const updateGuild = async (guildId: string, data: Partial<Guild>) => {

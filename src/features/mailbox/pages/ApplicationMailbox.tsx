@@ -79,7 +79,7 @@ export default function ApplicationMailbox() {
       'rejected': { label: t('mailbox:status_rejected', '拒絕'), color: 'text-red-600', icon: <XCircle className="w-4 h-4" /> },
       'discuss': { label: t('mailbox:status_discuss_full', '請到 Discord 聯絡總長'), color: 'text-amber-600', icon: <MessageCircle className="w-4 h-4" /> },
       'unclear': { label: t('mailbox:status_unclear_full', '意義不明。不受理，請重新申請'), color: 'text-purple-600', icon: <HelpCircle className="w-4 h-4" /> },
-      'who_are_you': { label: t('mailbox:status__who_are_you_full', '你是誰？不受理，請重新申請'), color: 'text-blue-600', icon: <Fingerprint className="w-4 h-4" /> },
+      'who_are_you': { label: t('mailbox:status_who_are_you_full', '你是誰？不受理，請重新申請'), color: 'text-blue-600', icon: <Fingerprint className="w-4 h-4" /> },
     };
 
     const s = statusMap[status] || statusMap['pending'];
@@ -213,7 +213,7 @@ export default function ApplicationMailbox() {
                     <select
                       value={app.status}
                       onChange={(e) => handleStatusUpdate(app.id, e.target.value as ApplicationStatus)}
-                      className="text-xs p-1 border border-stone-300 dark:border-stone-600 rounded bg-white dark:bg-stone-700 dark:text-stone-200 outline-none focus:ring-1 focus:ring-amber-500"
+                      className="text-xs p-1 border border-stone-300 dark:border-stone-600 rounded bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-200 outline-none focus:ring-1 focus:ring-amber-500"
                     >
                       <option value="pending">{t('mailbox:status_pending', '待處理')}</option>
                       <option value="acknowledged">{t('mailbox:status_acknowledged', '已知悉')}</option>
@@ -289,7 +289,7 @@ export default function ApplicationMailbox() {
                 <select
                   value={formData.subject}
                   onChange={(e) => setFormData({ ...formData, subject: e.target.value as ApplicationSubject })}
-                  className="w-full p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none dark:bg-stone-700 dark:text-stone-100"
+                  className="w-full p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
                 >
                   <option value="leave">{t('mailbox:subject_leave', '請假')}</option>
                   <option value="tier_change">{t('mailbox:subject_tier_change', '升降梯隊')}</option>
@@ -309,7 +309,7 @@ export default function ApplicationMailbox() {
                   rows={6}
                   maxLength={500}
                   placeholder={t('mailbox:content_placeholder', '請輸入申請內容...')}
-                  className="w-full p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none dark:bg-stone-700 dark:text-stone-100 resize-none"
+                  className="w-full p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100 resize-none"
                 />
                 <div className="text-right text-xs text-stone-500 dark:text-stone-400 mt-1">
                   {formData.content.length}/500

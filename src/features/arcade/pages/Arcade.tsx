@@ -15,7 +15,7 @@ export default function Arcade() {
   switch (activeGame) {
     case 'speed-refining':
       return (
-        <div className="min-h-screen bg-stone-900 flex flex-col items-center p-4">
+        <div className="min-h-screen bg-stone-900 text-stone-100 flex flex-col items-center p-4">
           <div className="w-full max-w-4xl">
             <button
               onClick={() => setActiveGame(null)}
@@ -30,7 +30,7 @@ export default function Arcade() {
       );
     case 'refine-simulator':
       return (
-        <div className="min-h-screen bg-stone-900 flex flex-col items-center p-4">
+        <div className="min-h-screen bg-stone-900 text-stone-100 flex flex-col items-center p-4">
           <div className="w-full max-w-4xl">
             <button
               onClick={() => setActiveGame(null)}

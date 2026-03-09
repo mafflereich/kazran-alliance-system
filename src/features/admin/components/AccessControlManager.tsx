@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '@/store';
-import { Lock, Check, Users, Mail, Gamepad2, Trophy, AlertCircle, BookUser, Wrench } from 'lucide-react';
+import { Lock, Check, Users, Mail, Gamepad2, Trophy, AlertCircle, BookUser, Wrench, Save, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 export default function AccessControlManager() {
   const { t } = useTranslation(['admin', 'translation']);
   const { db, updateAccessControl } = useAppContext();
-  const [isSaving, setIsSaving] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Local state for unsaved changes
+  const [localAccessControl, setLocalAccessControl] = useState<Record<string, ('member' | 'manager' | 'admin' | 'creator')[]>>({});
 
   const roles: ('member' | 'manager' | 'admin' | 'creator')[] = ['member', 'manager', 'admin', 'creator'];
 
@@ -31,22 +34,83 @@ export default function AccessControlManager() {
     }
   };
 
-  const handleToggle = async (pageId: string, role: 'member' | 'manager' | 'admin' | 'creator') => {
-    const currentRoles = db.accessControl[pageId]?.roles || getDefaultRoles(pageId);
-    let newRoles: ('member' | 'manager' | 'admin' | 'creator')[];
+  // Initialize local state from db
+  useEffect(() => {
+    const initialLocalState: Record<string, ('member' | 'manager' | 'admin' | 'creator')[]> = {};
+    pages.forEach(page => {
+      initialLocalState[page.id] = db.accessControl[page.id]?.roles || getDefaultRoles(page.id);
+    });
+    setLocalAccessControl(initialLocalState);
+  }, [db.accessControl]);
 
-    if (currentRoles.includes(role)) {
-      newRoles = currentRoles.filter(r => r !== role);
-    } else {
-      newRoles = [...currentRoles, role];
+  const hasChanges = useMemo(() => {
+    for (const page of pages) {
+      const dbRoles = db.accessControl[page.id]?.roles || getDefaultRoles(page.id);
+      const localRoles = localAccessControl[page.id] || [];
+      
+      if (dbRoles.length !== localRoles.length) return true;
+      
+      // Check if arrays contain the same elements
+      const dbSet = new Set(dbRoles);
+      for (const role of localRoles) {
+        if (!dbSet.has(role)) return true;
+      }
     }
+    return false;
+  }, [db.accessControl, localAccessControl]);
 
-    setIsSaving(pageId);
+  const handleToggle = (pageId: string, role: 'member' | 'manager' | 'admin' | 'creator') => {
+    setLocalAccessControl(prev => {
+      const currentRoles = prev[pageId] || [];
+      let newRoles: ('member' | 'manager' | 'admin' | 'creator')[];
+
+      if (currentRoles.includes(role)) {
+        newRoles = currentRoles.filter(r => r !== role);
+      } else {
+        newRoles = [...currentRoles, role];
+      }
+
+      return {
+        ...prev,
+        [pageId]: newRoles
+      };
+    });
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
     try {
-      await updateAccessControl(pageId, newRoles);
+      for (const pageId of Object.keys(localAccessControl)) {
+        const dbRoles = db.accessControl[pageId]?.roles || getDefaultRoles(pageId);
+        const localRoles = localAccessControl[pageId];
+        
+        // Only update if changed
+        let isChanged = dbRoles.length !== localRoles.length;
+        if (!isChanged) {
+          const dbSet = new Set(dbRoles);
+          for (const role of localRoles) {
+            if (!dbSet.has(role)) {
+              isChanged = true;
+              break;
+            }
+          }
+        }
+        
+        if (isChanged) {
+          await updateAccessControl(pageId, localRoles);
+        }
+      }
     } finally {
-      setIsSaving(null);
+      setIsSaving(false);
     }
+  };
+
+  const handleRestore = () => {
+    const initialLocalState: Record<string, ('member' | 'manager' | 'admin' | 'creator')[]> = {};
+    pages.forEach(page => {
+      initialLocalState[page.id] = db.accessControl[page.id]?.roles || getDefaultRoles(page.id);
+    });
+    setLocalAccessControl(initialLocalState);
   };
 
   return (
@@ -56,6 +120,24 @@ export default function AccessControlManager() {
           <Lock className="w-6 h-6 text-amber-600" />
           {t('nav.access_control')}
         </h2>
+        <div className="flex gap-3">
+          <button
+            onClick={handleRestore}
+            disabled={!hasChanges || isSaving}
+            className="flex items-center gap-2 px-4 py-2 bg-stone-200 dark:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-lg hover:bg-stone-300 dark:hover:bg-stone-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RotateCcw className="w-4 h-4" />
+            {t('common.restore', '還原')}
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!hasChanges || isSaving}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save className="w-4 h-4" />
+            {t('common.save', '儲存')}
+          </button>
+        </div>
       </div>
 
       <div className="bg-amber-50 dark:bg-amber-900/30 border-l-4 border-amber-400 dark:border-amber-600 p-4 rounded-r-lg mb-6">
@@ -78,14 +160,14 @@ export default function AccessControlManager() {
               </th>
               {roles.map(role => (
                 <th key={role} className="text-center py-4 px-4 text-stone-500 dark:text-stone-400 font-medium uppercase tracking-wider text-xs">
-                  {t(`roles.${role}`)}
+                  {role.toUpperCase()}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
             {pages.map(page => {
-              const currentRoles = db.accessControl[page.id]?.roles || getDefaultRoles(page.id);
+              const currentRoles = localAccessControl[page.id] || [];
               return (
                 <tr key={page.id} className="hover:bg-stone-50 dark:hover:bg-stone-700/50 transition-colors">
                   <td className="py-4 px-4">
@@ -103,11 +185,11 @@ export default function AccessControlManager() {
                         <div className="flex justify-center">
                           <button
                             onClick={() => handleToggle(page.id, role)}
-                            disabled={isSaving === page.id}
+                            disabled={isSaving}
                             className={`w-6 h-6 rounded border flex items-center justify-center transition-all ${isChecked
                               ? 'bg-amber-600 border-amber-600 text-white'
                               : 'border-stone-300 dark:border-stone-600 hover:border-amber-500'
-                              } ${isSaving === page.id ? 'animate-pulse' : ''}`}
+                              }`}
                           >
                             {isChecked && <Check className="w-4 h-4" />}
                           </button>

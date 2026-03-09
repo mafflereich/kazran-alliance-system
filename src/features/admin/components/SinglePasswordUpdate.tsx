@@ -134,7 +134,7 @@ export default function SinglePasswordUpdate() {
           <div className="relative">
             <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400 dark:text-stone-500" />
             <select
-              className="w-full pl-10 pr-4 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-stone-700 dark:text-stone-100 appearance-none disabled:bg-stone-50 dark:disabled:bg-stone-800"
+              className="w-full pl-10 pr-4 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100 appearance-none disabled:bg-stone-50 dark:disabled:bg-stone-800"
               value={selectedUsername}
               onChange={(e) => setSelectedUsername(e.target.value)}
               disabled={isFetching || isLoading}
@@ -155,7 +155,7 @@ export default function SinglePasswordUpdate() {
               <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">{t('passwords.new_password')}</label>
               <input
                 type="password"
-                className="w-full px-4 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none dark:bg-stone-700 dark:text-stone-100"
+                className="w-full px-4 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
                 placeholder={t('passwords.enter_new_password')}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -167,7 +167,7 @@ export default function SinglePasswordUpdate() {
               <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">{t('passwords.confirm_new_password')}</label>
               <input
                 type="password"
-                className="w-full px-4 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none dark:bg-stone-700 dark:text-stone-100"
+                className="w-full px-4 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
                 placeholder={t('passwords.enter_new_password_again')}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
