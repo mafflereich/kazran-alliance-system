@@ -1,11 +1,9 @@
-// src/components/MemberBoard/GuildSection.tsx
 import { useDroppable } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { MoveRight, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import MemberCard from './MemberCard/MemberCard';
 import type { Guild, Member } from '@entities/member/types';
 import { useMemberBoardStore } from './store/useMemberBoardStore';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 type GuildWithMembers = Guild & { members: Member[] };
@@ -16,13 +14,30 @@ type Props = {
 };
 
 export default function GuildSection({ guild, cardWidth }: Props) {
-    const { selectedIds, isMultiSelectMode, toggleSelect, addMember } = useMemberBoardStore();
+    const { selectedIds, isMultiSelectMode, toggleSelect, addMember, moveSelectedMembers } = useMemberBoardStore();
     const [isAdding, setIsAdding] = useState(false);
     const [newMemberName, setNewMemberName] = useState('');
+    const containerRef = useRef<HTMLDivElement>(null);
 
-    const { setNodeRef, isOver } = useDroppable({
-        id: `guild-${guild.id}`,
-    });
+    const handleGuildClick = (e: React.MouseEvent) => {
+        if (isMultiSelectMode && selectedIds.size > 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            moveSelectedMembers(guild.id!);
+        }
+    };
+
+    // 點擊外部關閉輸入框
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setIsAdding(false);
+                setNewMemberName('');
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const handleAddMember = async () => {
         if (!newMemberName.trim()) return;
@@ -45,10 +60,7 @@ export default function GuildSection({ guild, cardWidth }: Props) {
         setNewMemberName('');
     };
 
-    // ... (rest of the component)
-
-
-    // 排序：leader > coleader > 其他人
+    // 排序：先按角色優先級
     const sortedMembers = [...(guild.members || [])].sort((a, b) => {
         const getPriority = (role: string) => {
             if (role === 'leader') return 1;
@@ -60,20 +72,27 @@ export default function GuildSection({ guild, cardWidth }: Props) {
         const priB = getPriority(b.role);
 
         if (priA !== priB) return priA - priB;
-        return a.name.localeCompare(b.name);
+        
+        return (a.updatedAt ?? 0) - (b.updatedAt ?? 0);
     });
+
+    // 補足到 30 個位置
+    const displaySlots = [...sortedMembers];
+    while (displaySlots.length < 30) {
+        displaySlots.push({ id: `empty-${guild.id}-${displaySlots.length}` } as any);
+    }
 
     // 公會總分小計
     const guildTotalScore = (guild.members || []).reduce((sum, m) => sum + (m.totalScore ?? 0), 0);
 
     return (
         <div
-            ref={setNodeRef}
+            ref={containerRef}
+            onClick={handleGuildClick}
             className={`
         relative bg-gray-900 rounded-xl border overflow-hidden flex flex-col shadow-sm flex-shrink-0 transition-all duration-200
-        ${isOver
-                    ? 'border-4 border-indigo-500 bg-indigo-950/50 ring-2 ring-indigo-500/40 shadow-2xl scale-[1.03] animate-pulse'
-                    : 'border-gray-700'}
+        ${isMultiSelectMode && selectedIds.size > 0 ? 'cursor-pointer ring-2 ring-indigo-500' : 'cursor-default'}
+        border-gray-700
       `}
             style={{ width: `${cardWidth + 20}px` }}
         >
@@ -84,7 +103,7 @@ export default function GuildSection({ guild, cardWidth }: Props) {
                         {guild.name}
                     </h3>
                     <p className="text-xs text-gray-400 mt-1">
-                        {guild.members.length} 人
+                        {guild.members.length} / 30 人
                     </p>
                 </div>
 
@@ -93,46 +112,42 @@ export default function GuildSection({ guild, cardWidth }: Props) {
                 </div>
             </div>
 
-            <SortableContext
-                id={`guild-${guild.id}`}
-                items={sortedMembers.map(m => m.id!)}
-                strategy={verticalListSortingStrategy}
-            >
-                <div className="p-0.5 grid grid-cols-1 gap-0 bg-gray-950/60 min-h-[50px]">
-                    {sortedMembers.map((member) => {
-                        const isLeader = member.role === 'leader';
-                        const isVice = member.role === 'coleader';
-
+            <div className="p-0.5 grid grid-cols-1 gap-0 bg-gray-950/60 min-h-[50px]">
+                {displaySlots.map((member, index) => {
+                    const isEmpty = member.id?.startsWith('empty-');
+                    if (isEmpty) {
                         return (
-                            <MemberCard
-                                key={member.id}
-                                member={member}
-                                isSelected={selectedIds.has(member.id!)}
-                                isMultiSelectMode={isMultiSelectMode}
-                                onToggleSelect={() => toggleSelect(member.id!)}
-                                isLeader={isLeader}
-                                isVice={isVice}
-                                fixedWidth={cardWidth}
-                            />
+                            <div 
+                                key={member.id} 
+                                className="h-[32px] border border-dashed border-gray-800 rounded-md m-0.5 flex items-center justify-center text-[9px] text-gray-700 italic"
+                            >
+                                Slot {index + 1}
+                            </div>
                         );
-                    })}
-                </div>
-            </SortableContext>
+                    }
 
-            {/* 拖曳到此公會時的明顯提示 */}
-            {isOver && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-indigo-900/70 to-transparent pointer-events-none z-10">
-                    <MoveRight size={72} className="text-indigo-300 animate-bounce mb-4" strokeWidth={2.5} />
-                    <div className="text-indigo-200 text-lg font-bold tracking-wide drop-shadow-2xl px-6 py-3 bg-indigo-950/70 rounded-xl border-2 border-indigo-400/50 shadow-lg animate-pulse">
-                        鬆開移動至此公會
-                    </div>
-                </div>
-            )}
+                    const isLeader = member.role === 'leader';
+                    const isVice = member.role === 'coleader';
+
+                    return (
+                        <MemberCard
+                            key={member.id}
+                            member={member}
+                            isSelected={selectedIds.has(member.id!)}
+                            isMultiSelectMode={isMultiSelectMode}
+                            onToggleSelect={() => toggleSelect(member.id!)}
+                            isLeader={isLeader}
+                            isVice={isVice}
+                            fixedWidth={cardWidth}
+                        />
+                    );
+                })}
+            </div>
 
             {/* 新增成員按鈕 */}
             <div className="p-2 border-t border-gray-700 bg-gray-900">
                 {isAdding ? (
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
                         <input
                             type="text"
                             value={newMemberName}
@@ -145,12 +160,12 @@ export default function GuildSection({ guild, cardWidth }: Props) {
                                 }
                             }}
                             placeholder="輸入名稱..."
-                            className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-indigo-500"
+                            className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-indigo-500 min-w-0"
                             autoFocus
                         />
                         <button
                             onClick={handleAddMember}
-                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded text-xs"
+                            className="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded text-xs flex-shrink-0"
                         >
                             新增
                         </button>

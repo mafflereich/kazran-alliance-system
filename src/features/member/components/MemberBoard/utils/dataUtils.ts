@@ -33,7 +33,7 @@ export function buildTieredData(members: Member[], guilds: Guild[]): TieredData[
                 .sort((a, b) => (a.guild.orderNum ?? 999) - (b.guild.orderNum ?? 999))
                 .map(e => ({
                     ...e.guild,
-                    members: e.members.sort((a, b) => a.name.localeCompare(b.name)),
+                    members: e.members.sort((a, b) => (a.updatedAt ?? 0) - (b.updatedAt ?? 0)),
                 })) as GuildWithMembers[],
         }));
 

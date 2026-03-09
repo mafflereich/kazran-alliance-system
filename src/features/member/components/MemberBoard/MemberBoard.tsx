@@ -1,6 +1,6 @@
 // src/components/MemberBoard/MemberBoard.tsx
-import { useEffect, useState } from 'react';
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import { useEffect, useState, useRef } from 'react';
+import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { DndContext, closestCorners, DragEndEvent } from '@dnd-kit/core';
 import { useMemberBoardStore } from './store/useMemberBoardStore';
 import { buildTieredData } from './utils/dataUtils';
@@ -9,6 +9,8 @@ import BatchActionBar from './BatchActionBar';
 import ZoomControls from './ZoomControls';
 import NotificationModal from './NotificationModal';
 import type { Member, Guild, TieredData } from '@entities/member/types';
+import StagingArea from './StagingArea';
+import { RotateCcw } from 'lucide-react';
 
 type Props = {
     initialMembers: Member[];
@@ -28,10 +30,11 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
         clearSelection,
         deleteMember,
         pasteMembers,
-        moveMember,
+        undo,
+        redo,
+        history,
+        redoStack,
     } = useMemberBoardStore();
-
-    const [disablePan, setDisablePan] = useState(false);
 
     useEffect(() => {
         init(initialMembers, initialGuilds);
@@ -49,6 +52,22 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
     // ==================== 熱鍵 ====================
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Shift to toggle multi-select
+            if (e.key === 'Shift') {
+                setMultiSelectMode(!isMultiSelectMode);
+            }
+
+            // Undo / Redo
+            if (e.ctrlKey) {
+                if (e.key.toLowerCase() === 'z') {
+                    e.preventDefault();
+                    undo();
+                } else if (e.key.toLowerCase() === 'y') {
+                    e.preventDefault();
+                    redo();
+                }
+            }
+
             if (!isMultiSelectMode || !e.ctrlKey) return;
 
             const selected = Array.from(selectedIds);
@@ -70,7 +89,6 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
                         const pasted: Member[] = JSON.parse(text);
                         if (pasted.length === 0) return;
 
-                        // 彈出選擇公會的選單（這裡用簡單的 prompt 示範，你可以改成 modal）
                         const guildNames = localGuilds.map(g => g.name).join('\n');
                         const choice = prompt(
                             `請選擇要貼上的公會名稱（輸入名稱）:\n\n${guildNames}`,
@@ -93,7 +111,6 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
                         }));
 
                         pasteMembers(newMembers);
-                        console.log(`已暫存 ${newMembers.length} 位成員到公會 ${targetGuild.name}`);
                     } catch (err) {
                         console.error('貼上失敗', err);
                     }
@@ -103,32 +120,51 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isMultiSelectMode, selectedIds, localMembers, localGuilds, deleteMember, clearSelection, pasteMembers]);
+    }, [isMultiSelectMode, selectedIds, localMembers, localGuilds, deleteMember, clearSelection, pasteMembers, undo, redo]);
 
     // ==================== 拖曳 ====================
-    const handleDragStart = () => setDisablePan(true);
 
-    const handleDragEnd = (event: DragEndEvent) => {
-        setDisablePan(false);
-        const { active, over } = event;
-        if (!over) return;
+    useEffect(() => {
+        const handleGlobalPointerDown = (e: PointerEvent) => {
+            if (e.target instanceof HTMLElement && e.target.tagName !== 'INPUT') {
+                if (document.activeElement instanceof HTMLInputElement) {
+                    document.activeElement.blur();
+                }
+            }
+        };
+        window.addEventListener('pointerdown', handleGlobalPointerDown, { capture: true });
+        return () => window.removeEventListener('pointerdown', handleGlobalPointerDown, { capture: true });
+    }, []);
 
-        const activeId = active.id as string;
-        const overId = over.id as string;
 
-        if (overId.startsWith('guild-')) {
-            const targetGuildId = overId.replace('guild-', '');
-            moveMember(activeId, targetGuildId);
-        } else {
-            const targetMember = localMembers.find(m => m.id === overId);
-            if (targetMember) moveMember(activeId, targetMember.guildId);
-        }
-    };
 
     return (
-        <div className="relative h-screen w-full overflow-hidden bg-gray-950 text-gray-100">
+        <div className="relative max-h-[720px] w-full overflow-hidden bg-gray-950 text-gray-100">
             {/* 頂部控制列 */}
             <div className="absolute top-3 right-3 z-50 flex items-center gap-3">
+                <button
+                    onClick={undo}
+                    disabled={history.length === 0}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${history.length > 0
+                        ? 'bg-gray-800 text-gray-200 hover:bg-gray-700 border border-gray-600'
+                        : 'bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed opacity-50'
+                        }`}
+                >
+                    <RotateCcw size={14} />
+                    <span>Undo</span>
+                </button>
+                <button
+                    onClick={redo}
+                    disabled={redoStack.length === 0}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${redoStack.length > 0
+                        ? 'bg-gray-800 text-gray-200 hover:bg-gray-700 border border-gray-600'
+                        : 'bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed opacity-50'
+                        }`}
+                >
+                    <RotateCcw size={14} className="scale-x-[-1]" />
+                    <span>Redo</span>
+                </button>
+
                 <button
                     onClick={() => setMultiSelectMode(!isMultiSelectMode)}
                     className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${isMultiSelectMode
@@ -146,37 +182,31 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
                     儲存變更
                 </button>
             </div>
-
             <TransformWrapper
                 initialScale={0.6}
                 minScale={0.2}
                 maxScale={1.5}
-                panning={{ disabled: disablePan }}
                 wheel={{ step: 0.1 }}
                 pinch={{ disabled: false }}
                 doubleClick={{ disabled: true }}
-                limitToBounds={false}           // 關鍵：允許超出邊界
+                limitToBounds={false}
                 centerOnInit={false}
             >
                 <TransformComponent wrapperStyle={{ width: '300%', height: '100%' }}>
-                    {/* 強制內容高度 + 大量底部 padding，讓可以拉到最底 */}
                     <div className="min-h-[180vh] pb-[1200px] p-4">
-                        <DndContext
-                            collisionDetection={closestCorners}
-                            onDragStart={handleDragStart}
-                            onDragEnd={handleDragEnd}
-                        >
-                            <div className="w-full grid grid-cols-2 gap-4">
-                                {tieredData.map(({ tier, guilds }) => (
-                                    <TierSection key={tier} tier={tier} guilds={guilds} />
-                                ))}
-                            </div>
-                        </DndContext>
+                        <div className="w-full grid grid-cols-2 gap-4">
+                            {tieredData.map(({ tier, guilds }) => (
+                                <TierSection key={tier} tier={tier} guilds={guilds} />
+                            ))}
+                        </div>
                     </div>
                 </TransformComponent>
 
                 <ZoomControls />
             </TransformWrapper>
+
+            <StagingArea />
+
 
             <BatchActionBar />
             <NotificationModal />

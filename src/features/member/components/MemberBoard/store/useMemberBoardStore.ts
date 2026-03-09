@@ -5,10 +5,12 @@ import type { Member, Guild } from '@entities/member/types';
 type Store = {
     localMembers: Member[];
     localGuilds: Guild[];
-    pendingPastedMembers: Member[];   // ← 貼上成員暫存（等儲存才合併）
+    stagingMembers: Member[]; // ← 暫存區成員
+    history: { local: Member[], staging: Member[] }[]; // ← 歷史紀錄，用於 Undo
+    redoStack: { local: Member[], staging: Member[] }[]; // ← Redo 堆疊
     selectedIds: Set<string>;
     isMultiSelectMode: boolean;
-    initialMemberStates: Record<string, { guildId: string; note?: string }>; // Track initial state for note restoration
+    initialMemberStates: Record<string, { guildId: string; note?: string }>;
 
     // 初始化
     init: (members: Member[], guilds: Guild[]) => void;
@@ -18,7 +20,11 @@ type Store = {
     updateMember: (id: string, updates: Partial<Member>) => void;
     deleteMember: (id: string) => void;
     duplicateMember: (id: string) => void;
+    moveSelectedMembers: (targetGuildId: string) => void;
     moveMember: (id: string, newGuildId: string) => void;
+    moveToStaging: (id: string) => void;
+    undo: () => void;
+    redo: () => void; // ← 新增 redo
 
     // 批次操作
     batchUpdateColor: (color: string) => void;
@@ -44,14 +50,16 @@ type Store = {
     };
     closeNotification: () => void;
 
-    // 儲存到資料庫（這裡才真正合併 pending + 存入後端）
+    // 儲存到資料庫
     saveToDatabase: () => Promise<void>;
 };
 
 export const useMemberBoardStore = create<Store>((set, get) => ({
     localMembers: [],
     localGuilds: [],
-    pendingPastedMembers: [],
+    stagingMembers: [],
+    history: [],
+    redoStack: [], // ← 初始化
     selectedIds: new Set(),
     isMultiSelectMode: false,
     initialMemberStates: {},
@@ -74,68 +82,77 @@ export const useMemberBoardStore = create<Store>((set, get) => ({
         set({
             localMembers: [...members],
             localGuilds: [...guilds],
-            pendingPastedMembers: [], // 重置暫存
+            stagingMembers: [],
+            history: [],
+            redoStack: [],
             initialMemberStates: initialStates,
         });
     },
 
     addMember: (member) =>
-        set((state) => ({
-            localMembers: [...state.localMembers, member],
-            initialMemberStates: {
-                ...state.initialMemberStates,
-                [member.id!]: { guildId: member.guildId, note: member.note }
-            }
-        })),
+        set((state) => {
+            const newMembers = [...state.localMembers, { ...member }];
+            return {
+                localMembers: newMembers,
+                history: [...state.history, { local: state.localMembers, staging: state.stagingMembers }],
+                redoStack: [], // 新操作清空 redo
+                initialMemberStates: {
+                    ...state.initialMemberStates,
+                    [member.id!]: { guildId: 'new', note: member.note }
+                }
+            };
+        }),
 
     updateMember: (id, updates) =>
         set((state) => ({
             localMembers: state.localMembers.map((m) =>
-                m.id === id ? { ...m, ...updates, updatedAt: Date.now() } : m
+                m.id === id ? { ...m, ...updates } : m
             ),
+            stagingMembers: state.stagingMembers.map((m) =>
+                m.id === id ? { ...m, ...updates } : m
+            ),
+            history: [...state.history, { local: state.localMembers, staging: state.stagingMembers }],
+            redoStack: [], // 新操作清空 redo
         })),
 
     deleteMember: (id) =>
         set((state) => ({
             localMembers: state.localMembers.filter((m) => m.id !== id),
+            stagingMembers: state.stagingMembers.filter((m) => m.id !== id),
             selectedIds: new Set([...state.selectedIds].filter((sid) => sid !== id)),
+            history: [...state.history, { local: state.localMembers, staging: state.stagingMembers }],
+            redoStack: [], // 新操作清空 redo
         })),
 
     duplicateMember: (id) =>
         set((state) => {
-            const original = state.localMembers.find((m) => m.id === id);
+            const original = state.localMembers.find((m) => m.id === id) || state.stagingMembers.find(m => m.id === id);
             if (!original) return state;
             const copy = { ...original, id: uuidv4(), updatedAt: Date.now() };
-            // New member, initial state is current state
             const newInitialStates = {
                 ...state.initialMemberStates,
                 [copy.id]: { guildId: copy.guildId, note: copy.note }
             };
             return {
                 localMembers: [...state.localMembers, copy],
+                history: [...state.history, { local: state.localMembers, staging: state.stagingMembers }],
+                redoStack: [], // 新操作清空 redo
                 initialMemberStates: newInitialStates
             };
         }),
 
     moveMember: (id, newGuildId) =>
         set((state) => {
-            const member = state.localMembers.find(m => m.id === id);
+            const member = state.localMembers.find(m => m.id === id) || state.stagingMembers.find(m => m.id === id);
             if (!member) return {};
 
             const initialState = state.initialMemberStates[id];
             let newNote = member.note;
 
-            // Only modify note if we have initial state to compare against
             if (initialState) {
                 if (newGuildId === initialState.guildId) {
-                    // Moved back to original guild -> Restore original note
                     newNote = initialState.note;
                 } else {
-                    // Moved to different guild -> Set note to original guild name
-                    // Check if the note is already set to the original guild name to avoid overwriting manual edits?
-                    // The requirement says "automatically write", implying overwrite or set.
-                    // And "remove" when moving back.
-                    // We will just set it.
                     const originalGuild = state.localGuilds.find(g => g.id === initialState.guildId);
                     if (originalGuild) {
                         newNote = originalGuild.name;
@@ -143,10 +160,69 @@ export const useMemberBoardStore = create<Store>((set, get) => ({
                 }
             }
 
+            const updatedMember = { ...member, guildId: newGuildId, note: newNote, updatedAt: Date.now() };
+
+            // Remove from staging if it was there
+            const newStaging = state.stagingMembers.filter(m => m.id !== id);
+
+            // Remove from old position in localMembers
+            const filteredLocal = state.localMembers.filter(m => m.id !== id);
+
+            let newLocal;
+            if (member.guildId !== newGuildId) {
+                // Moving to different guild: append to end
+                newLocal = [...filteredLocal, updatedMember];
+            } else {
+                // Moving within same guild: keep original position
+                const oldIndex = state.localMembers.findIndex(m => m.id === id);
+                newLocal = [...filteredLocal];
+                newLocal.splice(oldIndex, 0, updatedMember);
+            }
+
             return {
-                localMembers: state.localMembers.map((m) =>
-                    m.id === id ? { ...m, guildId: newGuildId, note: newNote, updatedAt: Date.now() } : m
-                ),
+                localMembers: newLocal,
+                stagingMembers: newStaging,
+                history: [...state.history, { local: state.localMembers, staging: state.stagingMembers }],
+                redoStack: [], // 新操作清空 redo
+            };
+        }),
+
+    moveToStaging: (id) =>
+        set((state) => {
+            const member = state.localMembers.find(m => m.id === id);
+            if (!member) return {};
+
+            const updatedMember = { ...member, guildId: 'staging', updatedAt: Date.now() };
+
+            return {
+                localMembers: state.localMembers.filter(m => m.id !== id),
+                stagingMembers: [...state.stagingMembers, updatedMember],
+                history: [...state.history, { local: state.localMembers, staging: state.stagingMembers }],
+                redoStack: [], // 新操作清空 redo
+            };
+        }),
+
+    undo: () =>
+        set((state) => {
+            if (state.history.length === 0) return {};
+            const previous = state.history[state.history.length - 1];
+            return {
+                localMembers: previous.local,
+                stagingMembers: previous.staging,
+                history: state.history.slice(0, -1),
+                redoStack: [...state.redoStack, { local: state.localMembers, staging: state.stagingMembers }],
+            };
+        }),
+
+    redo: () =>
+        set((state) => {
+            if (state.redoStack.length === 0) return {};
+            const next = state.redoStack[state.redoStack.length - 1];
+            return {
+                localMembers: next.local,
+                stagingMembers: next.staging,
+                history: [...state.history, { local: state.localMembers, staging: state.stagingMembers }],
+                redoStack: state.redoStack.slice(0, -1),
             };
         }),
 
@@ -155,39 +231,75 @@ export const useMemberBoardStore = create<Store>((set, get) => ({
             localMembers: state.localMembers.map((m) =>
                 state.selectedIds.has(m.id!) ? { ...m, color, updatedAt: Date.now() } : m
             ),
+            stagingMembers: state.stagingMembers.map((m) =>
+                state.selectedIds.has(m.id!) ? { ...m, color, updatedAt: Date.now() } : m
+            ),
+            history: [...state.history, { local: state.localMembers, staging: state.stagingMembers }],
         })),
 
     batchDelete: () =>
         set((state) => ({
             localMembers: state.localMembers.filter((m) => !state.selectedIds.has(m.id!)),
+            stagingMembers: state.stagingMembers.filter((m) => !state.selectedIds.has(m.id!)),
             selectedIds: new Set(),
+            history: [...state.history, { local: state.localMembers, staging: state.stagingMembers }],
         })),
 
     batchDuplicate: () =>
         set((state) => {
-            const duplicates = state.localMembers
+            const duplicatesLocal = state.localMembers
+                .filter((m) => state.selectedIds.has(m.id!))
+                .map((m) => ({ ...m, id: uuidv4(), updatedAt: Date.now() }));
+
+            const duplicatesStaging = state.stagingMembers
                 .filter((m) => state.selectedIds.has(m.id!))
                 .map((m) => ({ ...m, id: uuidv4(), updatedAt: Date.now() }));
 
             const newInitialStates = { ...state.initialMemberStates };
-            duplicates.forEach(d => {
+            [...duplicatesLocal, ...duplicatesStaging].forEach(d => {
                 newInitialStates[d.id] = { guildId: d.guildId, note: d.note };
             });
 
             return {
-                localMembers: [...state.localMembers, ...duplicates],
-                initialMemberStates: newInitialStates
+                localMembers: [...state.localMembers, ...duplicatesLocal],
+                stagingMembers: [...state.stagingMembers, ...duplicatesStaging],
+                initialMemberStates: newInitialStates,
+                history: [...state.history, { local: state.localMembers, staging: state.stagingMembers }],
             };
         }),
 
     batchMoveToGuild: (guildId) =>
-        set((state) => ({
-            localMembers: state.localMembers.map((m) => {
-                if (!state.selectedIds.has(m.id!)) return m;
+        set((state) => {
+            const newLocalMembers = [...state.localMembers];
+            let newStagingMembers = [...state.stagingMembers];
 
+            // 處理 localMembers 中的選取項目
+            for (let i = 0; i < newLocalMembers.length; i++) {
+                const m = newLocalMembers[i];
+                if (state.selectedIds.has(m.id!)) {
+                    const initialState = state.initialMemberStates[m.id!];
+                    let newNote = m.note;
+                    if (initialState) {
+                        if (guildId === initialState.guildId) {
+                            newNote = initialState.note;
+                        } else {
+                            const originalGuild = state.localGuilds.find(g => g.id === initialState.guildId);
+                            if (originalGuild) {
+                                newNote = originalGuild.name;
+                            }
+                        }
+                    }
+                    newLocalMembers[i] = { ...m, guildId, note: newNote, updatedAt: Date.now() };
+                }
+            }
+
+            // 處理 stagingMembers 中的選取項目
+            const stagingToMove = newStagingMembers.filter(m => state.selectedIds.has(m.id!));
+            newStagingMembers = newStagingMembers.filter(m => !state.selectedIds.has(m.id!));
+
+            stagingToMove.forEach(m => {
                 const initialState = state.initialMemberStates[m.id!];
                 let newNote = m.note;
-
                 if (initialState) {
                     if (guildId === initialState.guildId) {
                         newNote = initialState.note;
@@ -198,10 +310,44 @@ export const useMemberBoardStore = create<Store>((set, get) => ({
                         }
                     }
                 }
+                newLocalMembers.push({ ...m, guildId, note: newNote, updatedAt: Date.now() });
+            });
 
-                return { ...m, guildId, note: newNote, updatedAt: Date.now() };
-            }),
-        })),
+            return {
+                localMembers: newLocalMembers,
+                stagingMembers: newStagingMembers,
+                history: [...state.history, { local: state.localMembers, staging: state.stagingMembers }],
+            };
+        }),
+
+    moveSelectedMembers: (targetGuildId: string) =>
+        set((state) => {
+            if (state.selectedIds.size === 0) return {};
+
+            const selectedIds = state.selectedIds;
+
+            // 處理 localMembers
+            let newLocalMembers = state.localMembers.filter(m => !selectedIds.has(m.id!));
+            let newStagingMembers = [...state.stagingMembers];
+
+            const membersToMove = [...state.localMembers, ...state.stagingMembers].filter(m => selectedIds.has(m.id!));
+
+            if (targetGuildId === 'staging') {
+                const updated = membersToMove.map(m => ({ ...m, guildId: 'staging', updatedAt: Date.now() }));
+                newStagingMembers = [...newStagingMembers, ...updated];
+            } else {
+                const updated = membersToMove.map(m => ({ ...m, guildId: targetGuildId, updatedAt: Date.now() }));
+                newLocalMembers = [...newLocalMembers, ...updated];
+            }
+
+            return {
+                localMembers: newLocalMembers,
+                stagingMembers: newStagingMembers,
+                selectedIds: new Set(),
+                history: [...state.history, { local: state.localMembers, staging: state.stagingMembers }],
+                redoStack: [],
+            };
+        }),
 
     toggleSelect: (id) =>
         set((state) => {
@@ -213,21 +359,34 @@ export const useMemberBoardStore = create<Store>((set, get) => ({
     setMultiSelectMode: (mode) => set({ isMultiSelectMode: mode }),
     clearSelection: () => set({ selectedIds: new Set() }),
 
-    // Ctrl+V 貼上 → 先放入 pending
+    // Ctrl+V 貼上
     pasteMembers: (pasted) =>
-        set((state) => ({
-            pendingPastedMembers: [...state.pendingPastedMembers, ...pasted],
-        })),
+        set((state) => {
+            const newMembers = pasted.map(m => ({ ...m }));
+            const newInitialStates = { ...state.initialMemberStates };
+            newMembers.forEach(m => {
+                newInitialStates[m.id!] = { guildId: 'pasted', note: m.note };
+            });
+            return {
+                localMembers: [...state.localMembers, ...newMembers],
+                history: [...state.history, { local: state.localMembers, staging: state.stagingMembers }],
+                initialMemberStates: newInitialStates,
+            };
+        }),
 
-    // 儲存到資料庫（這裡才真正合併 pending）
+    // 儲存到資料庫
     saveToDatabase: async () => {
-        const { localMembers, pendingPastedMembers, initialMemberStates, localGuilds } = get();
+        const { localMembers, initialMemberStates, localGuilds, stagingMembers } = get();
 
-        const finalMembers = [...localMembers, ...pendingPastedMembers];
+        if (stagingMembers.length > 0) {
+            alert('暫存區還有成員未分配公會，請先將他們拖曳至公會中再儲存。');
+            return;
+        }
+
+        const finalMembers = [...localMembers];
 
         console.log('💾 儲存到資料庫...', {
             totalMembers: finalMembers.length,
-            pendingCount: pendingPastedMembers.length,
         });
 
         try {
@@ -365,19 +524,9 @@ export const useMemberBoardStore = create<Store>((set, get) => ({
                 });
             }
 
-            // Update initial states after save to reflect the new "base" state
-            const newInitialStates: Record<string, { guildId: string; note?: string }> = {};
-            finalMembers.forEach(m => {
-                if (m.id) {
-                    newInitialStates[m.id] = { guildId: m.guildId, note: m.note };
-                }
-            });
-
             // 儲存成功後清空 pending
             set({
                 localMembers: finalMembers,
-                pendingPastedMembers: [],
-                initialMemberStates: newInitialStates,
             });
 
         } catch (err: any) {

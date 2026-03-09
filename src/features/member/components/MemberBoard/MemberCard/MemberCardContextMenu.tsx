@@ -62,12 +62,6 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
                         }}
                     >
                         <button
-                            onClick={() => { setShowNoteModal(true); setShowContextMenu(false); }}
-                            className="w-full text-left px-4 py-2 text-sm hover:bg-gray-800 text-gray-200 flex items-center gap-2 cursor-pointer"
-                        >
-                            <Pencil size={14} /> 編輯備註
-                        </button>
-                        <button
                             onClick={() => { setShowColorMenu(!showColorMenu); setShowGuildMenu(false); }}
                             className="w-full text-left px-4 py-2 text-sm hover:bg-gray-800 text-gray-200 flex items-center gap-2 cursor-pointer"
                         >
@@ -90,6 +84,12 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
                             className="w-full text-left px-4 py-2 text-sm hover:bg-indigo-900/50 text-indigo-300 flex items-center gap-2 cursor-pointer"
                         >
                             <MoveHorizontal size={14} /> 移動到其他公會
+                        </button>
+                        <button
+                            onClick={() => { useMemberBoardStore.getState().moveToStaging(member.id!); setShowContextMenu(false); }}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-indigo-900/50 text-indigo-300 flex items-center gap-2 cursor-pointer"
+                        >
+                            <MoveHorizontal size={14} /> 加入暫存區
                         </button>
                     </Popover.Content>
                 </Popover.Portal>

@@ -13,6 +13,11 @@ export default function MemberScoreEditor({ member }: Props) {
     const [value, setValue] = useState(member.totalScore?.toString() || '0');
     const inputRef = useRef<HTMLInputElement>(null);
 
+    // 當成員資訊變更（如移動公會）時，關閉編輯狀態
+    useEffect(() => {
+        setEditing(false);
+    }, [member.guildId, member.name]);
+
     useEffect(() => {
         if (editing && inputRef.current) {
             inputRef.current.focus();
@@ -51,6 +56,8 @@ export default function MemberScoreEditor({ member }: Props) {
                     onChange={(e) => setValue(e.target.value)}
                     onBlur={handleSave}
                     onKeyDown={handleKeyDown}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
                     className="
             w-16 text-[10px] bg-gray-800 border border-gray-600 rounded px-1 py-0.5 
             outline-none focus:border-emerald-500 text-emerald-300 text-right
