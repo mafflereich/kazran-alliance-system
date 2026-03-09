@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import type { Member } from '@entities/member/types';
 import MemberCardContextMenu from './MemberCardContextMenu';
-import MemberScoreEditor from './MemberScoreEditor';
 import { useMemberBoardStore } from '../store/useMemberBoardStore';
 
 type Props = {
@@ -35,22 +34,11 @@ export default function MemberCard({
     isVice = false,
     fixedWidth,
 }: Props) {
-    const { initialMemberStates, localGuilds, updateMember } = useMemberBoardStore();
+    const { initialMemberStates, localGuilds } = useMemberBoardStore();
 
     const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
-    const [isEditingNote, setIsEditingNote] = useState(false);
-    const [noteValue, setNoteValue] = useState(member.note || '');
 
     // ==================== 多選模式強制禁用 ====================
-    const canEdit = !isMultiSelectMode;
-
-    // 切換到多選模式時強制關閉備註編輯（防止狀態殘留）
-    useEffect(() => {
-        if (isMultiSelectMode && isEditingNote) {
-            setIsEditingNote(false);
-            setNoteValue(member.note || '');
-        }
-    }, [isMultiSelectMode, member.note]);
 
     const initialState = initialMemberStates[member.id!];
     const isMoved = initialState && initialState.guildId !== member.guildId;
@@ -69,10 +57,6 @@ export default function MemberCard({
 
     const originalGuild = isMoved && !isNew && !isPasted ? localGuilds.find(g => g.id === initialState.guildId) : null;
 
-    const handleNoteSave = () => {
-        updateMember(member.id!, { note: noteValue });
-        setIsEditingNote(false);
-    };
 
     return (
         <Tooltip.Provider delayDuration={200}>
@@ -83,7 +67,7 @@ export default function MemberCard({
                     width: `${fixedWidth}px`,
                 }}
                 className={`
-          relative flex flex-col justify-center px-2 py-1 rounded-md border text-[11px] transition-all duration-100 group overflow-hidden cursor-default m-0.5
+          relative flex flex-col justify-center px-2 py-1 rounded-md border text-[18px] transition-all duration-100 group overflow-hidden cursor-default m-0.5
           ${isLeader ? 'border-yellow-400 bg-gradient-to-r from-yellow-900/60 to-gray-900 shadow-[0_0_10px_rgba(250,204,21,0.3)]' : ''}
           ${isVice ? 'border-purple-400 bg-gradient-to-r from-purple-900/50 to-gray-900 shadow-[0_0_8px_rgba(192,132,252,0.3)]' : ''}
           ${isNew ? 'bg-emerald-900/40 border-emerald-500/50' : (isMoved || isPasted ? 'bg-amber-900/40 border-amber-500/50' : '')}
@@ -110,63 +94,31 @@ export default function MemberCard({
                                 {member.name}
                             </span>
                             {isMoved && originalGuild && (
-                                <span className="text-[8px] px-1 bg-amber-500/20 text-amber-300 rounded border border-amber-500/30 whitespace-nowrap">
+                                <span className="text-[18px] px-1 bg-amber-500/20 text-amber-300 rounded border border-amber-500/30 whitespace-nowrap">
                                     ← {originalGuild.name}
                                 </span>
                             )}
                         </div>
                     </div>
 
-                    {/* 總分（靠右，可編輯） */}
-                    <MemberScoreEditor
-                        member={member}
-                        disabled={!canEdit}
-                    />
+                    {/* 總分（靠右） */}
+                    <div className={`text-[18px] font-medium transition-colors hover:text-emerald-300 text-emerald-400`}>
+                        {member.totalScore ?? 0}
+                    </div>
                 </div>
 
                 {/* 備註（名字下方） */}
-                <div className="mt-0.5 relative z-10">
-                    {isEditingNote && canEdit ? (
-                        <input
-                            type="text"
-                            value={noteValue}
-                            onChange={(e) => setNoteValue(e.target.value)}
-                            onBlur={handleNoteSave}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleNoteSave();
-                                if (e.key === 'Escape') {
-                                    setNoteValue(member.note || '');
-                                    setIsEditingNote(false);
-                                }
-                            }}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            className="w-full bg-gray-800 border border-gray-600 rounded px-1 py-0 text-[9px] text-gray-200 focus:outline-none focus:border-indigo-500"
-                            autoFocus
-                        />
-                    ) : (
+                {member.note && (
+                    <div className="mt-0.5 relative z-10">
                         <Tooltip.Root>
                             <Tooltip.Trigger asChild>
-                                <div
-                                    className={`
-                                        text-[9px] text-gray-400 truncate min-h-[12px] transition-colors
-                                        ${canEdit
-                                            ? 'cursor-text hover:text-gray-200'
-                                            : 'select-none'}
-                                    `}
-                                    onClick={(e) => {
-                                        if (canEdit) {
-                                            e.stopPropagation();
-                                            setIsEditingNote(true);
-                                        }
-                                    }}
-                                >
-                                    {member.note || <span className="opacity-30 italic">Add note...</span>}
+                                <div className={`text-[18px] text-gray-400 truncate min-h-[12px] transition-colors select-none`}               >
+                                    {member.note}
                                 </div>
                             </Tooltip.Trigger>
                         </Tooltip.Root>
-                    )}
-                </div>
+                    </div>
+                )}
 
                 {/* 右鍵選單 */}
                 <MemberCardContextMenu

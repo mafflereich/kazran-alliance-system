@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import * as Popover from '@radix-ui/react-popover';
-import { Pencil, Copy, Trash2, MoveHorizontal, Palette } from 'lucide-react';
+import { Copy, Trash2, MoveHorizontal, Palette } from 'lucide-react';
 import { useMemberBoardStore } from '../store/useMemberBoardStore';
 import type { Member } from '@entities/member/types';
-import MemberNoteModal from './MemberNoteModal';
 
 type Props = {
     member: Member;
@@ -28,7 +26,6 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
     const [showContextMenu, setShowContextMenu] = useState(false);
     const [showGuildMenu, setShowGuildMenu] = useState(false);
     const [showColorMenu, setShowColorMenu] = useState(false);
-    const [showNoteModal, setShowNoteModal] = useState(false);
     const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
 
     useEffect(() => {
@@ -74,12 +71,6 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
                             <Copy size={14} /> 複製
                         </button>
                         <button
-                            onClick={() => { deleteMember(member.id!); setShowContextMenu(false); }}
-                            className="w-full text-left px-4 py-2 text-sm hover:bg-red-900/50 text-red-300 flex items-center gap-2 cursor-pointer"
-                        >
-                            <Trash2 size={14} /> 刪除
-                        </button>
-                        <button
                             onClick={() => { setShowGuildMenu(!showGuildMenu); setShowColorMenu(false); }}
                             className="w-full text-left px-4 py-2 text-sm hover:bg-indigo-900/50 text-indigo-300 flex items-center gap-2 cursor-pointer"
                         >
@@ -90,6 +81,12 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
                             className="w-full text-left px-4 py-2 text-sm hover:bg-indigo-900/50 text-indigo-300 flex items-center gap-2 cursor-pointer"
                         >
                             <MoveHorizontal size={14} /> 加入暫存區
+                        </button>
+                        <button
+                            onClick={() => { deleteMember(member.id!); setShowContextMenu(false); }}
+                            className="w-full text-left px-4 py-2 text-sm hover:bg-red-900/50 text-red-300 flex items-center gap-2 cursor-pointer"
+                        >
+                            <Trash2 size={14} /> 刪除
                         </button>
                     </Popover.Content>
                 </Popover.Portal>
@@ -167,19 +164,6 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
                 </Popover.Portal>
             </Popover.Root>
 
-            {/* 備註編輯 Modal */}
-            {showNoteModal && createPortal(
-                <MemberNoteModal
-                    memberName={member.name}
-                    initialNote={member.note || ''}
-                    onSave={(note) => {
-                        updateMember(member.id!, { note });
-                        setShowNoteModal(false);
-                    }}
-                    onCancel={() => setShowNoteModal(false)}
-                />,
-                document.body
-            )}
         </>
     );
 }
