@@ -1,413 +1,490 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { supabase } from '@/shared/api/supabase';
 import { useAppContext } from '@/store';
+import { Trophy, Save, Search, AlertCircle, X, Swords, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronUp, Edit2, Save, X, Swords, Search, CheckSquare, Square } from 'lucide-react';
-import { getTierColor, getImageUrl } from '@/shared/lib/utils';
-import { Member, CostumeRecord } from '@/entities/member/types';
+import { getImageUrl } from '@/shared/lib/utils';
+import { logEvent } from '@/analytics';
+
+interface RaidSeason {
+  id: string;
+  season_number: number;
+  period_text: string;
+  description: string;
+}
+
+interface MemberRaidRecord {
+  id?: string;
+  season_id: string;
+  member_id: string;
+  score: number;
+  note: string;
+}
 
 export default function GuildRaidManager() {
   const { t, i18n } = useTranslation();
-  const { db, updateMember, showToast } = useAppContext();
-  
-  const [selectedGuildId, setSelectedGuildId] = useState<string | null>(null);
-  const [isGuildSelectOpen, setIsGuildSelectOpen] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState<Record<string, { totalScore: number, note: string }>>({});
-  const [isSaving, setIsSaving] = useState(false);
-  
-  const [trainingInfoMemberId, setTrainingInfoMemberId] = useState<string | null>(null);
-  const [compareMemberIds, setCompareMemberIds] = useState<string[]>([]);
+  const { db, currentUser } = useAppContext();
 
-  const sortedGuilds = useMemo(() => {
+  const [seasons, setSeasons] = useState<RaidSeason[]>([]);
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string>('');
+  const [records, setRecords] = useState<Record<string, MemberRaidRecord>>({}); // key: member_id
+  const [draftRecords, setDraftRecords] = useState<Record<string, MemberRaidRecord>>({});
+  
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const [isComparisonMode, setIsComparisonMode] = useState(false);
+  const [selectedGuildIds, setSelectedGuildIds] = useState<string[]>([]);
+  
+  const [sortConfig, setSortConfig] = useState<{ key: 'default' | 'score', order: 'asc' | 'desc' }>({ key: 'default', order: 'asc' });
+  const [selectedMemberStats, setSelectedMemberStats] = useState<any>(null);
+
+  const userRole = currentUser ? db.users[currentUser]?.role : null;
+  const canManage = userRole === 'manager' || userRole === 'admin' || userRole === 'creator';
+  const userGuildId = !canManage && currentUser ? Object.entries(db.guilds).find(([_, g]) => g.username === currentUser)?.[0] : null;
+
+  // Get guilds in the same tier
+  const adminGuild = userGuildId ? db.guilds[userGuildId] : null;
+  const targetTier = adminGuild?.tier || 1; // Default to tier 1 if admin has no guild
+
+  const availableGuilds = useMemo(() => {
     return Object.values(db.guilds)
-      .filter(g => g.isDisplay !== false)
-      .sort((a, b) => {
-        const tierA = a.tier || 99;
-        const tierB = b.tier || 99;
-        if (tierA !== tierB) return tierA - tierB;
-        const orderA = a.orderNum || 99;
-        const orderB = b.orderNum || 99;
-        return orderA - orderB;
-      });
-  }, [db.guilds]);
+      .filter(g => canManage || g.tier === targetTier)
+      .sort((a, b) => (a.orderNum || 99) - (b.orderNum || 99));
+  }, [db.guilds, canManage, targetTier]);
 
-  const tiers = useMemo(() => {
-    const uniqueTiers = Array.from(new Set(sortedGuilds.map(g => g.tier || 1))).sort((a, b) => a - b);
-    return uniqueTiers;
-  }, [sortedGuilds]);
+  useEffect(() => {
+    if (availableGuilds.length > 0 && selectedGuildIds.length === 0) {
+      setSelectedGuildIds([availableGuilds[0].id!]);
+    }
+  }, [availableGuilds]);
 
-  const guild = selectedGuildId ? db.guilds[selectedGuildId] : null;
-  const members = useMemo(() => {
-    if (!selectedGuildId) return [];
-    return Object.entries(db.members)
-      .filter(([_, m]) => m.guildId === selectedGuildId)
-      .map(([id, m]) => ({ id, ...m }))
-      .sort((a, b) => {
-        const roleOrder: Record<string, number> = { 'leader': 1, 'coleader': 2, 'member': 3 };
-        const orderA = roleOrder[a.role] || 99;
-        const orderB = roleOrder[b.role] || 99;
-        if (orderA !== orderB) return orderA - orderB;
-        return a.name.localeCompare(b.name);
-      });
-  }, [db.members, selectedGuildId]);
-
-  const handleEditStart = () => {
-    const initialData: Record<string, { totalScore: number, note: string }> = {};
-    members.forEach(m => {
-      initialData[m.id] = {
-        totalScore: m.totalScore || 0,
-        note: m.note || ''
-      };
-    });
-    setEditData(initialData);
-    setIsEditing(true);
-  };
-
-  const handleEditCancel = () => {
-    setIsEditing(false);
-    setEditData({});
-  };
-
-  const handleEditSave = async () => {
-    setIsSaving(true);
+  const fetchSeasons = async () => {
     try {
-      const promises = Object.entries(editData).map(([id, data]) => {
-        const member = db.members[id];
-        if (member && (member.totalScore !== data.totalScore || member.note !== data.note)) {
-          return updateMember(id, { totalScore: data.totalScore, note: data.note });
-        }
-        return Promise.resolve();
-      });
-      await Promise.all(promises);
-      showToast(t('common.save_success', '儲存成功'), 'success');
-      setIsEditing(false);
-    } catch (error: any) {
-      console.error("Error saving raid data:", error);
-      showToast(`${t('common.save_failed', '儲存失敗')}: ${error.message}`, 'error');
-    } finally {
-      setIsSaving(false);
+      const { data, error } = await supabase.from('raid_seasons').select('*').order('season_number', { ascending: false });
+      if (error) throw error;
+      setSeasons(data || []);
+      if (data && data.length > 0) {
+        setSelectedSeasonId(data[0].id);
+      }
+    } catch (err: any) {
+      console.error('Error fetching seasons:', err);
+      setError(err.message);
     }
   };
 
-  const toggleCompare = (id: string) => {
-    setCompareMemberIds(prev => {
-      if (prev.includes(id)) return prev.filter(x => x !== id);
-      if (prev.length >= 2) return [prev[1], id];
-      return [...prev, id];
+  useEffect(() => {
+    fetchSeasons();
+  }, []);
+
+  const fetchRecords = async () => {
+    if (!selectedSeasonId) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('member_raid_records')
+        .select('*')
+        .eq('season_id', selectedSeasonId);
+
+      if (error) {
+        // If table doesn't exist, we just use empty data
+        if (error.code !== '42P01') throw error;
+      }
+
+      const recordsMap: Record<string, MemberRaidRecord> = {};
+      (data || []).forEach(r => {
+        recordsMap[r.member_id] = r;
+      });
+      setRecords(recordsMap);
+      setDraftRecords({});
+    } catch (err: any) {
+      console.error('Error fetching records:', err);
+      // Don't show error if table doesn't exist yet
+      if (err.code !== '42P01') {
+        setError(err.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecords();
+  }, [selectedSeasonId]);
+
+  const handleGuildToggle = (guildId: string) => {
+    if (isComparisonMode) {
+      setSelectedGuildIds(prev => {
+        if (prev.includes(guildId)) {
+          if (prev.length === 1) return prev; // Keep at least one
+          return prev.filter(id => id !== guildId);
+        }
+        if (prev.length >= 4) return prev; // Max 4
+        return [...prev, guildId];
+      });
+    } else {
+      setSelectedGuildIds([guildId]);
+    }
+  };
+
+  useEffect(() => {
+    if (!isComparisonMode && selectedGuildIds.length > 1) {
+      setSelectedGuildIds([selectedGuildIds[0]]);
+    }
+  }, [isComparisonMode]);
+
+  const handleRecordChange = (memberId: string, field: 'score' | 'note', value: string | number) => {
+    setDraftRecords(prev => {
+      const existingRecord = prev[memberId] || records[memberId] || { season_id: selectedSeasonId, member_id: memberId, score: 0, note: '' };
+      
+      let finalValue = value;
+      if (field === 'score') {
+        finalValue = Math.min(Math.max(Number(value) || 0, 0), 10000);
+      }
+
+      return {
+        ...prev,
+        [memberId]: {
+          ...existingRecord,
+          [field]: finalValue
+        }
+      };
     });
   };
 
-  const renderTrainingInfo = (memberId: string) => {
-    const member = db.members[memberId];
-    if (!member) return null;
+  const handleSaveAll = async () => {
+    const draftsToSave = Object.values(draftRecords);
+    if (draftsToSave.length === 0) return;
 
-    const characters = Object.values(db.characters).sort((a, b) => a.orderNum - b.orderNum);
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('member_raid_records')
+        .upsert(draftsToSave, { onConflict: 'season_id, member_id' });
 
+      if (error) throw error;
+
+      setRecords(prev => ({ ...prev, ...draftRecords }));
+      setDraftRecords({});
+      logEvent('GuildRaidManager', 'Save Records', `Count: ${draftsToSave.length}`);
+    } catch (err: any) {
+      console.error('Error saving records:', err);
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getSortedMembers = (guildId: string) => {
+    const guildMembers = Object.values(db.members).filter(m => m.guildId === guildId);
+    
+    return guildMembers.sort((a, b) => {
+      if (sortConfig.key === 'score') {
+        const scoreA = draftRecords[a.id!]?.score ?? records[a.id!]?.score ?? 0;
+        const scoreB = draftRecords[b.id!]?.score ?? records[b.id!]?.score ?? 0;
+        if (scoreA !== scoreB) {
+          return sortConfig.order === 'desc' ? scoreB - scoreA : scoreA - scoreB;
+        }
+      }
+
+      // Default sort: role then name
+      const roleOrder: Record<string, number> = { 'leader': 1, 'coleader': 2, 'member': 3 };
+      const orderA = roleOrder[a.role] || 99;
+      const orderB = roleOrder[b.role] || 99;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name);
+    });
+  };
+
+  const handleSort = (key: 'default' | 'score') => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        return { key, order: prev.order === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, order: key === 'score' ? 'desc' : 'asc' };
+    });
+  };
+
+  if (!canManage) {
     return (
-      <div className="flex flex-col gap-4">
-        <h3 className="font-bold text-lg text-stone-800 dark:text-stone-200 text-center mb-2">{member.name}</h3>
-        {characters.map(character => {
-          const characterCostumes = Object.values(db.costumes)
-            .filter(c => c.characterId === character.id)
-            .sort((a, b) => (a.orderNum ?? 999) - (b.orderNum ?? 999));
-            
-          if (characterCostumes.length === 0) return null;
-          
-          const hasExclusiveWeapon = member.exclusiveWeapons?.[character.id] ?? false;
+      <div className="h-screen flex flex-col">
+        <div className="flex-1 flex items-center justify-center bg-stone-100 dark:bg-stone-900">
+          <div className="text-center p-8 bg-white dark:bg-stone-800 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-700 max-w-md">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('errors.permission')}</h2>
+            <p className="text-stone-500 dark:text-stone-400 mb-6">{t('dashboard.no_permission')}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-          return (
-            <div key={character.id} className="bg-white dark:bg-stone-800 rounded-xl shadow-sm border border-stone-200 dark:border-stone-700 overflow-hidden">
-              <div className="bg-stone-50 dark:bg-stone-700 px-3 py-2 border-b border-stone-200 dark:border-stone-600 flex justify-between items-center">
-                <h4 className="font-bold text-stone-800 dark:text-stone-200 text-sm">
-                  {i18n.language === 'en' ? (character.nameE || character.name) : character.name}
-                </h4>
+  return (
+    <div className="min-h-screen bg-stone-100 dark:bg-stone-900 flex flex-col">
+      <main className="max-w-7xl mx-auto p-4 sm:p-6 flex-1 w-full flex flex-col">
+        
+        {/* Top Control Bar */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl">
+              <Trophy className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-stone-800 dark:text-stone-100">
+                {t('raid.title_guild_manager', '公會分數管理')}
+              </h1>
+              <div className="text-sm text-stone-500 dark:text-stone-400">
+                Tier {targetTier}
               </div>
-              <div className="p-3 flex flex-wrap gap-3">
-                {characterCostumes.map(costume => {
-                  const record = member.records?.[costume.id];
-                  const hasCostume = record && record.level >= 0;
-                  
-                  let levelColorClass = "bg-orange-400 text-stone-900";
-                  if (hasCostume) {
-                    const level = Number(record.level);
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={selectedSeasonId}
+              onChange={e => setSelectedSeasonId(e.target.value)}
+              className="px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            >
+              {seasons.map(s => (
+                <option key={s.id} value={s.id}>S{s.season_number} ({s.period_text})</option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => {
+                // To be implemented or linked to AllianceRaidRecord's modal
+                alert('請至「聯盟成績記錄」頁面新增賽季');
+              }}
+              className="flex items-center gap-2 px-3 py-2 bg-stone-800 dark:bg-stone-700 text-white rounded-lg hover:bg-stone-700 dark:hover:bg-stone-600 transition-colors text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('alliance_raid.add_season', '新增賽季')}</span>
+            </button>
+
+            <label className="flex items-center gap-2 cursor-pointer bg-white dark:bg-stone-800 px-3 py-2 rounded-lg border border-stone-200 dark:border-stone-700 shadow-sm">
+              <span className="text-sm font-medium text-stone-700 dark:text-stone-300">⚖️ {t('raid.comparison_mode', '比較模式')}</span>
+              <div className="relative flex items-center">
+                <input
+                  type="checkbox"
+                  className="peer sr-only"
+                  checked={isComparisonMode}
+                  onChange={(e) => setIsComparisonMode(e.target.checked)}
+                />
+                <div className="w-10 h-6 bg-stone-200 dark:bg-stone-600 rounded-full peer peer-checked:bg-indigo-500 transition-colors shadow-inner"></div>
+                <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform peer-checked:translate-x-4 shadow-md"></div>
+              </div>
+            </label>
+
+            <button
+              onClick={handleSaveAll}
+              disabled={saving || Object.keys(draftRecords).length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            >
+              <Save className="w-4 h-4" />
+              <span>{saving ? t('common.saving', '儲存中...') : t('raid.save_all', '儲存所有變更')}</span>
+              {Object.keys(draftRecords).length > 0 && (
+                <span className="bg-white text-emerald-700 text-xs font-bold px-1.5 py-0.5 rounded-full ml-1">
+                  {Object.keys(draftRecords).length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3 text-red-700 dark:text-red-400">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <p>{error}</p>
+          </div>
+        )}
+
+        {/* Guild Selection */}
+        <div className="mb-4 flex flex-wrap gap-2">
+          {availableGuilds.map(guild => {
+            const isSelected = selectedGuildIds.includes(guild.id!);
+            return (
+              <button
+                key={guild.id}
+                onClick={() => handleGuildToggle(guild.id!)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  isSelected
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 border border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-700'
+                }`}
+              >
+                {isComparisonMode && (
+                  <input 
+                    type="checkbox" 
+                    checked={isSelected} 
+                    readOnly 
+                    className="mr-2 accent-indigo-500"
+                  />
+                )}
+                {guild.name}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Tables Area */}
+        <div className={`flex-1 grid gap-4 ${isComparisonMode ? `grid-cols-1 md:grid-cols-${Math.min(selectedGuildIds.length, 4)}` : 'grid-cols-1'}`}>
+          {selectedGuildIds.map(guildId => {
+            const guild = db.guilds[guildId];
+            const sortedMembers = getSortedMembers(guildId);
+
+            return (
+              <div key={guildId} className="bg-white dark:bg-stone-800 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-700 flex flex-col overflow-hidden">
+                <div className="bg-stone-50 dark:bg-stone-700 px-4 py-3 border-b border-stone-200 dark:border-stone-600 font-bold text-stone-800 dark:text-stone-200 flex justify-between items-center">
+                  <span>{guild?.name}</span>
+                  <span className="text-xs font-normal text-stone-500 dark:text-stone-400">{sortedMembers.length} {t('common.member', '成員')}</span>
+                </div>
+                
+                <div className="flex-1 overflow-auto">
+                  {loading ? (
+                    <div className="p-8 text-center text-stone-500">{t('common.loading', '載入中...')}</div>
+                  ) : (
+                    <table className="w-full text-left border-collapse">
+                      <thead className="sticky top-0 bg-stone-50 dark:bg-stone-700 z-10 shadow-sm">
+                        <tr>
+                          <th 
+                            className="p-3 text-xs font-semibold text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-600 cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-600"
+                            onClick={() => handleSort('default')}
+                          >
+                            {t('common.member', '成員')}
+                          </th>
+                          <th 
+                            className="p-3 text-xs font-semibold text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-600 cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-600 w-24"
+                            onClick={() => handleSort('score')}
+                          >
+                            {t('raid.column_score', '分數')}
+                          </th>
+                          {!isComparisonMode && (
+                            <th className="p-3 text-xs font-semibold text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-600">
+                              {t('raid.column_note', '備註')}
+                            </th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedMembers.map(member => {
+                          const record = draftRecords[member.id!] || records[member.id!] || { score: 0, note: '' };
+                          const isDirty = !!draftRecords[member.id!];
+
+                          return (
+                            <tr key={member.id} className={`border-b border-stone-100 dark:border-stone-700/50 hover:bg-stone-50 dark:hover:bg-stone-700/50 transition-colors ${isDirty ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}>
+                              <td className="p-2">
+                                <button 
+                                  onClick={() => setSelectedMemberStats(member)}
+                                  className="flex items-center gap-2 text-sm font-medium text-stone-800 dark:text-stone-200 hover:text-indigo-600 dark:hover:text-indigo-400 text-left"
+                                >
+                                  <Search className="w-3.5 h-3.5 text-stone-400" />
+                                  <span className="truncate max-w-[120px]">{member.name}</span>
+                                </button>
+                              </td>
+                              <td className="p-2">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="10000"
+                                  value={record.score || ''}
+                                  onChange={(e) => handleRecordChange(member.id!, 'score', e.target.value)}
+                                  className={`w-full px-2 py-1 text-sm border rounded bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:ring-2 focus:ring-indigo-500 outline-none ${isDirty ? 'border-amber-300 dark:border-amber-600' : 'border-stone-300 dark:border-stone-600'}`}
+                                />
+                              </td>
+                              {!isComparisonMode && (
+                                <td className="p-2">
+                                  <input
+                                    type="text"
+                                    value={record.note || ''}
+                                    onChange={(e) => handleRecordChange(member.id!, 'note', e.target.value)}
+                                    className={`w-full px-2 py-1 text-sm border rounded bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:ring-2 focus:ring-indigo-500 outline-none ${isDirty ? 'border-amber-300 dark:border-amber-600' : 'border-stone-300 dark:border-stone-600'}`}
+                                  />
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+      </main>
+
+      {/* Member Stats Modal */}
+      {selectedMemberStats && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-stone-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden">
+            <div className="flex justify-between items-center p-4 border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-700/50">
+              <h3 className="text-lg font-bold text-stone-800 dark:text-stone-100 flex items-center gap-2">
+                {selectedMemberStats.name} {t('raid.stats', '練度資訊')}
+              </h3>
+              <button
+                onClick={() => setSelectedMemberStats(null)}
+                className="p-1 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 rounded-lg hover:bg-stone-200 dark:hover:bg-stone-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {Object.values(db.costumes)
+                  .filter(c => selectedMemberStats.records?.[c.id]?.level >= 0)
+                  .sort((a, b) => (b.orderNum || 99) - (a.orderNum || 99))
+                  .map(costume => {
+                    const level = selectedMemberStats.records[costume.id].level;
+                    const hasWeapon = selectedMemberStats.exclusiveWeapons?.[costume.characterId];
+                    
+                    let levelColorClass = "bg-orange-400 text-stone-900";
                     if (level <= 0) levelColorClass = "bg-stone-300 text-stone-900";
                     else if (level === 1) levelColorClass = "bg-blue-300 text-stone-900";
                     else if (level === 2) levelColorClass = "bg-blue-400 text-stone-900";
                     else if (level === 3) levelColorClass = "bg-purple-300 text-stone-900";
                     else if (level === 4) levelColorClass = "bg-purple-400 text-stone-900";
-                  }
 
-                  return (
-                    <div key={costume.id} className="relative w-[60px] h-[60px] bg-stone-100 dark:bg-stone-700 rounded-lg overflow-hidden border border-stone-200 dark:border-stone-600 shrink-0">
-                      {costume.imageName && (
-                        <img
-                          src={getImageUrl(costume.imageName)}
-                          alt={costume.name}
-                          className={`w-full h-full object-cover ${!hasCostume ? 'opacity-30 grayscale' : ''}`}
-                          referrerPolicy="no-referrer"
-                        />
-                      )}
-                      <div className="absolute top-0.5 right-0.5 flex items-center gap-0.5 bg-black/60 rounded px-1 py-0.5 backdrop-blur-sm">
-                        {hasExclusiveWeapon && <Swords className="w-3 h-3 text-amber-400" />}
-                        <span className={`text-[10px] font-bold leading-none ${hasCostume ? levelColorClass : 'text-stone-300 bg-transparent'}`}>
-                          {hasCostume ? `+${record.level}` : '-'}
-                        </span>
+                    return (
+                      <div key={costume.id} className="bg-stone-50 dark:bg-stone-700/50 rounded-xl p-3 border border-stone-200 dark:border-stone-700 flex flex-col items-center gap-2 relative">
+                        {costume.imageName && (
+                          <div className="w-16 h-16 rounded-lg overflow-hidden border border-stone-200 dark:border-stone-600">
+                            <img
+                              src={getImageUrl(costume.imageName)}
+                              alt={i18n.language === 'en' ? (costume.nameE || costume.name) : costume.name}
+                              className="w-full h-full object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                        )}
+                        <div className="text-xs font-medium text-center truncate w-full text-stone-700 dark:text-stone-300" title={i18n.language === 'en' ? (costume.nameE || costume.name) : costume.name}>
+                          {i18n.language === 'en' ? (costume.nameE || costume.name) : costume.name}
+                        </div>
+                        <div className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${levelColorClass}`}>
+                          +{level}
+                        </div>
+                        {hasWeapon && (
+                          <div className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center shadow-sm">
+                            <Swords className="w-3.5 h-3.5 text-amber-600" />
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  );
+                    );
                 })}
               </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  return (
-    <div className="min-h-screen bg-stone-100 dark:bg-stone-900 flex flex-col">
-      <main className="max-w-7xl mx-auto p-4 sm:p-6 flex-1 w-full flex flex-col gap-6">
-        
-        {/* Guild Selection Panel */}
-        <div className="bg-white dark:bg-stone-800 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-700 overflow-hidden">
-          <div 
-            className="px-6 py-4 flex justify-between items-center cursor-pointer hover:bg-stone-50 dark:hover:bg-stone-700/50 transition-colors"
-            onClick={() => setIsGuildSelectOpen(!isGuildSelectOpen)}
-          >
-            <h2 className="text-lg font-bold text-stone-800 dark:text-stone-200">
-              {t('guilds.select_guild', '選擇公會')}
-            </h2>
-            {isGuildSelectOpen ? <ChevronUp className="w-5 h-5 text-stone-500" /> : <ChevronDown className="w-5 h-5 text-stone-500" />}
-          </div>
-          
-          {isGuildSelectOpen && (
-            <div className="p-6 border-t border-stone-200 dark:border-stone-700 flex flex-col gap-4">
-              {tiers.map(tier => {
-                const tierGuilds = sortedGuilds.filter(g => g.tier === tier);
-                if (tierGuilds.length === 0) return null;
-                
-                return (
-                  <div key={tier} className="flex items-center gap-4">
-                    <div className="w-16 shrink-0 font-bold text-stone-500 dark:text-stone-400">
-                      Tier {tier}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {tierGuilds.map(g => {
-                        const isSelected = selectedGuildId === g.id;
-                        const tierColorClass = getTierColor(tier);
-                        // Extract background class for selected state
-                        const bgClass = tierColorClass.split(' ').find(c => c.startsWith('bg-') && !c.includes('/')) || 'bg-stone-200';
-                        const darkBgClass = tierColorClass.split(' ').find(c => c.startsWith('dark:bg-') && !c.includes('/')) || 'dark:bg-stone-600';
-                        const textClass = tierColorClass.split(' ').find(c => c.startsWith('text-')) || 'text-stone-800';
-                        const darkTextClass = tierColorClass.split(' ').find(c => c.startsWith('dark:text-')) || 'dark:text-stone-200';
-                        
-                        return (
-                          <button
-                            key={g.id}
-                            onClick={() => {
-                              setSelectedGuildId(g.id);
-                              setIsEditing(false);
-                            }}
-                            className={`px-4 py-2 rounded-lg font-medium transition-all border ${
-                              isSelected 
-                                ? `${bgClass} ${darkBgClass} text-white border-transparent shadow-md` 
-                                : `bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-700 ${textClass} ${darkTextClass}`
-                            }`}
-                          >
-                            {g.name}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Guild Members Section */}
-        {guild && (
-          <div className="bg-white dark:bg-stone-800 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-700 overflow-hidden flex flex-col flex-1">
-            <div className="px-6 py-4 border-b border-stone-200 dark:border-stone-700 flex justify-between items-center bg-stone-50 dark:bg-stone-700/50">
-              <div className="flex items-baseline gap-3">
-                <h2 className="text-xl font-bold text-stone-800 dark:text-stone-200">{guild.name}</h2>
-                <span className="text-sm font-medium text-stone-500 dark:text-stone-400">
-                  {members.length} / 30 {t('common.members', '成員')}
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                {isEditing ? (
-                  <>
-                    <button 
-                      onClick={handleEditCancel}
-                      className="px-4 py-2 bg-stone-200 dark:bg-stone-600 text-stone-800 dark:text-stone-200 rounded-lg hover:bg-stone-300 dark:hover:bg-stone-500 transition-colors flex items-center gap-2"
-                    >
-                      <X className="w-4 h-4" />
-                      {t('common.cancel', '取消')}
-                    </button>
-                    <button 
-                      onClick={handleEditSave}
-                      disabled={isSaving}
-                      className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-                    >
-                      <Save className="w-4 h-4" />
-                      {isSaving ? t('common.loading', '儲存中...') : t('common.save', '儲存')}
-                    </button>
-                  </>
-                ) : (
-                  <button 
-                    onClick={handleEditStart}
-                    className="px-4 py-2 bg-stone-800 dark:bg-stone-600 text-white rounded-lg hover:bg-stone-700 dark:hover:bg-stone-500 transition-colors flex items-center gap-2"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                    {t('common.edit', '編輯')}
-                  </button>
-                )}
-              </div>
-            </div>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-700">
-                    <th className="py-2 px-4 font-semibold w-48">{t('common.name', '名稱')}</th>
-                    <th className="py-2 px-4 font-semibold w-32">{t('common.score', '分數')}</th>
-                    <th className="py-2 px-4 font-semibold">{t('common.note', '備註')}</th>
-                    <th className="py-2 px-4 font-semibold w-48 text-right">{t('common.actions', '操作')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {members.map(member => (
-                    <tr key={member.id} className="border-b border-stone-100 dark:border-stone-700/50 hover:bg-stone-50 dark:hover:bg-stone-700/30 transition-colors">
-                      <td className="py-1.5 px-4 font-medium text-stone-800 dark:text-stone-200">
-                        <div className="flex items-center gap-2">
-                          {member.name}
-                          {(member.role === 'leader' || member.role === 'coleader') && (
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${member.role === 'leader' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'}`}>
-                              {member.role === 'leader' ? t('roles.leader') : t('roles.coleader')}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-1.5 px-4">
-                        {isEditing ? (
-                          <input 
-                            type="number"
-                            value={editData[member.id]?.totalScore ?? ''}
-                            onChange={e => setEditData(prev => ({
-                              ...prev,
-                              [member.id]: { ...prev[member.id], totalScore: Number(e.target.value) }
-                            }))}
-                            className="w-full px-2 py-1 border border-stone-300 dark:border-stone-600 rounded bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 text-sm focus:ring-1 focus:ring-amber-500 outline-none"
-                          />
-                        ) : (
-                          <span className="text-stone-700 dark:text-stone-300 font-mono">
-                            {member.totalScore?.toLocaleString() || '-'}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-1.5 px-4">
-                        {isEditing ? (
-                          <input 
-                            type="text"
-                            value={editData[member.id]?.note ?? ''}
-                            onChange={e => setEditData(prev => ({
-                              ...prev,
-                              [member.id]: { ...prev[member.id], note: e.target.value }
-                            }))}
-                            className="w-full px-2 py-1 border border-stone-300 dark:border-stone-600 rounded bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 text-sm focus:ring-1 focus:ring-amber-500 outline-none"
-                          />
-                        ) : (
-                          <span className="text-stone-500 dark:text-stone-400 text-sm">
-                            {member.note || '-'}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-1.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => toggleCompare(member.id)}
-                            className={`p-1.5 rounded transition-colors flex items-center gap-1 text-xs font-medium ${
-                              compareMemberIds.includes(member.id) 
-                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400' 
-                                : 'text-stone-500 hover:bg-stone-200 dark:text-stone-400 dark:hover:bg-stone-600'
-                            }`}
-                          >
-                            {compareMemberIds.includes(member.id) ? <CheckSquare className="w-3.5 h-3.5" /> : <Square className="w-3.5 h-3.5" />}
-                            {t('common.compare', '比較')}
-                          </button>
-                          <button
-                            onClick={() => setTrainingInfoMemberId(member.id)}
-                            className="px-2 py-1.5 bg-stone-200 dark:bg-stone-700 text-stone-700 dark:text-stone-300 text-xs font-medium rounded hover:bg-stone-300 dark:hover:bg-stone-600 transition-colors"
-                          >
-                            {t('common.training_info', '練度資訊')}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {members.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="py-8 text-center text-stone-500 dark:text-stone-400">
-                        {t('common.noData', '無資料')}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* Training Info Modal (Single or Compare) */}
-      {(trainingInfoMemberId || compareMemberIds.length > 0) && (
-        <div 
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-          onClick={() => {
-            setTrainingInfoMemberId(null);
-            setCompareMemberIds([]);
-          }}
-        >
-          <div 
-            className={`bg-stone-100 dark:bg-stone-900 rounded-2xl shadow-2xl w-full max-h-[90vh] flex flex-col overflow-hidden ${
-              compareMemberIds.length > 0 ? 'max-w-6xl' : 'max-w-3xl'
-            }`}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="px-6 py-4 border-b border-stone-200 dark:border-stone-700 flex justify-between items-center bg-white dark:bg-stone-800">
-              <h2 className="text-xl font-bold text-stone-800 dark:text-stone-200">
-                {compareMemberIds.length > 0 ? t('common.compare_mode', '並列比較模式') : t('common.training_info', '練度資訊')}
-              </h2>
-              <button 
-                onClick={() => {
-                  setTrainingInfoMemberId(null);
-                  setCompareMemberIds([]);
-                }} 
-                className="p-2 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-full transition-colors"
-              >
-                <X className="w-6 h-6 text-stone-500 dark:text-stone-400" />
-              </button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto flex-1">
-              {compareMemberIds.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {compareMemberIds.map(id => (
-                    <div key={id} className="flex flex-col">
-                      {renderTrainingInfo(id)}
-                    </div>
-                  ))}
+              {(!selectedMemberStats.records || Object.keys(selectedMemberStats.records).length === 0) && (
+                <div className="text-center text-stone-500 py-8">
+                  {t('raid.no_stats', '尚無練度資料')}
                 </div>
-              ) : trainingInfoMemberId ? (
-                renderTrainingInfo(trainingInfoMemberId)
-              ) : null}
+              )}
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 }
