@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/app/providers/ThemeContext';
 import { logEvent } from '@/analytics';
 import { motion, AnimatePresence } from 'motion/react';
+import { canUserAccessPage } from '@/shared/lib/access';
 
 import { supabase } from '@/shared/api/supabase';
 
@@ -182,21 +183,8 @@ export default function Header() {
   const userRole = currentUser ? db.users[currentUser]?.role : null;
   const canSeeAllGuilds = userRole === 'admin' || userRole === 'creator' || userRole === 'manager';
 
-  const getDefaultRoles = (pageId: string): ('member' | 'manager' | 'admin' | 'creator')[] => {
-    switch (pageId) {
-      case 'costume_list': return ['member', 'manager', 'admin', 'creator'];
-      case 'application_mailbox': return ['member', 'manager', 'admin', 'creator'];
-      case 'arcade': return ['manager', 'admin', 'creator'];
-      case 'alliance_raid_record': return ['creator'];
-      case 'toolbox': return ['member', 'manager', 'admin', 'creator'];
-      default: return ['creator', 'admin'];
-    }
-  };
-
   const canAccessPage = (pageId: string) => {
-    const roles = db.accessControl?.[pageId]?.roles || getDefaultRoles(pageId);
-    if (!currentUser) return false;
-    return roles.includes(userRole as any);
+    return canUserAccessPage(pageId, userRole || undefined, db.accessControl);
   };
 
   const userGuildId = !canSeeAllGuilds && currentUser ? Object.entries(db.guilds).find(([_, g]) => g.username === currentUser)?.[0] : null;

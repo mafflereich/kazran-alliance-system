@@ -361,5 +361,14 @@
     "copyright": "© 2026 Browndust2 - Kazran Alliance System by 爽世 & ChaosOp. All rights reserved.",
     "disclaimer": "This website is not affiliated with or endorsed by Browndust2. All trademarks and copyrights of the game and its characters are owned by their respective owners.",
     "language": "Language"
+  },
+  "raid": {
+    "title_guild_manager": "Guild Raid Manager",
+    "comparison_mode": "Comparison Mode",
+    "save_all": "Save All",
+    "column_score": "Score",
+    "column_note": "Note",
+    "stats": "Stats",
+    "no_stats": "No stats available"
   }
 }

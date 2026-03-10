@@ -98,6 +98,7 @@ interface AppContextType {
   userVolume: number | null;
   setUserVolume: (volume: number) => void;
 
+  isLoaded: boolean;
   isRoleLoading: boolean;
   isMembersLoading: boolean;
 }
@@ -319,7 +320,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const characters = charactersRes.data.reduce((acc, char) => ({ ...acc, [char.id]: toCamel(char) }), {});
         const costumes = costumesRes.data.reduce((acc, costume) => ({ ...acc, [costume.id]: toCamel(costume) }), {});
         const settings = settingsRes.data.reduce((acc, setting) => ({ ...acc, [setting.id]: toCamel(setting) }), {});
-        const accessControl = accessControlData.reduce((acc, ac) => ({ ...acc, [ac.page]: toCamel(ac) }), {});
+        const accessControl = accessControlData.reduce((acc, ac) => {
+          const camelAc = toCamel<AccessControl>(ac);
+          return { ...acc, [camelAc.page]: camelAc };
+        }, {});
 
         setDbState(prev => ({
           ...prev,
@@ -1131,7 +1135,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       fetchApplyMails, addApplyMail, updateApplyMail, deleteApplyMail,
       updateAccessControl,
       restoreData, toasts, showToast, removeToast,
-      userVolume, setUserVolume, isRoleLoading, isMembersLoading
+      userVolume, setUserVolume, isLoaded, isRoleLoading, isMembersLoading
     }}>
       {children}
     </AppContext.Provider>

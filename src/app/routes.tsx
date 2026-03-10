@@ -28,7 +28,7 @@ export default function AppRoutes() {
             <Routes>
                 <Route path="/" element={<LoginWrapper />} />
                 <Route path="/guild/:guildId" element={
-                    <ProtectedRoute>
+                    <ProtectedRoute pageId="costume_list">
                         <GuildDashboardWrapper />
                     </ProtectedRoute>
                 } />
@@ -38,27 +38,27 @@ export default function AppRoutes() {
                     </ProtectedRoute>
                 } />
                 <Route path="/team" element={
-                    <ProtectedRoute>
+                    <ProtectedRoute pageId="member_board">
                         <TeamManagementPage />
                     </ProtectedRoute>
                 } />
                 <Route path="/raid" element={
-                    <ProtectedRoute>
+                    <ProtectedRoute pageId="alliance_raid_record">
                         <AllianceRaidRecord />
                     </ProtectedRoute>
                 } />
                 <Route path="/mailbox" element={
-                    <ProtectedRoute>
+                    <ProtectedRoute pageId="application_mailbox">
                         <ApplicationMailbox />
                     </ProtectedRoute>
                 } />
                 <Route path="/arcade" element={
-                    <ProtectedRoute>
+                    <ProtectedRoute pageId="arcade">
                         <ArcadePage />
                     </ProtectedRoute>
                 } />
                 <Route path="/toolbox" element={
-                    <ProtectedRoute>
+                    <ProtectedRoute pageId="toolbox">
                         <Toolbox />
                     </ProtectedRoute>
                 } />

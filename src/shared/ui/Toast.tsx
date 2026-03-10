@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle, AlertCircle, Info, AlertTriangle, X } from 'lucide-react';
 import { useAppContext } from '@/store';
 import { ToastType } from '@/entities/member/types';

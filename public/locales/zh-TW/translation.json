@@ -363,5 +363,14 @@
     "copyright": "© 2026 Browndust2 - Kazran Alliance System by 爽世 & ChaosOp. All rights reserved.",
     "disclaimer": "本網站與 Browndust2 無關，亦未獲得其認可。遊戲及其角色的所有商標和版權均歸其各自所有者所有。",
     "language": "語言"
+  },
+  "raid": {
+    "title_guild_manager": "公會分數管理",
+    "comparison_mode": "比較模式",
+    "save_all": "儲存所有變更",
+    "column_score": "分數",
+    "column_note": "備註",
+    "stats": "練度資訊",
+    "no_stats": "尚無練度資料"
   }
 }

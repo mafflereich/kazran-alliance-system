@@ -6,11 +6,13 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Missing Supabase URL or Anon Key in environment variables');
+    console.warn('Missing Supabase URL or Anon Key in environment variables. Supabase features will be disabled.');
 }
 
 // 原始 client（不建議直接在業務程式碼中使用）
-const rawSupabase = createClient(supabaseUrl, supabaseKey);
+const rawSupabase = (supabaseUrl && supabaseKey) 
+    ? createClient(supabaseUrl, supabaseKey)
+    : null as any; // Cast to any to avoid type errors if null
 
 // 轉換工具
 export const toCamel = <T>(data: any): T => {

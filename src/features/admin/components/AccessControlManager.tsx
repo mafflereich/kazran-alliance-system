@@ -29,7 +29,7 @@ export default function AccessControlManager() {
       case 'arcade': return ['manager', 'admin', 'creator'];
       case 'alliance_raid_record': return ['creator'];
       case 'member_board': return ['manager', 'admin', 'creator'];
-      case 'toolbox': return ['member', 'manager', 'admin', 'creator'];
+      case 'toolbox': return ['manager', 'admin', 'creator'];
       default: return ['creator', 'admin'];
     }
   };
