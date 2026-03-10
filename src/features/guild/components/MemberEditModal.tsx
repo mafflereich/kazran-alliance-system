@@ -3,6 +3,7 @@ import { useAppContext } from '@/store';
 import { X, Save, CheckCircle2, Swords } from 'lucide-react';
 import { getImageUrl } from '@/shared/lib/utils';
 import { useTranslation } from 'react-i18next';
+import { logEvent } from '@/analytics';
 
 export default function MemberEditModal({ memberId, onClose }: { memberId: string, onClose: () => void }) {
   const { t, i18n } = useTranslation();
@@ -19,6 +20,7 @@ export default function MemberEditModal({ memberId, onClose }: { memberId: strin
 
   const handleSave = async () => {
     setIsSaving(true);
+    logEvent('GuildDashboard', 'Update Member Costume', member.name);
 
     try {
       setShowSuccess(true);
