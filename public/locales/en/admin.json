@@ -215,7 +215,18 @@
     "new_costume_ownership_rate": "New Costume Ownership Rate",
     "message": "Message",
     "message_placeholder": "Enter message to display on main page...",
-    "bgm_default_volume": "Default BGM Volume"
+    "bgm_default_volume": "Default BGM Volume",
+    "audio_settings": "Audio Settings",
+    "bgm_url_help": "Please enter the full URL of the background music, supporting common formats like mp3.",
+    "bgm_volume": "BGM Volume",
+    "index_page_settings": "Index Page Settings",
+    "guild_percentage_display": "Guild Percentage Display",
+    "display_all": "Display All",
+    "display_top5": "Display Top 5",
+    "display_none": "Do Not Display",
+    "guild_percentage_order": "Guild Percentage Order",
+    "order_desc": "Descending (High to Low)",
+    "order_asc": "Ascending (Low to High)"
   },
   "access": {
     "page": "Page",

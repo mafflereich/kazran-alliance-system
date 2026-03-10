@@ -215,7 +215,18 @@
     "new_costume_ownership_rate": "新服裝持有率",
     "message": "訊息",
     "message_placeholder": "輸入顯示在主頁面的訊息...",
-    "bgm_default_volume": "背景音樂預設音量"
+    "bgm_default_volume": "背景音樂預設音量",
+    "audio_settings": "音訊設定",
+    "bgm_url_help": "請輸入背景音樂的完整網址，支援 mp3 等常見格式。",
+    "bgm_volume": "背景音樂音量",
+    "index_page_settings": "首頁設定",
+    "guild_percentage_display": "公會百分比顯示",
+    "display_all": "顯示全部",
+    "display_top5": "顯示前五名",
+    "display_none": "不顯示",
+    "guild_percentage_order": "公會百分比排序",
+    "order_desc": "降序 (高到低)",
+    "order_asc": "升序 (低到高)"
   },
   "access": {
     "page": "頁面",

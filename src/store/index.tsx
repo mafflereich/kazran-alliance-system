@@ -270,6 +270,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Subscribe to global data (costumes, users) and guilds
   useEffect(() => {
     const initAuth = async () => {
+      if (!supabase) {
+        console.warn("Supabase is not initialized. Auth features disabled.");
+        return;
+      }
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) {
@@ -292,21 +296,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        setCurrentUser(null);
-        setCurrentView(null);
-      }
-    });
+    let subscription: { unsubscribe: () => void } | null = null;
+    if (supabase) {
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT') {
+          setCurrentUser(null);
+          setCurrentView(null);
+        }
+      });
+      subscription = data.subscription;
+    }
 
     const fetchInitialData = async () => {
       try {
         const [guildsRes, charactersRes, costumesRes, settingsRes, accessControlRes] = await Promise.all([
-          supabase.from('guilds').select('*'),
-          supabase.from('characters').select('*'),
-          supabase.from('costumes').select('*'),
-          supabase.from('settings').select('*'),
-          supabase.from('access_control').select('*'),
+          supabase ? supabase.from('guilds').select('*') : { data: [], error: null },
+          supabase ? supabase.from('characters').select('*') : { data: [], error: null },
+          supabase ? supabase.from('costumes').select('*') : { data: [], error: null },
+          supabase ? supabase.from('settings').select('*') : { data: [], error: null },
+          supabase ? supabase.from('access_control').select('*') : { data: [], error: null },
         ]);
 
         if (guildsRes.error) throw guildsRes.error;
@@ -316,11 +324,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // access_control might not exist yet, handle gracefully
         const accessControlData = accessControlRes.error ? [] : accessControlRes.data;
 
-        const guilds = guildsRes.data.reduce((acc, guild) => ({ ...acc, [guild.id]: toCamel(guild) }), {});
-        const characters = charactersRes.data.reduce((acc, char) => ({ ...acc, [char.id]: toCamel(char) }), {});
-        const costumes = costumesRes.data.reduce((acc, costume) => ({ ...acc, [costume.id]: toCamel(costume) }), {});
-        const settings = settingsRes.data.reduce((acc, setting) => ({ ...acc, [setting.id]: toCamel(setting) }), {});
-        const accessControl = accessControlData.reduce((acc, ac) => {
+        const guilds = (guildsRes.data as any[] || []).reduce((acc, guild) => ({ ...acc, [guild.id]: toCamel(guild) }), {});
+        const characters = (charactersRes.data as any[] || []).reduce((acc, char) => ({ ...acc, [char.id]: toCamel(char) }), {});
+        const costumes = (costumesRes.data as any[] || []).reduce((acc, costume) => ({ ...acc, [costume.id]: toCamel(costume) }), {});
+        const settings = (settingsRes.data as any[] || []).reduce((acc, setting) => ({ ...acc, [setting.id]: toCamel(setting) }), {});
+        const accessControl = (accessControlData as any[] || []).reduce((acc, ac) => {
           const camelAc = toCamel<AccessControl>(ac);
           return { ...acc, [camelAc.page]: camelAc };
         }, {});
@@ -346,7 +354,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetchInitialData();
 
     return () => {
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, []);
 
