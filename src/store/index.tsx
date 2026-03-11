@@ -366,7 +366,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   // Function to fetch members for a specific guild
-  const fetchMembers = async (guildId: string, columns: string = 'id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, archive_remark, member_notes(note, is_reserved, friend_group)') => {
+  const fetchMembers = async (guildId: string, columns: string = 'id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, archive_remark, member_notes(note, is_reserved), member_raid_records(season_note)') => {
     if (isOffline) return;
 
     // Check if we already have members for this guild
@@ -395,17 +395,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newMembers = data.reduce((acc, member) => {
       const camelMember = toCamel<any>(member);
       const memberNotes = Array.isArray(camelMember.memberNotes) ? camelMember.memberNotes[0] : camelMember.memberNotes;
+      const memberRaidRecords = Array.isArray(camelMember.memberRaidRecords) ? camelMember.memberRaidRecords[0] : camelMember.memberRaidRecords;
       // member_notes keys are in snake_case since toCamel uses { deep: false }
       const note = memberNotes?.note || '';
-      const isReserved = memberNotes?.is_reversed || false;
-      const friendGroup = memberNotes?.friend_group || '';
+      const isReserved = memberNotes?.is_reserved || false;
+      const seasonNote = memberRaidRecords?.seasonNote || memberRaidRecords?.season_note || '';
       const mappedMember: Member = {
         ...camelMember,
         note,
         isReserved,
-        friendGroup,
+        seasonNote,
       };
       delete (mappedMember as any).memberNotes;
+      delete (mappedMember as any).memberRaidRecords;
       return { ...acc, [mappedMember.id!]: mappedMember };
     }, {});
 
@@ -428,7 +430,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchAllMembers = async () => {
     if (isOffline) return;
 
-    const { data, error } = await supabase.from('members').select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, archive_remark, member_notes(note, is_reserved, friend_group)');
+    const { data, error } = await supabase.from('members').select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, archive_remark, member_notes(note, is_reserved), member_raid_records(season_note)');
 
     if (error) {
       console.error("Error fetching all members:", error);
@@ -438,17 +440,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const allMembers: Record<string, Member> = data.reduce((acc, member) => {
       const camelMember = toCamel<any>(member);
       const memberNotes = Array.isArray(camelMember.memberNotes) ? camelMember.memberNotes[0] : camelMember.memberNotes;
+      const memberRaidRecords = Array.isArray(camelMember.memberRaidRecords) ? camelMember.memberRaidRecords[0] : camelMember.memberRaidRecords;
       // member_notes keys are in snake_case since toCamel uses { deep: false }
       const note = memberNotes?.note || '';
-      const isReserved = memberNotes?.is_reversed || false;
-      const friendGroup = memberNotes?.friend_group || '';
+      const isReserved = memberNotes?.is_reserved || false;
+      const seasonNote = memberRaidRecords?.seasonNote || memberRaidRecords?.season_note || '';
       const mappedMember: Member = {
         ...camelMember,
         note,
         isReserved,
-        friendGroup,
+        seasonNote,
       };
       delete (mappedMember as any).memberNotes;
+      delete (mappedMember as any).memberRaidRecords;
       return { ...acc, [mappedMember.id!]: mappedMember };
     }, {});
     setDbState(prev => ({ ...prev, members: allMembers }));
@@ -462,7 +466,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     let queryBuilder = supabase
       .from('members')
-      .select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, archive_remark, member_notes(note, is_reserved, friend_group)', { count: 'exact' })
+      .select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, archive_remark, member_notes(note, is_reserved), member_raid_records(season_note)', { count: 'exact' })
       .ilike('name', `%${query}%`)
       .order('status', { ascending: true }) // active comes before archived
       .order('name', { ascending: true })
@@ -480,27 +484,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     return { 
-       data: (data as any[]).map(m => {
-         const camelMember = toCamel<any>(m);
-         const memberNotes = Array.isArray(camelMember.memberNotes) ? camelMember.memberNotes[0] : camelMember.memberNotes;
+      data: (data as any[]).map(m => {
+        const camelMember = toCamel<any>(m);
+        const memberNotes = Array.isArray(camelMember.memberNotes) ? camelMember.memberNotes[0] : camelMember.memberNotes;
+        const memberRaidRecords = Array.isArray(camelMember.memberRaidRecords) ? camelMember.memberRaidRecords[0] : camelMember.memberRaidRecords;
        // member_notes keys are in snake_case since toCamel uses { deep: false }
        const note = memberNotes?.note || '';
-      const isReserved = memberNotes?.is_reserved || false;
-       const friendGroup = memberNotes?.friend_group || '';
+       const isReserved = memberNotes?.is_reserved || false;
+       const seasonNote = memberRaidRecords?.seasonNote || memberRaidRecords?.season_note || '';
          const mappedMember: Member = {
            ...camelMember,
            note,
            isReserved,
-           friendGroup,
+           seasonNote,
          };
          delete (mappedMember as any).memberNotes;
+         delete (mappedMember as any).memberRaidRecords;
          return mappedMember;
-       }),
+       }), 
       total: count || 0 
     };
   };
 
-  // Cleanup subscription on unmount
+   // Cleanup subscription on unmount
   useEffect(() => {
     return () => {
       if (memberUnsub) memberUnsub();
@@ -555,7 +561,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const addMember = async (guildId: string, name: string, role: Role = 'member', note: string = '', isReserved: boolean = false, friendGroup: string = '') => {
+  const addMember = async (guildId: string, name: string, role: Role = 'member', note: string = '', isReserved: boolean = false) => {
     // Check if member already exists in active status
     const { data: activeData, error: activeError } = await supabase
       .from('members')
@@ -611,10 +617,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    if (note || isReserved || friendGroup) {
+    if (note || isReserved) {
       await supabase
         .from('member_notes')
-        .insert({ member_id: newMemberId, note, is_reserved: isReserved, friend_group: friendGroup });
+        .insert({ member_id: newMemberId, note, is_reserved: isReserved });
     }
 
     if (data) {
@@ -658,12 +664,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateMember = async (memberId: string, data: Partial<Member>) => {
     const now = Date.now();
-    const { note, isReserved, friendGroup, ...memberData } = data;
+    const { note, isReserved, ...memberData } = data;
     
     const { error } = await supabaseUpdate('members', { ...memberData, updatedAt: now }, { id: memberId });
 
     // Check if any member_notes fields are being updated
-    const hasMemberNotesUpdate = note !== undefined || isReserved !== undefined || friendGroup !== undefined;
+    const hasMemberNotesUpdate = note !== undefined || isReserved !== undefined;
 
     if (hasMemberNotesUpdate) {
       const { data: existingNote, error: checkError } = await supabase
@@ -679,7 +685,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updateData: any = {};
       if (note !== undefined) updateData.note = note;
       if (isReserved !== undefined) updateData.is_reserved = isReserved;
-      if (friendGroup !== undefined) updateData.friend_group = friendGroup;
 
       if (existingNote) {
         const { error: updateNoteError } = await supabase

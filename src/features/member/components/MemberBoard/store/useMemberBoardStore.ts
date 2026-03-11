@@ -497,7 +497,6 @@ export const useMemberBoardStore = create<Store>((set, get) => ({
                 member_id: m.id,
                 note: m.note,
                 is_reserved: m.isReserved || false,
-                friend_group: m.friendGroup,
             }));
 
             // Upsert to members table

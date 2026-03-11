@@ -221,11 +221,11 @@ export default function MemberCard({
                         )}
 
                         {/* 備註（名字下方） */}
-                        {(member.note || member.friendGroup) && (
+                        {(member.note || member.seasonNote) && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <div ref={noteRef} className="mt-1 text-xs text-gray-400 line-clamp-2 cursor-default select-none">
-                                        {member.friendGroup && <span className="text-emerald-400 mr-1">[{member.friendGroup}]</span>}
+                                        {member.seasonNote && <span className="text-blue-400 mr-1">[{member.seasonNote}]</span>}
                                         {member.note}
                                     </div>
                                 </TooltipTrigger>
@@ -237,7 +237,7 @@ export default function MemberCard({
                                     collisionBoundary={document.body}  // 可選：限制碰撞邊界
                                 >
                                     <p className="whitespace-pre-wrap">
-                                        {member.friendGroup && <span className="text-emerald-400">[{member.friendGroup}]</span>} {member.note}
+                                        {member.seasonNote && <span className="text-blue-400">[{member.seasonNote}]</span>} {member.note}
                                     </p>
                                 </TooltipContent>}
                             </Tooltip>
