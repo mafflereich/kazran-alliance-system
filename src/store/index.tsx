@@ -366,7 +366,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   // Function to fetch members for a specific guild
-  const fetchMembers = async (guildId: string, columns: string = 'id, name, guild_id, role, records, exclusive_weapons, note, color, total_score, updated_at, status, archive_remark') => {
+  const fetchMembers = async (guildId: string, columns: string = 'id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, archive_remark, member_notes(note)') => {
     if (isOffline) return;
 
     // Check if we already have members for this guild
@@ -382,7 +382,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { data, error } = await supabase
       .from('members')
       .select(selectQuery)
-      .eq('guild_id', guildId) as unknown as { data: Member[], error: Error };
+      .eq('guild_id', guildId) as unknown as { data: any[], error: Error };
 
     if (error) {
       console.error("Error fetching members:", error);
@@ -392,7 +392,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    const newMembers = data.reduce((acc, member) => ({ ...acc, [member.id]: toCamel(member) }), {});
+    const newMembers = data.reduce((acc, member) => {
+      const camelMember = toCamel<any>(member);
+      const memberNotes = Array.isArray(camelMember.memberNotes) ? camelMember.memberNotes[0] : camelMember.memberNotes;
+      const mappedMember: Member = {
+        ...camelMember,
+        note: memberNotes?.note || '',
+      };
+      delete (mappedMember as any).memberNotes;
+      return { ...acc, [mappedMember.id!]: mappedMember };
+    }, {});
 
     setDbState(prev => {
       // Filter out old members of this guild from the previous state
@@ -413,14 +422,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchAllMembers = async () => {
     if (isOffline) return;
 
-    const { data, error } = await supabase.from('members').select('*');
+    const { data, error } = await supabase.from('members').select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, archive_remark, member_notes(note)');
 
     if (error) {
       console.error("Error fetching all members:", error);
       return;
     }
 
-    const allMembers: Record<string, Member> = data.reduce((acc, member) => ({ ...acc, [member.id]: toCamel(member) }), {});
+    const allMembers: Record<string, Member> = data.reduce((acc, member) => {
+      const camelMember = toCamel<any>(member);
+      const memberNotes = Array.isArray(camelMember.memberNotes) ? camelMember.memberNotes[0] : camelMember.memberNotes;
+      const mappedMember: Member = {
+        ...camelMember,
+        note: memberNotes?.note || '',
+      };
+      delete (mappedMember as any).memberNotes;
+      return { ...acc, [mappedMember.id!]: mappedMember };
+    }, {});
     setDbState(prev => ({ ...prev, members: allMembers }));
   };
 
@@ -432,7 +450,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     let queryBuilder = supabase
       .from('members')
-      .select('id, name, guild_id, role, records, exclusive_weapons, note, color, total_score, updated_at, status, archive_remark', { count: 'exact' })
+      .select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, archive_remark, member_notes(note)', { count: 'exact' })
       .ilike('name', `%${query}%`)
       .order('status', { ascending: true }) // active comes before archived
       .order('name', { ascending: true })
@@ -449,7 +467,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { data: [], total: 0 };
     }
 
-    return { data: (data as any[]).map(toCamel) as Member[], total: count || 0 };
+    return { 
+      data: (data as any[]).map(m => {
+        const camelMember = toCamel<any>(m);
+        const memberNotes = Array.isArray(camelMember.memberNotes) ? camelMember.memberNotes[0] : camelMember.memberNotes;
+        const mappedMember: Member = {
+          ...camelMember,
+          note: memberNotes?.note || '',
+        };
+        delete (mappedMember as any).memberNotes;
+        return mappedMember;
+      }), 
+      total: count || 0 
+    };
   };
 
   // Cleanup subscription on unmount
@@ -540,15 +570,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (archivedData) {
       // If archived, unarchive them to the target guild
       await unarchiveMember(archivedData.id, guildId);
+      if (note) {
+        await updateMember(archivedData.id, { note });
+      }
       return;
     }
 
+    const newMemberId = uuidv4();
     const newMember = {
-      id: uuidv4(),
+      id: newMemberId,
       name,
       guildId,
       role,
-      note,
       records: {},
       updatedAt: Date.now()
     };
@@ -559,8 +592,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error('Error adding member:', error);
       return;
     }
+
+    if (note) {
+      await supabase
+        .from('member_notes')
+        .insert({ member_id: newMemberId, note });
+    }
+
     if (data) {
-      const addedMember = data[0];
+      const addedMember = { ...data[0], note };
       setDbState(prev => ({
         ...prev,
         members: { ...prev.members, [addedMember.id]: addedMember }
@@ -600,7 +640,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateMember = async (memberId: string, data: Partial<Member>) => {
     const now = Date.now();
-    const { error } = await supabaseUpdate('members', { ...data, updatedAt: now }, { id: memberId });
+    const { note, ...memberData } = data;
+    
+    const { error } = await supabaseUpdate('members', { ...memberData, updatedAt: now }, { id: memberId });
+
+    if (note !== undefined) {
+      const { data: existingNote, error: checkError } = await supabase
+        .from('member_notes')
+        .select('uid')
+        .eq('member_id', memberId)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing note:', checkError);
+      }
+
+      if (existingNote) {
+        const { error: updateNoteError } = await supabase
+          .from('member_notes')
+          .update({ note })
+          .eq('member_id', memberId);
+        if (updateNoteError) console.error('Error updating note:', updateNoteError);
+      } else {
+        const { error: insertNoteError } = await supabase
+          .from('member_notes')
+          .insert({ member_id: memberId, note });
+        if (insertNoteError) console.error('Error inserting note:', insertNoteError);
+      }
+    }
 
     if (error) {
       console.error('Error updating member:', error);

@@ -46,7 +46,7 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
   const closeArchiveModal = () => setArchiveModal(prev => ({ ...prev, isOpen: false }));
 
   useEffect(() => {
-    fetchMembers(guildId, '*');
+    fetchMembers(guildId);
   }, [guildId]);
 
   const sortedGuilds = (Object.entries(db.guilds) as [string, any][]).sort((a, b) => {
@@ -294,13 +294,13 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
             </div>
           </div>
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">{t('common.note')}</label>
+            <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">{t('common.member_note', '成員備註')}</label>
             <input
               type="text"
               className="w-full p-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
               value={formData.note}
               onChange={e => setFormData({ ...formData, note: e.target.value })}
-              placeholder={t('common.note')}
+              placeholder={t('common.member_note', '成員備註')}
             />
           </div>
           <div className="flex gap-2">
@@ -318,7 +318,7 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
             <tr className="border-b-2 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400">
               <th className="p-3 font-semibold">{t('common.name')}</th>
               <th className="p-3 font-semibold">{t('common.role')}</th>
-              <th className="p-3 font-semibold">{t('common.note')}</th>
+              <th className="p-3 font-semibold">{t('common.member_note', '成員備註')}</th>
               <th className="p-3 font-semibold">{t('common.history')}</th>
               <th className="p-3 font-semibold text-right">{t('common.actions')}</th>
             </tr>
@@ -365,9 +365,12 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
                           className="w-full p-1.5 border border-stone-300 dark:border-stone-600 rounded bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100 text-sm"
                           value={formData.note}
                           onChange={e => setFormData({ ...formData, note: e.target.value })}
-                          placeholder={t('common.note')}
+                          placeholder={t('common.member_note', '成員備註')}
                         />
                       </div>
+                    </td>
+                    <td className="p-2 text-stone-400 dark:text-stone-500 text-xs">
+                      {member.archiveRemark}
                     </td>
                     <td className="p-2 text-right">
                       <div className="flex justify-end gap-1">
@@ -402,7 +405,7 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
                       {member.role === 'leader' ? t('roles.leader') : member.role === 'coleader' ? t('roles.coleader') : t('roles.member')}
                     </span>
                   </td>
-                  <td className="p-3 text-stone-500 dark:text-stone-400 text-sm">{member.note}</td>
+                  <td className="p-3 text-stone-500 dark:text-stone-400 text-sm">{member.note || '沒有'}</td>
                   <td className="p-3 text-stone-400 dark:text-stone-500 text-xs">{member.archiveRemark}</td>
                   <td className="p-3 text-right">
                     <div className="flex justify-end gap-1">
