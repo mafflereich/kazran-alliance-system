@@ -795,24 +795,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
-    const archivedMember = toCamel(archivedData) as ArchivedMember;
+    const archivedMember = toCamel(archivedData) as any;
+    const historyArray = archivedMember.membersArchiveHistory ? toCamel(archivedMember.membersArchiveHistory) as any[] : [];
+    
+    // Sort by archived_at descending to get the latest
+    historyArray.sort((a, b) => new Date(b.archivedAt).getTime() - new Date(a.archivedAt).getTime());
 
-    const latestHistory = archivedMember.membersArchiveHistory?.[0];
+    const latestHistory = historyArray[0];
     const archivedAt = latestHistory ? formatDate(latestHistory.archivedAt) : t('common.unknown_time');
-    const archiveCount = archivedMember.membersArchiveHistory?.length || 0;
+    const archiveCount = historyArray.length;
     const remark = t('common.archive_remark', { time: archivedAt, count: archiveCount });
 
     const { error: updateError } = await supabaseUpdate('members',
       {
         status: 'active',
-        guild_id: targetGuildId,
-        archive_remark: remark
+        guild_id: targetGuildId
       },
       {
         'id': memberId
       });
 
     if (updateError) throw updateError;
+
+    const { data: existingNote, error: checkError } = await supabase
+      .from('member_notes')
+      .select('uid')
+      .eq('member_id', memberId)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Error checking existing note:', checkError);
+    }
+
+    if (existingNote) {
+      const { error: updateNoteError } = await supabase
+        .from('member_notes')
+        .update({ archive_remark: remark })
+        .eq('member_id', memberId);
+      if (updateNoteError) console.error('Error updating archive_remark:', updateNoteError);
+    } else {
+      const { error: insertNoteError } = await supabase
+        .from('member_notes')
+        .insert({ member_id: memberId, archive_remark: remark });
+      if (insertNoteError) console.error('Error inserting archive_remark:', insertNoteError);
+    }
 
     // Update local state if needed (optional, depends on if we want to immediately show them in the guild)
     // Usually fetchMembers will handle this when the view changes, but for addMember flow it's good to have.

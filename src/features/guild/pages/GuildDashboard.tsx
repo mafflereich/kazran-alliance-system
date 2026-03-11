@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/store';
 import { Menu, X, Shield, Swords, ArrowDownNarrowWide, ArrowDownWideNarrow, Search } from 'lucide-react';
@@ -8,6 +8,7 @@ import ConfirmModal from '@shared/ui/ConfirmModal';
 import { getTierTextColorDark, getTierHighlightClass, getTierHoverClass, truncateName, getImageUrl } from '@/shared/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { logEvent } from '@/analytics';
+import { supabase } from '@/shared/api/supabase';
 
 export default function GuildDashboard({ guildId }: { guildId: string }) {
   const { t, i18n } = useTranslation();
@@ -18,10 +19,39 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   const [sortConfig, setSortConfig] = useState<{ key: 'member' | string, order: 'asc' | 'desc' }>({ key: 'member', order: 'asc' });
+  const [archiveRemarks, setArchiveRemarks] = useState<Record<string, string>>({});
 
-  React.useEffect(() => {
+  useEffect(() => {
     setSortConfig({ key: 'member', order: 'asc' });
   }, [guildId]);
+
+  useEffect(() => {
+    const fetchArchiveRemarks = async () => {
+      const memberIds = Object.values(db.members)
+        .filter((m: any) => m.guildId === guildId)
+        .map((m: any) => m.id);
+
+      if (memberIds.length === 0) return;
+
+      const { data, error } = await supabase
+        .from('member_notes')
+        .select('member_id, archive_remark')
+        .in('member_id', memberIds)
+        .not('archive_remark', 'is', null);
+
+      if (!error && data) {
+        const remarksMap = data.reduce((acc, note) => {
+          if (note.archive_remark) {
+            acc[note.member_id] = note.archive_remark;
+          }
+          return acc;
+        }, {} as Record<string, string>);
+        setArchiveRemarks(remarksMap);
+      }
+    };
+
+    fetchArchiveRemarks();
+  }, [guildId, db.members]);
 
   const handleSort = (key: string) => {
     logEvent('GuildDashboard', 'Sort', key);
@@ -425,9 +455,9 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
                                     {formatDate(member.updatedAt)}
                                   </span>
                                 )}
-                                {((userRole === 'manager' || userRole === 'admin' || userRole === 'creator') && member.archiveRemark) && (
+                                {((userRole === 'manager' || userRole === 'admin' || userRole === 'creator') && archiveRemarks[id]) && (
                                   <span className="text-[10px] text-amber-600 mt-0.5">
-                                    {member.archiveRemark}
+                                    {archiveRemarks[id]}
                                   </span>
                                 )}
                               </div>
