@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/shared/api/supabase';
 import { useAppContext } from '@/store';
-import { Trophy, Save, AlertCircle, Plus, ChevronDown, ChevronRight, Archive } from 'lucide-react';
+import { Trophy, Save, AlertCircle, Plus, ChevronDown, ChevronRight, Archive, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { logEvent } from '@/analytics';
 import GuildRaidTable from '../components/GuildRaidTable';
@@ -45,6 +45,9 @@ export default function GuildRaidManager() {
   const [selectedMemberStats, setSelectedMemberStats] = useState<any>(null);
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
+
+  const [isSeasonModalOpen, setIsSeasonModalOpen] = useState(false);
+  const [newSeason, setNewSeason] = useState({ season_number: 1, period_text: '', description: '' });
 
   const userRole = currentUser ? db.users[currentUser]?.role : null;
   const canManage = userRole === 'manager' || userRole === 'admin' || userRole === 'creator';
@@ -302,6 +305,33 @@ export default function GuildRaidManager() {
     }
   };
 
+  const handleSaveSeason = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from('raid_seasons')
+        .insert([newSeason])
+        .select();
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const createdSeason = data[0];
+        setSeasons(prev => [createdSeason, ...prev].sort((a, b) => b.season_number - a.season_number));
+        setSelectedSeasonId(String(createdSeason.id));
+        setIsSeasonModalOpen(false);
+        setNewSeason({ season_number: createdSeason.season_number + 1, period_text: '', description: '' });
+        logEvent('GuildRaidManager', 'Add Season', `Season ID: ${createdSeason.id}`);
+      }
+    } catch (err: any) {
+      console.error('Error saving season:', err);
+      setError(`Error saving season: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const selectedSeason = seasons.find(s => String(s.id) === String(selectedSeasonId).trim());
   const isSelectedSeasonArchived = !!selectedSeason?.is_archived;
 
@@ -357,8 +387,12 @@ export default function GuildRaidManager() {
 
             <button
               onClick={() => {
-                // To be implemented or linked to AllianceRaidRecord's modal
-                alert('請至「聯盟成績記錄」頁面新增賽季');
+                setNewSeason({ 
+                  season_number: (seasons[0]?.season_number || 0) + 1, 
+                  period_text: '', 
+                  description: '' 
+                });
+                setIsSeasonModalOpen(true);
               }}
               className="flex items-center gap-2 px-3 py-2 bg-stone-800 dark:bg-stone-700 text-white rounded-lg hover:bg-stone-700 dark:hover:bg-stone-600 transition-colors text-sm"
             >
@@ -530,6 +564,82 @@ export default function GuildRaidManager() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Season Modal */}
+      {isSeasonModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-stone-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="flex justify-between items-center p-4 border-b border-stone-200 dark:border-stone-700">
+              <h3 className="text-lg font-bold text-stone-800 dark:text-stone-100">{t('alliance_raid.add_season')}</h3>
+              <button
+                onClick={() => setIsSeasonModalOpen(false)}
+                className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSeason} className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                  {t('alliance_raid.season_number')}
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  value={newSeason.season_number}
+                  onChange={e => setNewSeason(prev => ({ ...prev, season_number: Number(e.target.value) }))}
+                  className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                  {t('alliance_raid.period')}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newSeason.period_text}
+                  onChange={e => setNewSeason(prev => ({ ...prev, period_text: e.target.value }))}
+                  className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                  {t('alliance_raid.description')}
+                </label>
+                <input
+                  type="text"
+                  value={newSeason.description}
+                  onChange={e => setNewSeason(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100"
+                />
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsSeasonModalOpen(false)}
+                  className="px-4 py-2 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-lg transition-colors"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-4 py-2 bg-stone-800 dark:bg-stone-600 text-white rounded-lg hover:bg-stone-700 dark:hover:bg-stone-500 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {saving && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                  {t('common.add')}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
