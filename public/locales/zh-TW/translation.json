@@ -319,30 +319,6 @@
     "delete_failed": "刪除公會失敗",
     "auth_account_notice": "使用系統開新公會後，要在 Supabase Auth 開一個帳號"
   },
-  "alliance_raid": {
-    "title": "聯盟成績記錄",
-    "download_record": "下載記錄",
-    "add_season": "新增賽季",
-    "edit_season": "編輯賽季",
-    "season_number": "賽季編號",
-    "period": "期間",
-    "description": "說明",
-    "download_title": "下載成績圖片",
-    "single_season": "單次賽季",
-    "consecutive_season": "連續賽季",
-    "all_seasons": "全部賽季",
-    "select_season": "選擇賽季",
-    "start_season": "開始賽季",
-    "end_season": "結束賽季",
-    "start_download": "開始下載圖片",
-    "generating": "生成中...",
-    "no_records": "目前沒有任何賽季記錄。",
-    "export_failed": "生成圖片失敗",
-    "history_title": "聯盟成績歷史",
-    "season_label": "賽季",
-    "seasons_label": "賽季",
-    "generated_at": "生成於"
-  },
   "errors": {
     "unknown": "發生未知錯誤",
     "network": "網路錯誤",
@@ -363,14 +339,5 @@
     "copyright": "© 2026 Browndust2 - Kazran Alliance System by 爽世 & ChaosOp. All rights reserved.",
     "disclaimer": "本網站與 Browndust2 無關，亦未獲得其認可。遊戲及其角色的所有商標和版權均歸其各自所有者所有。",
     "language": "語言"
-  },
-  "raid": {
-    "title_guild_manager": "公會分數管理",
-    "comparison_mode": "比較模式",
-    "save_all": "儲存所有變更",
-    "column_score": "分數",
-    "column_note": "備註",
-    "stats": "練度資訊",
-    "no_stats": "尚無練度資料"
   }
 }

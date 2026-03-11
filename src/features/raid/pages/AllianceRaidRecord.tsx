@@ -22,7 +22,7 @@ interface GuildRaidRecord {
 }
 
 export default function AllianceRaidRecord() {
-  const { t } = useTranslation();
+  const { t } = useTranslation(['raid', 'translation']);
   const { db, currentUser } = useAppContext();
 
   const [seasons, setSeasons] = useState<RaidSeason[]>([]);
@@ -291,20 +291,6 @@ export default function AllianceRaidRecord() {
               <Download className="w-4 h-4" />
               <span>{t('alliance_raid.download_record')}</span>
             </button>
-
-            {canManage && (
-              <button
-                onClick={() => {
-                  setEditingSeasonId(null);
-                  setNewSeason({ season_number: (seasons[0]?.season_number || 0) + 1, period_text: '', description: '' });
-                  setIsSeasonModalOpen(true);
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-stone-800 dark:bg-stone-700 text-white rounded-lg hover:bg-stone-700 dark:hover:bg-stone-600 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                <span>{t('alliance_raid.add_season')}</span>
-              </button>
-            )}
           </div>
         </div>
 

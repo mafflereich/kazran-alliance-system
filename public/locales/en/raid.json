@@ -1,0 +1,36 @@
+{
+  "alliance_raid": {
+    "title": "Alliance Raid Record",
+    "download_record": "Download Record",
+    "add_season": "Add Season",
+    "edit_season": "Edit Season",
+    "season_number": "Season Number",
+    "period": "Period",
+    "description": "Description",
+    "download_title": "Download Record Image",
+    "single_season": "Single Season",
+    "consecutive_season": "Consecutive Season",
+    "all_seasons": "All Seasons",
+    "select_season": "Select Season",
+    "start_season": "Start Season",
+    "end_season": "End Season",
+    "start_download": "Start Download Image",
+    "generating": "Generating...",
+    "no_records": "No season records available.",
+    "export_failed": "Failed to generate image",
+    "history_title": "Alliance Raid History",
+    "season_label": "Season",
+    "seasons_label": "Seasons",
+    "generated_at": "Generated at"
+  },
+  "raid": {
+    "title_guild_manager": "Guild Raid Manager",
+    "comparison_mode": "Parallel Mode",
+    "save_all": "Save All",
+    "column_score": "Score",
+    "column_note": "Member Note",
+    "column_season_note": "Season Note",
+    "stats": "Stats",
+    "no_stats": "No stats available"
+  }
+}

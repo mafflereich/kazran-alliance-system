@@ -317,30 +317,6 @@
     "delete_failed": "Failed to delete guild",
     "auth_account_notice": "After creating a new guild using the system, you need to create an account in Supabase Auth"
   },
-  "alliance_raid": {
-    "title": "Alliance Raid Record",
-    "download_record": "Download Record",
-    "add_season": "Add Season",
-    "edit_season": "Edit Season",
-    "season_number": "Season Number",
-    "period": "Period",
-    "description": "Description",
-    "download_title": "Download Record Image",
-    "single_season": "Single Season",
-    "consecutive_season": "Consecutive Season",
-    "all_seasons": "All Seasons",
-    "select_season": "Select Season",
-    "start_season": "Start Season",
-    "end_season": "End Season",
-    "start_download": "Start Download Image",
-    "generating": "Generating...",
-    "no_records": "No season records available.",
-    "export_failed": "Failed to generate image",
-    "history_title": "Alliance Raid History",
-    "season_label": "Season",
-    "seasons_label": "Seasons",
-    "generated_at": "Generated at"
-  },
   "errors": {
     "unknown": "Unknown error occurred",
     "network": "Network error",
@@ -361,14 +337,5 @@
     "copyright": "© 2026 Browndust2 - Kazran Alliance System by 爽世 & ChaosOp. All rights reserved.",
     "disclaimer": "This website is not affiliated with or endorsed by Browndust2. All trademarks and copyrights of the game and its characters are owned by their respective owners.",
     "language": "Language"
-  },
-  "raid": {
-    "title_guild_manager": "Guild Raid Manager",
-    "comparison_mode": "Comparison Mode",
-    "save_all": "Save All",
-    "column_score": "Score",
-    "column_note": "Note",
-    "stats": "Stats",
-    "no_stats": "No stats available"
   }
 }

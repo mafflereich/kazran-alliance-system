@@ -1,0 +1,40 @@
+{
+  "alliance_raid": {
+    "title": "聯盟成績記錄",
+    "download_record": "下載記錄",
+    "add_season": "新增賽季",
+    "edit_season": "編輯賽季",
+    "season_number": "賽季編號",
+    "period": "期間",
+    "description": "說明",
+    "download_title": "下載成績圖片",
+    "single_season": "單次賽季",
+    "consecutive_season": "連續賽季",
+    "all_seasons": "全部賽季",
+    "select_season": "選擇賽季",
+    "start_season": "開始賽季",
+    "end_season": "結束賽季",
+    "start_download": "開始下載圖片",
+    "generating": "生成中...",
+    "no_records": "目前沒有任何賽季記錄。",
+    "export_failed": "生成圖片失敗",
+    "history_title": "聯盟成績歷史",
+    "season_label": "賽季",
+    "seasons_label": "賽季",
+    "generated_at": "生成於"
+  },
+  "raid": {
+    "title_guild_manager": "公會戰管理",
+    "comparison_mode": "並列模式",
+    "save_all": "儲存所有變更",
+    "column_score": "分數",
+    "column_note": "成員備註",
+    "column_season_note": "賽季備註",
+    "stats": "練度資訊",
+    "no_stats": "尚無練度資料",
+    "archive_season": "封存賽季",
+    "season_archived": "已封存",
+    "archive_season_confirm_title": "確認封存賽季？",
+    "archive_season_confirm_desc": "封存後，此賽季的成績將無法再被修改。您確定要封存嗎？"
+  }
+}

@@ -9,6 +9,7 @@ interface MemberRaidRecord {
   member_id: string;
   score: number;
   note: string;
+  season_note?: string;
 }
 
 interface GuildRaidTableProps {
@@ -18,10 +19,12 @@ interface GuildRaidTableProps {
   records: Record<string, MemberRaidRecord>;
   draftRecords: Record<string, MemberRaidRecord>;
   isComparisonMode: boolean;
+  isArchived?: boolean;
+  seasonId: string;
   loading: boolean;
   saving: boolean;
   onSort: (key: 'default' | 'score') => void;
-  onRecordChange: (memberId: string, field: 'score' | 'note', value: string | number) => void;
+  onRecordChange: (memberId: string, field: 'score' | 'note' | 'season_note', value: string | number) => void;
   onMemberClick: (member: Member) => void;
   onSave: (guildId: string) => Promise<void>;
   onCancel: (guildId: string) => void;
@@ -34,6 +37,8 @@ export default function GuildRaidTable({
   records,
   draftRecords,
   isComparisonMode,
+  isArchived,
+  seasonId,
   loading,
   saving,
   onSort,
@@ -42,8 +47,19 @@ export default function GuildRaidTable({
   onSave,
   onCancel
 }: GuildRaidTableProps) {
-  const { t } = useTranslation();
+  const { t } = useTranslation(['raid', 'translation']);
   const [isEditing, setIsEditing] = useState(false);
+
+  // Reset editing state when season changes or comparison mode changes
+  React.useEffect(() => {
+    console.log('GuildRaidTable Resetting isEditing:', {
+      guildId,
+      seasonId,
+      isComparisonMode,
+      isArchived
+    });
+    setIsEditing(false);
+  }, [seasonId, isComparisonMode]);
 
   const handleSave = async () => {
     await onSave(guildId);
@@ -75,7 +91,11 @@ export default function GuildRaidTable({
               </button>
             </>
           ) : (
-            <button onClick={() => setIsEditing(true)} className="flex items-center gap-1 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors">
+            <button 
+              onClick={() => setIsEditing(true)} 
+              disabled={!!isComparisonMode || !!isArchived}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <Pencil className="w-4 h-4" />
               {t('common.edit', '編輯')}
             </button>
@@ -96,22 +116,28 @@ export default function GuildRaidTable({
                 >
                   {t('common.member', '成員')}
                 </th>
+                {!isComparisonMode && (
+                  <th className="p-3 text-xs font-semibold text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-600">
+                    {t('raid.column_note', '成員備註')}
+                  </th>
+                )}
+                {!isComparisonMode && (
+                  <th className="p-3 text-xs font-semibold text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-600">
+                    {t('raid.column_season_note', '賽季備註')}
+                  </th>
+                )}
                 <th 
                   className="p-3 text-xs font-semibold text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-600 cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-600 w-24"
                   onClick={() => onSort('score')}
                 >
                   {t('raid.column_score', '分數')}
                 </th>
-                {!isComparisonMode && (
-                  <th className="p-3 text-xs font-semibold text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-600">
-                    {t('raid.column_note', '備註')}
-                  </th>
-                )}
               </tr>
             </thead>
             <tbody>
               {sortedMembers.map(member => {
-                const record = draftRecords[member.id!] || records[member.id!] || { score: 0, note: '' };
+                const record = draftRecords[member.id!] || records[member.id!] || { score: 0, season_note: '' };
+                const noteValue = draftRecords[member.id!]?.note ?? member.note ?? '';
                 const isDirty = !!draftRecords[member.id!];
 
                 return (
@@ -125,6 +151,38 @@ export default function GuildRaidTable({
                         <span className="truncate max-w-[120px]">{member.name}</span>
                       </button>
                     </td>
+                    {!isComparisonMode && (
+                      <td className="py-1 px-2">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={noteValue}
+                            onChange={(e) => onRecordChange(member.id!, 'note', e.target.value)}
+                            className={`w-full px-2 py-1 text-sm border rounded bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:ring-2 focus:ring-indigo-500 outline-none ${isDirty ? 'border-amber-300 dark:border-amber-600' : 'border-stone-300 dark:border-stone-600'}`}
+                          />
+                        ) : (
+                          <div className="px-2 py-1 text-sm text-stone-800 dark:text-stone-200 truncate">
+                            {noteValue || ''}
+                          </div>
+                        )}
+                      </td>
+                    )}
+                    {!isComparisonMode && (
+                      <td className="py-1 px-2">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={record.season_note || ''}
+                            onChange={(e) => onRecordChange(member.id!, 'season_note', e.target.value)}
+                            className={`w-full px-2 py-1 text-sm border rounded bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:ring-2 focus:ring-indigo-500 outline-none ${isDirty ? 'border-amber-300 dark:border-amber-600' : 'border-stone-300 dark:border-stone-600'}`}
+                          />
+                        ) : (
+                          <div className="px-2 py-1 text-sm text-stone-800 dark:text-stone-200 truncate">
+                            {record.season_note || ''}
+                          </div>
+                        )}
+                      </td>
+                    )}
                     <td className="py-1 px-2">
                       {isEditing ? (
                         <input
@@ -141,22 +199,6 @@ export default function GuildRaidTable({
                         </div>
                       )}
                     </td>
-                    {!isComparisonMode && (
-                      <td className="py-1 px-2">
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            value={record.note || ''}
-                            onChange={(e) => onRecordChange(member.id!, 'note', e.target.value)}
-                            className={`w-full px-2 py-1 text-sm border rounded bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:ring-2 focus:ring-indigo-500 outline-none ${isDirty ? 'border-amber-300 dark:border-amber-600' : 'border-stone-300 dark:border-stone-600'}`}
-                          />
-                        ) : (
-                          <div className="px-2 py-1 text-sm text-stone-800 dark:text-stone-200 truncate">
-                            {record.note || '-'}
-                          </div>
-                        )}
-                      </td>
-                    )}
                   </tr>
                 );
               })}

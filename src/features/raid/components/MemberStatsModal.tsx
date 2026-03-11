@@ -10,7 +10,7 @@ interface MemberStatsModalProps {
 }
 
 export default function MemberStatsModal({ member, onClose }: MemberStatsModalProps) {
-  const { t, i18n } = useTranslation();
+  const { t, i18n } = useTranslation(['raid', 'translation']);
   const { db } = useAppContext();
 
   const costumesByCharacter = useMemo(() => {
