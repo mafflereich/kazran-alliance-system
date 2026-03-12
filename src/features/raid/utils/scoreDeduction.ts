@@ -5,7 +5,7 @@ export interface DeductionResult {
   borrow: number;
 }
 
-export function deduceScore(targetScore: number, t: (key: string, defaultValue?: string) => string): string {
+export function deduceScore(targetScore: number, t: any): string {
   if (targetScore === 0) return '';
 
   const LANCELOT_SCORE = 49;

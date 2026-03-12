@@ -369,7 +369,7 @@ export default function Header() {
                         {preference === 'light' && <Sun className="w-4 h-4" />}
                         {preference === 'dark' && <Moon className="w-4 h-4" />}
                         {preference === 'system' && <Monitor className="w-4 h-4" />}
-                        <span className="text-xs font-medium">Theme</span>
+                        <span className="text-xs font-medium">{t('common.theme')}</span>
                       </button>
                       <div className="relative" ref={volumeContainerRef}>
                         <button
@@ -379,7 +379,7 @@ export default function Header() {
                           }`}
                         >
                           {isMuted || !hasBgm ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                          <span className="text-xs font-medium">Audio</span>
+                          <span className="text-xs font-medium">{t('settings.bgm')}</span>
                         </button>
                       </div>
                     </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/shared/api/supabase';
 import { useAppContext } from '@/store';
-import { Trophy, Save, AlertCircle, Plus, ChevronDown, ChevronRight, Archive, X } from 'lucide-react';
+import { Trophy, Save, AlertCircle, Plus, Archive, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import GuildRaidTable from '../components/GuildRaidTable';
 import MemberStatsModal from '../components/MemberStatsModal';
@@ -40,8 +40,20 @@ export default function GuildRaidManager() {
   const [seasons, setSeasons] = useState<RaidSeason[]>([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState<string>('');
   const [records, setRecords] = useState<Record<string, MemberRaidRecord>>({}); // key: member_id
+  const recordsRef = React.useRef(records);
+  const dbRef = React.useRef(db);
+  
+  useEffect(() => {
+    recordsRef.current = records;
+  }, [records]);
+
+  useEffect(() => {
+    dbRef.current = db;
+  }, [db]);
+
   const [draftRecords, setDraftRecords] = useState<Record<string, MemberRaidRecord>>({});
   const [guildRaidRecords, setGuildRaidRecords] = useState<Record<string, GuildRaidRecord>>({}); // key: guild_id
+  const [highlightedMemberIds, setHighlightedMemberIds] = useState<Set<string>>(new Set());
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,7 +61,6 @@ export default function GuildRaidManager() {
 
   const [isComparisonMode, setIsComparisonMode] = useState(false);
   const [selectedGuildIds, setSelectedGuildIds] = useState<string[]>([]);
-  const [isGuildSelectionOpen, setIsGuildSelectionOpen] = useState(true);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   
   const [sortConfig, setSortConfig] = useState<{ key: 'default' | 'score', order: 'asc' | 'desc' }>({ key: 'default', order: 'asc' });
@@ -150,6 +161,127 @@ export default function GuildRaidManager() {
     fetchAllMembers();
   }, []);
 
+  useEffect(() => {
+    if (!selectedSeasonId || !supabase) return;
+
+    console.log('Initializing real-time subscriptions for season:', selectedSeasonId);
+
+    const memberRaidRecordsChannel = supabase
+      .channel(`member_raid_records_${selectedSeasonId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'member_raid_records'
+        },
+        (payload) => {
+          console.log('Member raid record change received:', payload);
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const newRecord = payload.new as MemberRaidRecord;
+            if (String(newRecord.season_id) !== String(selectedSeasonId)) return;
+            
+            // Trigger flash effect
+            setHighlightedMemberIds(prev => {
+              const next = new Set(prev);
+              next.add(newRecord.member_id);
+              return next;
+            });
+            setTimeout(() => {
+              setHighlightedMemberIds(prev => {
+                const next = new Set(prev);
+                next.delete(newRecord.member_id);
+                return next;
+              });
+            }, 2000);
+
+            setRecords(prev => ({
+              ...prev,
+              [newRecord.member_id]: newRecord
+            }));
+          } else if (payload.eventType === 'DELETE') {
+            const oldRecord = payload.old as MemberRaidRecord;
+            if (String(oldRecord.season_id) !== String(selectedSeasonId)) return;
+            setRecords(prev => {
+              const next = { ...prev };
+              delete next[oldRecord.member_id];
+              return next;
+            });
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log(`Member raid records subscription status for ${selectedSeasonId}:`, status);
+      });
+
+    const guildRaidRecordsChannel = supabase
+      .channel(`guild_raid_records_${selectedSeasonId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'guild_raid_records'
+        },
+        (payload) => {
+          console.log('Guild raid record change received:', payload);
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const newRecord = payload.new as GuildRaidRecord;
+            if (String(newRecord.season_id) !== String(selectedSeasonId)) return;
+            setGuildRaidRecords(prev => ({
+              ...prev,
+              [newRecord.guild_id]: newRecord
+            }));
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log(`Guild raid records subscription status for ${selectedSeasonId}:`, status);
+      });
+
+    const memberNotesChannel = supabase
+      .channel('member_notes_all')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'member_notes'
+        },
+        (payload) => {
+          console.log('Member note change received:', payload);
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+            const memberId = (payload.new as any)?.member_id || (payload.old as any)?.member_id;
+            if (memberId) {
+              setHighlightedMemberIds(prev => {
+                const next = new Set(prev);
+                next.add(memberId);
+                return next;
+              });
+              setTimeout(() => {
+                setHighlightedMemberIds(prev => {
+                  const next = new Set(prev);
+                  next.delete(memberId);
+                  return next;
+                });
+              }, 2000);
+            }
+            fetchAllMembers();
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Member notes subscription status:', status);
+      });
+
+    return () => {
+      console.log('Cleaning up real-time subscriptions for season:', selectedSeasonId);
+      supabase.removeChannel(memberRaidRecordsChannel);
+      supabase.removeChannel(guildRaidRecordsChannel);
+      supabase.removeChannel(memberNotesChannel);
+    };
+  }, [selectedSeasonId, supabase]);
+
   const fetchRecords = async (isBackground = false) => {
     if (!selectedSeasonId) return;
     if (!isBackground) setLoading(true);
@@ -217,7 +349,6 @@ export default function GuildRaidManager() {
       });
     } else {
       setSelectedGuildIds([guildId]);
-      setIsGuildSelectionOpen(false);
     }
   };
 
@@ -247,33 +378,62 @@ export default function GuildRaidManager() {
     });
   };
 
-  const handleSaveGuild = async (guildId: string) => {
+  const updateGuildMedian = async (guildId: string, customRecords?: Record<string, MemberRaidRecord>) => {
+    const currentRecords = customRecords || records;
     const guildMembers = Object.values(db.members).filter(m => {
       if (isSelectedSeasonArchived) {
-        return records[m.id!]?.season_guild === guildId;
+        return currentRecords[m.id!]?.season_guild === guildId;
       }
       return m.guildId === guildId;
     });
-    const memberIds = new Set(guildMembers.map(m => m.id));
-    const draftsToSave = Object.values(draftRecords).filter(d => {
-      if (!memberIds.has(d.member_id)) return false;
-      const originalRecord = records[d.member_id];
-      const originalNote = db.members[d.member_id]?.note || '';
-      
-      const scoreChanged = d.score !== (originalRecord?.score ?? 0);
-      const seasonNoteChanged = (d.season_note || '') !== (originalRecord?.season_note || '');
-      const noteChanged = (d.note || '') !== originalNote;
-      
-      return scoreChanged || seasonNoteChanged || noteChanged;
-    });
+
+    const currentScores = guildMembers.map(m => currentRecords[m.id!]?.score ?? 0).filter(s => s > 0);
+    const sorted = [...currentScores].sort((a, b) => a - b);
+    let median = 0;
+    if (sorted.length > 0) {
+      const mid = Math.floor(sorted.length / 2);
+      if (sorted.length % 2 !== 0) {
+        median = sorted[mid];
+      } else {
+        median = (sorted[mid - 1] + sorted[mid]) / 2;
+      }
+    }
+    const roundedMedian = Math.floor(median);
+
+    const guildRecord: GuildRaidRecord = {
+      ...guildRaidRecords[guildId],
+      season_id: selectedSeasonId,
+      guild_id: guildId,
+      member_score_median: roundedMedian
+    };
+
+    const { error: guildError } = await supabase
+      .from('guild_raid_records')
+      .upsert(guildRecord, { onConflict: 'season_id, guild_id' });
     
-    if (draftsToSave.length === 0) {
-      // If nothing actually changed, just clear the drafts for this guild
+    if (guildError) throw guildError;
+
+    setGuildRaidRecords(prev => ({
+      ...prev,
+      [guildId]: guildRecord
+    }));
+  };
+
+  const handleAutoSave = async (memberId: string, guildId: string) => {
+    const draft = draftRecords[memberId];
+    if (!draft) return;
+
+    const originalRecord = records[memberId];
+    const originalNote = db.members[memberId]?.note || '';
+    
+    const scoreChanged = draft.score !== (originalRecord?.score ?? 0);
+    const seasonNoteChanged = (draft.season_note || '') !== (originalRecord?.season_note || '');
+    const noteChanged = (draft.note || '') !== originalNote;
+
+    if (!scoreChanged && !seasonNoteChanged && !noteChanged) {
       setDraftRecords(prev => {
         const next = { ...prev };
-        guildMembers.forEach(m => {
-          delete next[m.id!];
-        });
+        delete next[memberId];
         return next;
       });
       return;
@@ -281,95 +441,38 @@ export default function GuildRaidManager() {
 
     setSaving(true);
     try {
-      // Separate raid records and notes
-      const raidRecordsToSave = draftsToSave.map(d => {
-        const { note, ...rest } = d;
-        return rest;
-      });
-
+      const { note, ...raidRecord } = draft;
+      
       const { error } = await supabase
         .from('member_raid_records')
-        .upsert(raidRecordsToSave, { onConflict: 'season_id, member_id' });
+        .upsert(raidRecord, { onConflict: 'season_id, member_id' });
 
       if (error) throw error;
 
-      // Calculate and save median
-      const currentScores = guildMembers.map(m => draftRecords[m.id!]?.score ?? records[m.id!]?.score ?? 0).filter(s => s > 0);
-      const sorted = [...currentScores].sort((a, b) => a - b);
-      let median = 0;
-      if (sorted.length > 0) {
-        const mid = Math.floor(sorted.length / 2);
-        if (sorted.length % 2 !== 0) {
-          median = sorted[mid];
-        } else {
-          median = (sorted[mid - 1] + sorted[mid]) / 2;
-        }
+      if (noteChanged) {
+        await updateMember(memberId, { note: note });
       }
-      const roundedMedian = Math.floor(median);
 
-      const guildRecord: GuildRaidRecord = {
-        ...guildRaidRecords[guildId],
-        season_id: selectedSeasonId,
-        guild_id: guildId,
-        member_score_median: roundedMedian
-      };
-
-      const { error: guildError } = await supabase
-        .from('guild_raid_records')
-        .upsert(guildRecord, { onConflict: 'season_id, guild_id' });
-      
-      if (guildError) throw guildError;
-
-      setGuildRaidRecords(prev => ({
+      setRecords(prev => ({
         ...prev,
-        [guildId]: guildRecord
+        [memberId]: raidRecord as MemberRaidRecord
       }));
 
-      // Update notes
-      for (const d of draftsToSave) {
-        const currentNote = db.members[d.member_id]?.note || '';
-        if (d.note !== undefined && d.note !== currentNote) {
-          await updateMember(d.member_id, { note: d.note });
-        }
-      }
-
-      setRecords(prev => {
-        const next = { ...prev };
-        raidRecordsToSave.forEach(d => {
-          next[d.member_id] = { ...next[d.member_id], ...d } as MemberRaidRecord;
-        });
-        return next;
-      });
-      
       setDraftRecords(prev => {
         const next = { ...prev };
-        draftsToSave.forEach(d => {
-          delete next[d.member_id];
-        });
+        delete next[memberId];
         return next;
       });
+
+      if (scoreChanged) {
+        await updateGuildMedian(guildId);
+      }
     } catch (err: any) {
-      console.error('Error saving records:', err);
+      console.error('Auto-save failed:', err);
       setError(err.message);
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleCancelGuild = (guildId: string) => {
-    setDraftRecords(prev => {
-      const next = { ...prev };
-      const guildMembers = Object.values(db.members).filter(m => {
-        if (isSelectedSeasonArchived) {
-          return records[m.id!]?.season_guild === guildId;
-        }
-        return m.guildId === guildId;
-      });
-      guildMembers.forEach(m => {
-        delete next[m.id!];
-      });
-      return next;
-    });
   };
 
   const getSortedMembers = (guildId: string) => {
@@ -497,6 +600,10 @@ export default function GuildRaidManager() {
 
   const selectedSeason = seasons.find(s => String(s.id) === String(selectedSeasonId).trim());
   const isSelectedSeasonArchived = !!selectedSeason?.is_archived;
+  const isArchivedRef = React.useRef(isSelectedSeasonArchived);
+  useEffect(() => {
+    isArchivedRef.current = isSelectedSeasonArchived;
+  }, [isSelectedSeasonArchived]);
 
   if (!canManage) {
     return (
@@ -607,58 +714,44 @@ export default function GuildRaidManager() {
         )}
 
         {/* Guild Selection */}
-        <div className="flex flex-col lg:flex-row gap-6 mb-6 items-start">
-          <div className="flex-1 w-full bg-white dark:bg-stone-800 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-700 overflow-hidden">
-            <button 
-              onClick={() => setIsGuildSelectionOpen(!isGuildSelectionOpen)}
-              className="w-full px-4 py-3 flex items-center justify-between bg-stone-50 dark:bg-stone-700/50 hover:bg-stone-100 dark:hover:bg-stone-600 transition-colors"
-            >
-              <span className="font-bold text-stone-800 dark:text-stone-200">
-                {t('common.select_guild', '選擇公會')}
-              </span>
-              {isGuildSelectionOpen ? <ChevronDown className="w-5 h-5 text-stone-500" /> : <ChevronRight className="w-5 h-5 text-stone-500" />}
-            </button>
-            
-            {isGuildSelectionOpen && (
-              <div className="p-4 space-y-4">
-                {Object.entries(guildsByTier).sort(([a], [b]) => Number(a) - Number(b)).map(([tierStr, guilds]) => {
-                  const tier = Number(tierStr);
-                  return (
-                    <div key={tier} className="flex items-start gap-4">
-                      <div className="w-16 flex-shrink-0 pt-2 text-sm font-bold text-stone-500 dark:text-stone-400">
-                        T{tier}
-                      </div>
-                      <div className="flex flex-wrap gap-2 flex-1">
-                        {guilds.map(guild => {
-                          const isSelected = selectedGuildIds.includes(guild.id!);
-                          return (
-                            <button
-                              key={guild.id}
-                              onClick={() => handleGuildToggle(guild.id!)}
-                              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
-                                isSelected
-                                  ? getTierColorActive(tier)
-                                  : 'bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-700'
-                              }`}
-                            >
-                              {isComparisonMode && (
-                                <input 
-                                  type="checkbox" 
-                                  checked={isSelected} 
-                                  readOnly 
-                                  className="mr-2"
-                                />
-                              )}
-                              {guild.name}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+        <div className="mb-4">
+          <div className="space-y-1">
+            {Object.entries(guildsByTier).sort(([a], [b]) => Number(a) - Number(b)).map(([tierStr, guilds]) => {
+              const tier = Number(tierStr);
+              return (
+                <div key={tier} className="flex items-center gap-2">
+                  <div className="w-6 flex-shrink-0 text-[10px] font-bold text-stone-400 dark:text-stone-500">
+                    T{tier}
+                  </div>
+                  <div className="flex flex-wrap gap-1 flex-1">
+                    {guilds.map(guild => {
+                      const isSelected = selectedGuildIds.includes(guild.id!);
+                      return (
+                        <button
+                          key={guild.id}
+                          onClick={() => handleGuildToggle(guild.id!)}
+                          className={`px-2.5 py-1 rounded text-[12px] font-medium transition-all border ${
+                            isSelected
+                              ? getTierColorActive(tier)
+                              : 'bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 border-stone-200 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-700'
+                          }`}
+                        >
+                          {isComparisonMode && (
+                            <input 
+                              type="checkbox" 
+                              checked={isSelected} 
+                              readOnly 
+                              className="mr-1.5 w-3.5 h-3.5"
+                            />
+                          )}
+                          {guild.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -672,7 +765,7 @@ export default function GuildRaidManager() {
               <GuildRaidTable
                 key={guildId}
                 guildId={guildId}
-                guildName={guild?.name || ''}
+                guild={guild}
                 sortedMembers={sortedMembers}
                 records={records}
                 draftRecords={draftRecords}
@@ -685,15 +778,15 @@ export default function GuildRaidManager() {
                 sortConfig={sortConfig}
                 onSort={handleSort}
                 onRecordChange={handleRecordChange}
+                onBlur={(memberId) => handleAutoSave(memberId, guildId)}
                 onMemberClick={setSelectedMemberStats}
-                onSave={handleSaveGuild}
-                onCancel={handleCancelGuild}
                 rowHeights={rowHeights}
                 onRowHeightChange={handleRowHeightChange}
                 headerHeight={headerHeight}
                 onHeaderHeightChange={handleHeaderHeightChange}
                 theadHeight={theadHeight}
                 onTheadHeightChange={handleTheadHeightChange}
+                highlightedMemberIds={highlightedMemberIds}
               />
             );
           })}

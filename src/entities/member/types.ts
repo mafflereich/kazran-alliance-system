@@ -7,6 +7,7 @@ export interface Guild {
   orderNum?: number;
   username?: string;
   isDisplay?: boolean;
+  serial?: string | number;
 }
 
 export interface CostumeRecord {
@@ -113,14 +114,6 @@ export interface Toast {
   id: string;
   message: string;
   type: ToastType;
-}
-
-export interface Guild {
-  id?: string;
-  name: string;
-  tier?: number;
-  orderNum?: number;
-  isDisplay?: boolean;
 }
 
 export type GuildWithMembers = Guild & {

@@ -299,8 +299,11 @@ export default function AllianceRaidRecord() {
               <table className="w-full text-left border-collapse min-w-max">
                 <thead>
                   <tr>
-                    <th className="sticky left-0 z-20 bg-stone-100 dark:bg-stone-800 p-2 border-b border-r border-stone-200 dark:border-stone-700 font-bold text-stone-700 dark:text-stone-300 w-24 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] text-xs">
-                      {/* 移除 "公會名稱" */}
+                    <th className="sticky left-0 z-20 bg-stone-100 dark:bg-stone-800 p-2 border-b border-r border-stone-200 dark:border-stone-700 font-bold text-stone-700 dark:text-stone-300 w-12 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] text-xs">
+                      {/* 會數 */}
+                    </th>
+                    <th className="sticky left-12 z-20 bg-stone-100 dark:bg-stone-800 p-2 border-b border-r border-stone-200 dark:border-stone-700 font-bold text-stone-700 dark:text-stone-300 w-24 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] text-xs">
+                      {/* 公會名稱 */}
                     </th>
                     {seasons.map(season => (
                       <th key={season.id} className="p-2 border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 w-[110px] min-w-[110px] max-w-[110px] align-top relative group">
@@ -345,7 +348,10 @@ export default function AllianceRaidRecord() {
 
                     return (
                       <tr key={guild.id} className={`border-b border-stone-100 dark:border-stone-700/50 hover:brightness-95 dark:hover:brightness-110 transition-all ${bgClasses}`}>
-                        <td className={`sticky left-0 z-10 py-1 px-2 border-r border-stone-200 dark:border-stone-700 font-medium shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] text-xs w-24 truncate ${guildColBg} ${textClasses}`}>
+                        <td className={`sticky left-0 z-10 py-1 px-2 border-r border-stone-200 dark:border-stone-700 font-medium shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] text-xs w-12 truncate ${guildColBg} ${textClasses}`}>
+                          {guild.serial ? `${guild.serial} 會` : '-'}
+                        </td>
+                        <td className={`sticky left-12 z-10 py-1 px-2 border-r border-stone-200 dark:border-stone-700 font-medium shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] text-xs w-24 truncate ${guildColBg} ${textClasses}`}>
                           {guild.name}
                         </td>
                         {seasons.map(season => {
@@ -392,7 +398,7 @@ export default function AllianceRaidRecord() {
                                 <div className="flex items-center gap-1.5 min-h-[20px] relative pr-6">
                                   {record ? (
                                     <>
-                                      <div className={`text-sm font-bold leading-tight ${!record.rank.includes('%')
+                                      <div className={`text-sm font-bold leading-tight ${record.rank && !record.rank.includes('%')
                                         ? 'bg-gradient-to-r from-amber-400 to-orange-600 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(245,158,11,0.5)] scale-110 transform origin-left'
                                         : 'text-amber-600 dark:text-amber-400'
                                         }`}>
@@ -610,7 +616,10 @@ export default function AllianceRaidRecord() {
                     <div className="space-y-2">
                       {sortedGuilds.filter(g => g.tier === tier).map(guild => (
                         <div key={guild.id} className="bg-stone-800/50 py-2 px-4 rounded-xl border border-stone-700/50 flex justify-between items-center">
-                          <div className="font-bold text-lg">{guild.name}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-stone-500 font-mono text-sm">{guild.serial ? `${guild.serial} 會` : ''}</span>
+                            <div className="font-bold text-lg">{guild.name}</div>
+                          </div>
                           <div className="flex gap-6">
                             {selectedSeasonsForExport.map(season => {
                               const record = getRecord(guild.id, season.id);
@@ -651,7 +660,10 @@ export default function AllianceRaidRecord() {
                     <div className="space-y-2">
                       {sortedGuilds.filter(g => g.tier === tier).map(guild => (
                         <div key={guild.id} className="bg-stone-800/50 py-2 px-4 rounded-xl border border-stone-700/50 flex justify-between items-center">
-                          <div className="font-bold text-lg">{guild.name}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-stone-500 font-mono text-sm">{guild.serial ? `${guild.serial} 會` : ''}</span>
+                            <div className="font-bold text-lg">{guild.name}</div>
+                          </div>
                           <div className="flex gap-6">
                             {selectedSeasonsForExport.map(season => {
                               const record = getRecord(guild.id, season.id);

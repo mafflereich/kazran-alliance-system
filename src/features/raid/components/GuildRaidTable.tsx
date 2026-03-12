@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, Pencil, Save, X, ArrowDownWideNarrow, ArrowDownNarrowWide } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Member } from '@/entities/member/types';
+import { Member, Guild } from '@/entities/member/types';
 import { deduceScore } from '../utils/scoreDeduction';
 
 interface MemberRaidRecord {
@@ -16,7 +16,7 @@ interface MemberRaidRecord {
 
 interface GuildRaidTableProps {
   guildId: string;
-  guildName: string;
+  guild: Guild;
   sortedMembers: Member[];
   records: Record<string, MemberRaidRecord>;
   draftRecords: Record<string, MemberRaidRecord>;
@@ -29,20 +29,20 @@ interface GuildRaidTableProps {
   sortConfig: { key: 'default' | 'score', order: 'asc' | 'desc' };
   onSort: (key: 'default' | 'score') => void;
   onRecordChange: (memberId: string, field: 'score' | 'note' | 'season_note', value: string | number) => void;
+  onBlur: (memberId: string) => void;
   onMemberClick: (member: Member) => void;
-  onSave: (guildId: string) => Promise<void>;
-  onCancel: (guildId: string) => void;
   rowHeights?: Record<number, number>;
   onRowHeightChange?: (index: number, height: number) => void;
   headerHeight?: number;
   onHeaderHeightChange?: (height: number) => void;
   theadHeight?: number;
   onTheadHeightChange?: (height: number) => void;
+  highlightedMemberIds?: Set<string>;
 }
 
 export default function GuildRaidTable({
   guildId,
-  guildName,
+  guild,
   sortedMembers,
   records,
   draftRecords,
@@ -55,17 +55,20 @@ export default function GuildRaidTable({
   sortConfig,
   onSort,
   onRecordChange,
+  onBlur,
   onMemberClick,
-  onSave,
-  onCancel,
   rowHeights,
   onRowHeightChange,
   headerHeight,
   onHeaderHeightChange,
   theadHeight,
-  onTheadHeightChange
+  onTheadHeightChange,
+  highlightedMemberIds
 }: GuildRaidTableProps) {
   const { t } = useTranslation(['raid', 'translation']);
+  const guildName = guild?.name || '';
+  const guildSerial = guild?.serial ? `${guild.serial} 會 ` : '';
+  const displayGuildName = `${guildSerial}${guildName}`;
 
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -99,17 +102,6 @@ export default function GuildRaidTable({
     return () => observer.disconnect();
   }, [isComparisonMode, onRowHeightChange, onHeaderHeightChange, onTheadHeightChange, sortedMembers]);
 
-  const guildMemberIds = sortedMembers.map(m => m.id!);
-  const hasChanges = guildMemberIds.some(id => !!draftRecords[id]);
-
-  const handleSave = async () => {
-    await onSave(guildId);
-  };
-
-  const handleCancel = () => {
-    onCancel(guildId);
-  };
-
   // Calculate median score
   const medianScore = useMemo(() => {
     const validScores = sortedMembers
@@ -136,29 +128,9 @@ export default function GuildRaidTable({
         className="bg-stone-50 dark:bg-stone-700 px-4 py-3 border-b border-stone-200 dark:border-stone-600 font-bold text-stone-800 dark:text-stone-200 flex items-center justify-between"
       >
         <div className="flex items-center gap-2">
-          <span>{guildName}</span>
+          <span>{displayGuildName}</span>
           <span className="text-xs font-normal text-stone-500 dark:text-stone-400">({sortedMembers.length} {t('common.member', '成員')})</span>
         </div>
-        {!isComparisonMode && (
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={handleCancel} 
-              disabled={!hasChanges || saving}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-stone-200 dark:bg-stone-600 text-stone-700 dark:text-stone-200 rounded hover:bg-stone-300 dark:hover:bg-stone-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <X className="w-4 h-4" />
-              {t('raid.restore', '還原')}
-            </button>
-            <button 
-              onClick={handleSave} 
-              disabled={!hasChanges || saving}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Save className="w-4 h-4" />
-              {saving ? t('common.saving', '儲存中...') : t('common.save', '儲存')}
-            </button>
-          </div>
-        )}
       </div>
       
       <div className="flex-1 overflow-auto">
@@ -220,13 +192,14 @@ export default function GuildRaidTable({
                 const record = draftRecords[member.id!] || records[member.id!] || { score: 0, season_note: '' };
                 const noteValue = draftRecords[member.id!]?.note ?? member.note ?? '';
                 const isDirty = !!draftRecords[member.id!];
+                const isHighlighted = highlightedMemberIds?.has(member.id!);
 
                 return (
                   <tr 
                     key={member.id} 
                     ref={el => { rowRefs.current[index] = el; }}
                     style={isComparisonMode && rowHeights?.[index] ? { height: `${rowHeights[index]}px` } : {}}
-                    className={`border-b border-stone-100 dark:border-stone-700/50 hover:bg-stone-50 dark:hover:bg-stone-700/50 transition-colors ${isDirty ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''}`}
+                    className={`border-b border-stone-100 dark:border-stone-700/50 hover:bg-stone-50 dark:hover:bg-stone-700/50 transition-colors ${isDirty ? 'bg-amber-50/50 dark:bg-amber-900/10' : ''} ${isHighlighted ? 'animate-flash-orange' : ''}`}
                   >
                     <td className="py-0.5 px-2">
                       <button 
@@ -245,6 +218,7 @@ export default function GuildRaidTable({
                           max="10000"
                           value={record.score || ''}
                           onChange={(e) => onRecordChange(member.id!, 'score', e.target.value)}
+                          onBlur={() => onBlur(member.id!)}
                           className={`w-full px-2 py-0.5 text-xs border rounded bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:ring-2 focus:ring-indigo-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isDirty ? 'border-amber-300 dark:border-amber-600' : 'border-stone-300 dark:border-stone-600'}`}
                         />
                       ) : (
@@ -267,6 +241,7 @@ export default function GuildRaidTable({
                               type="text"
                               value={noteValue}
                               onChange={(e) => onRecordChange(member.id!, 'note', e.target.value)}
+                              onBlur={() => onBlur(member.id!)}
                               className={`w-full px-2 py-0.5 text-xs border rounded bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:ring-2 focus:ring-indigo-500 outline-none ${isDirty ? 'border-amber-300 dark:border-amber-600' : 'border-stone-300 dark:border-stone-600'}`}
                             />
                           ) : (
@@ -283,6 +258,7 @@ export default function GuildRaidTable({
                               type="text"
                               value={record.season_note || ''}
                               onChange={(e) => onRecordChange(member.id!, 'season_note', e.target.value)}
+                              onBlur={() => onBlur(member.id!)}
                               className={`w-full px-2 py-0.5 text-xs border rounded bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:ring-2 focus:ring-indigo-500 outline-none ${isDirty ? 'border-amber-300 dark:border-amber-600' : 'border-stone-300 dark:border-stone-600'}`}
                             />
                           ) : (
