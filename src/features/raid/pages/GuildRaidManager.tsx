@@ -453,10 +453,12 @@ export default function GuildRaidManager() {
         await updateMember(memberId, { note: note });
       }
 
-      setRecords(prev => ({
-        ...prev,
+      const nextRecords = {
+        ...recordsRef.current,
         [memberId]: raidRecord as MemberRaidRecord
-      }));
+      };
+
+      setRecords(nextRecords);
 
       setDraftRecords(prev => {
         const next = { ...prev };
@@ -465,7 +467,7 @@ export default function GuildRaidManager() {
       });
 
       if (scoreChanged) {
-        await updateGuildMedian(guildId);
+        await updateGuildMedian(guildId, nextRecords);
       }
     } catch (err: any) {
       console.error('Auto-save failed:', err);
@@ -769,7 +771,6 @@ export default function GuildRaidManager() {
                 sortedMembers={sortedMembers}
                 records={records}
                 draftRecords={draftRecords}
-                savedMedian={guildRaidRecords[guildId]?.member_score_median}
                 isComparisonMode={isComparisonMode}
                 isArchived={isSelectedSeasonArchived}
                 seasonId={selectedSeasonId}

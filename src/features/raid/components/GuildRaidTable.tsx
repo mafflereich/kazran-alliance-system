@@ -20,7 +20,6 @@ interface GuildRaidTableProps {
   sortedMembers: Member[];
   records: Record<string, MemberRaidRecord>;
   draftRecords: Record<string, MemberRaidRecord>;
-  savedMedian?: number;
   isComparisonMode: boolean;
   isArchived?: boolean;
   seasonId: string;
@@ -46,7 +45,6 @@ export default function GuildRaidTable({
   sortedMembers,
   records,
   draftRecords,
-  savedMedian,
   isComparisonMode,
   isArchived,
   seasonId,
@@ -277,7 +275,7 @@ export default function GuildRaidTable({
                   {t('raid.median', '中位數')}：
                 </td>
                 <td className="py-1 px-3 text-xs text-stone-500 dark:text-stone-400">
-                  {Object.keys(draftRecords).length > 0 ? medianScore : (savedMedian ?? medianScore)}
+                  {medianScore}
                 </td>
                 {!isComparisonMode && <td colSpan={3}></td>}
               </tr>
