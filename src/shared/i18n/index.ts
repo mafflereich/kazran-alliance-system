@@ -33,7 +33,7 @@ i18n
         interpolation: {
             escapeValue: false,
         },
-        debug: import.meta.env.DEV,
+        debug: false,
         react: {
             useSuspense: true,
         },

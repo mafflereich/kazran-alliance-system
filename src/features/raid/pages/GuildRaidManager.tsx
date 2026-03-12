@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/shared/api/supabase';
 import { useAppContext } from '@/store';
 import { Trophy, Save, AlertCircle, Plus, ChevronDown, ChevronRight, Archive, X } from 'lucide-react';
@@ -22,16 +23,25 @@ interface MemberRaidRecord {
   score: number;
   note: string;
   season_note?: string;
+  season_guild?: string;
+}
+
+interface GuildRaidRecord {
+  season_id: string;
+  guild_id: string;
+  member_score_median: number;
 }
 
 export default function GuildRaidManager() {
   const { t } = useTranslation(['raid', 'translation']);
+  const navigate = useNavigate();
   const { db, currentUser, updateMember, fetchAllMembers } = useAppContext();
 
   const [seasons, setSeasons] = useState<RaidSeason[]>([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState<string>('');
   const [records, setRecords] = useState<Record<string, MemberRaidRecord>>({}); // key: member_id
   const [draftRecords, setDraftRecords] = useState<Record<string, MemberRaidRecord>>({});
+  const [guildRaidRecords, setGuildRaidRecords] = useState<Record<string, GuildRaidRecord>>({}); // key: guild_id
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,6 +59,34 @@ export default function GuildRaidManager() {
 
   const [isSeasonModalOpen, setIsSeasonModalOpen] = useState(false);
   const [newSeason, setNewSeason] = useState({ season_number: 1, period_text: '', description: '' });
+
+  const [rowHeights, setRowHeights] = useState<Record<number, number>>({});
+  const [headerHeight, setHeaderHeight] = useState<number>(0);
+  const [theadHeight, setTheadHeight] = useState<number>(0);
+
+  const handleRowHeightChange = (index: number, height: number) => {
+    setRowHeights(prev => {
+      if ((prev[index] || 0) < height) {
+        return { ...prev, [index]: height };
+      }
+      return prev;
+    });
+  };
+
+  const handleHeaderHeightChange = (height: number) => {
+    setHeaderHeight(prev => Math.max(prev, height));
+  };
+
+  const handleTheadHeightChange = (height: number) => {
+    setTheadHeight(prev => Math.max(prev, height));
+  };
+
+  // Reset row heights when context changes
+  useEffect(() => {
+    setRowHeights({});
+    setHeaderHeight(0);
+    setTheadHeight(0);
+  }, [selectedSeasonId, isComparisonMode, sortConfig]);
 
   const userRole = currentUser ? db.users[currentUser]?.role : null;
   const canManage = userRole === 'manager' || userRole === 'admin' || userRole === 'creator';
@@ -112,26 +150,39 @@ export default function GuildRaidManager() {
     fetchAllMembers();
   }, []);
 
-  const fetchRecords = async () => {
+  const fetchRecords = async (isBackground = false) => {
     if (!selectedSeasonId) return;
-    setLoading(true);
+    if (!isBackground) setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('member_raid_records')
-        .select('*')
-        .eq('season_id', selectedSeasonId);
+      const [recordsRes, guildRecordsRes] = await Promise.all([
+        supabase
+          .from('member_raid_records')
+          .select('*')
+          .eq('season_id', selectedSeasonId),
+        supabase
+          .from('guild_raid_records')
+          .select('*')
+          .eq('season_id', selectedSeasonId)
+      ]);
 
-      if (error) {
-        // If table doesn't exist, we just use empty data
-        if (error.code !== '42P01') throw error;
-      }
+      if (recordsRes.error && recordsRes.error.code !== '42P01') throw recordsRes.error;
+      if (guildRecordsRes.error && guildRecordsRes.error.code !== '42P01') throw guildRecordsRes.error;
 
       const recordsMap: Record<string, MemberRaidRecord> = {};
-      (data || []).forEach(r => {
+      (recordsRes.data || []).forEach(r => {
         recordsMap[r.member_id] = r;
       });
       setRecords(recordsMap);
-      setDraftRecords({});
+
+      const guildRecordsMap: Record<string, GuildRaidRecord> = {};
+      (guildRecordsRes.data || []).forEach(r => {
+        guildRecordsMap[r.guild_id] = r;
+      });
+      setGuildRaidRecords(guildRecordsMap);
+
+      if (!isBackground) {
+        setDraftRecords({});
+      }
     } catch (err: any) {
       console.error('Error fetching records:', err);
       // Don't show error if table doesn't exist yet
@@ -139,13 +190,20 @@ export default function GuildRaidManager() {
         setError(err.message);
       }
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchRecords();
+    fetchRecords(false);
   }, [selectedSeasonId]);
+
+  useEffect(() => {
+    if (selectedSeasonId && selectedGuildIds.length > 0) {
+      fetchRecords(true);
+      fetchAllMembers();
+    }
+  }, [selectedGuildIds]);
 
   const handleGuildToggle = (guildId: string) => {
     if (isComparisonMode) {
@@ -190,11 +248,36 @@ export default function GuildRaidManager() {
   };
 
   const handleSaveGuild = async (guildId: string) => {
-    const guildMembers = Object.values(db.members).filter(m => m.guildId === guildId);
+    const guildMembers = Object.values(db.members).filter(m => {
+      if (isSelectedSeasonArchived) {
+        return records[m.id!]?.season_guild === guildId;
+      }
+      return m.guildId === guildId;
+    });
     const memberIds = new Set(guildMembers.map(m => m.id));
-    const draftsToSave = Object.values(draftRecords).filter(d => memberIds.has(d.member_id));
+    const draftsToSave = Object.values(draftRecords).filter(d => {
+      if (!memberIds.has(d.member_id)) return false;
+      const originalRecord = records[d.member_id];
+      const originalNote = db.members[d.member_id]?.note || '';
+      
+      const scoreChanged = d.score !== (originalRecord?.score ?? 0);
+      const seasonNoteChanged = (d.season_note || '') !== (originalRecord?.season_note || '');
+      const noteChanged = (d.note || '') !== originalNote;
+      
+      return scoreChanged || seasonNoteChanged || noteChanged;
+    });
     
-    if (draftsToSave.length === 0) return;
+    if (draftsToSave.length === 0) {
+      // If nothing actually changed, just clear the drafts for this guild
+      setDraftRecords(prev => {
+        const next = { ...prev };
+        guildMembers.forEach(m => {
+          delete next[m.id!];
+        });
+        return next;
+      });
+      return;
+    }
 
     setSaving(true);
     try {
@@ -209,6 +292,38 @@ export default function GuildRaidManager() {
         .upsert(raidRecordsToSave, { onConflict: 'season_id, member_id' });
 
       if (error) throw error;
+
+      // Calculate and save median
+      const currentScores = guildMembers.map(m => draftRecords[m.id!]?.score ?? records[m.id!]?.score ?? 0).filter(s => s > 0);
+      const sorted = [...currentScores].sort((a, b) => a - b);
+      let median = 0;
+      if (sorted.length > 0) {
+        const mid = Math.floor(sorted.length / 2);
+        if (sorted.length % 2 !== 0) {
+          median = sorted[mid];
+        } else {
+          median = (sorted[mid - 1] + sorted[mid]) / 2;
+        }
+      }
+      const roundedMedian = Math.floor(median);
+
+      const guildRecord: GuildRaidRecord = {
+        ...guildRaidRecords[guildId],
+        season_id: selectedSeasonId,
+        guild_id: guildId,
+        member_score_median: roundedMedian
+      };
+
+      const { error: guildError } = await supabase
+        .from('guild_raid_records')
+        .upsert(guildRecord, { onConflict: 'season_id, guild_id' });
+      
+      if (guildError) throw guildError;
+
+      setGuildRaidRecords(prev => ({
+        ...prev,
+        [guildId]: guildRecord
+      }));
 
       // Update notes
       for (const d of draftsToSave) {
@@ -244,7 +359,12 @@ export default function GuildRaidManager() {
   const handleCancelGuild = (guildId: string) => {
     setDraftRecords(prev => {
       const next = { ...prev };
-      const guildMembers = Object.values(db.members).filter(m => m.guildId === guildId);
+      const guildMembers = Object.values(db.members).filter(m => {
+        if (isSelectedSeasonArchived) {
+          return records[m.id!]?.season_guild === guildId;
+        }
+        return m.guildId === guildId;
+      });
       guildMembers.forEach(m => {
         delete next[m.id!];
       });
@@ -253,7 +373,12 @@ export default function GuildRaidManager() {
   };
 
   const getSortedMembers = (guildId: string) => {
-    const guildMembers = Object.values(db.members).filter(m => m.guildId === guildId);
+    const guildMembers = Object.values(db.members).filter(m => {
+      if (isSelectedSeasonArchived) {
+        return records[m.id!]?.season_guild === guildId;
+      }
+      return m.guildId === guildId;
+    });
     
     return guildMembers.sort((a, b) => {
       if (sortConfig.key === 'score') {
@@ -298,6 +423,32 @@ export default function GuildRaidManager() {
     if (!selectedSeasonId) return;
     setArchiving(true);
     try {
+      // 1. Get all non-archived members
+      const activeMembers = Object.values(db.members).filter(m => m.status !== 'archived');
+
+      // 2. Prepare records to upsert with current guild_id as season_guild
+      const recordsToUpsert = activeMembers.map(m => {
+        const existing = records[m.id!];
+        return {
+          season_id: selectedSeasonId,
+          member_id: m.id!,
+          season_guild: m.guildId,
+          score: existing?.score ?? 0,
+          note: existing?.note ?? '',
+          season_note: existing?.season_note ?? ''
+        };
+      });
+
+      // 3. Upsert the records
+      if (recordsToUpsert.length > 0) {
+        const { error: upsertError } = await supabase
+          .from('member_raid_records')
+          .upsert(recordsToUpsert, { onConflict: 'season_id, member_id' });
+        
+        if (upsertError) throw upsertError;
+      }
+
+      // 4. Mark season as archived
       const { error } = await supabase
         .from('raid_seasons')
         .update({ is_archived: true })
@@ -307,6 +458,9 @@ export default function GuildRaidManager() {
 
       setSeasons(prev => prev.map(s => String(s.id) === String(selectedSeasonId).trim() ? { ...s, is_archived: true } : s));
       setIsArchiveModalOpen(false);
+      
+      // Refresh records to get the new season_guild values
+      fetchRecords();
     } catch (err: any) {
       console.error('Error archiving season:', err);
       setError(err.message);
@@ -376,6 +530,14 @@ export default function GuildRaidManager() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => navigate('/raid')}
+              className="flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm"
+            >
+              <Trophy className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('header.alliance_raid_record')}</span>
+            </button>
+
             <select
               value={selectedSeasonId}
               onChange={e => setSelectedSeasonId(e.target.value)}
@@ -514,6 +676,7 @@ export default function GuildRaidManager() {
                 sortedMembers={sortedMembers}
                 records={records}
                 draftRecords={draftRecords}
+                savedMedian={guildRaidRecords[guildId]?.member_score_median}
                 isComparisonMode={isComparisonMode}
                 isArchived={isSelectedSeasonArchived}
                 seasonId={selectedSeasonId}
@@ -525,6 +688,12 @@ export default function GuildRaidManager() {
                 onMemberClick={setSelectedMemberStats}
                 onSave={handleSaveGuild}
                 onCancel={handleCancelGuild}
+                rowHeights={rowHeights}
+                onRowHeightChange={handleRowHeightChange}
+                headerHeight={headerHeight}
+                onHeaderHeightChange={handleHeaderHeightChange}
+                theadHeight={theadHeight}
+                onTheadHeightChange={handleTheadHeightChange}
               />
             );
           })}

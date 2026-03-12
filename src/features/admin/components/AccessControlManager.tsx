@@ -17,7 +17,6 @@ export default function AccessControlManager() {
     { id: 'costume_list', label: t('header.costume_list'), icon: <Users className="w-5 h-5" /> },
     { id: 'application_mailbox', label: t('header.application_mailbox'), icon: <Mail className="w-5 h-5" /> },
     { id: 'arcade', label: t('header.arcade'), icon: <Gamepad2 className="w-5 h-5" /> },
-    { id: 'alliance_raid_record', label: t('header.alliance_raid_record'), icon: <Trophy className="w-5 h-5" /> },
     { id: 'guild_raid_manager', label: t('header.guild_raid_manager', '公會聯合戰管理'), icon: <Trophy className="w-5 h-5" /> },
     { id: 'member_board', label: t('header.member_board', "Team Assign Board"), icon: <BookUser className="w-5 h-5" /> },
     { id: 'toolbox', label: t('header.toolbox_title', '小工具'), icon: <Wrench className="w-5 h-5" /> },
@@ -29,7 +28,6 @@ export default function AccessControlManager() {
       case 'costume_list': return ['member', 'manager', 'admin', 'creator'];
       case 'application_mailbox': return ['member', 'manager', 'admin', 'creator'];
       case 'arcade': return ['manager', 'admin', 'creator'];
-      case 'alliance_raid_record': return ['creator'];
       case 'guild_raid_manager': return ['manager', 'admin', 'creator'];
       case 'member_board': return ['manager', 'admin', 'creator'];
       case 'toolbox': return ['manager', 'admin', 'creator'];

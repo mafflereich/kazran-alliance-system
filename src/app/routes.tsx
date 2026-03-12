@@ -44,7 +44,7 @@ export default function AppRoutes() {
                     </ProtectedRoute>
                 } />
                 <Route path="/raid" element={
-                    <ProtectedRoute pageId="alliance_raid_record">
+                    <ProtectedRoute pageId="guild_raid_manager">
                         <AllianceRaidRecord />
                     </ProtectedRoute>
                 } />

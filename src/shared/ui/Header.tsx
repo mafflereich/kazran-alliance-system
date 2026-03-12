@@ -196,7 +196,6 @@ export default function Header() {
     { id: 'arcade', icon: Gamepad2, label: t('header.arcade'), path: '/arcade', active: location.pathname === '/arcade' },
     { id: 'member_board', icon: BookUser, label: t('header.member_board', "Team Assign Board"), path: '/team', active: location.pathname === '/team' },
     { id: 'toolbox', icon: Wrench, label: t('header.toolbox_title'), path: '/toolbox', active: location.pathname === '/toolbox' },
-    { id: 'alliance_raid_record', icon: Trophy, label: t('header.alliance_raid_record'), path: '/raid', active: location.pathname === '/raid' },
     { id: 'guild_raid_manager', icon: Trophy, label: t('header.guild_raid_manager', '公會聯合戰管理'), path: '/raid-manager', active: location.pathname === '/raid-manager' },
     { id: 'admin_settings', icon: Settings, label: t('header.admin_settings'), path: '/admin', active: location.pathname === '/admin' },
   ];

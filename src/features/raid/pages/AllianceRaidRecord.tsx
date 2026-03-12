@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/shared/api/supabase';
 import { useAppContext } from '@/store';
-import { Trophy, Plus, Edit2, Save, X, AlertCircle, Download } from 'lucide-react';
+import { Trophy, Plus, Edit2, Save, X, AlertCircle, Download, Undo2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getTierColor } from '@/shared/lib/utils';
 import { toPng } from 'html-to-image';
@@ -19,10 +20,12 @@ interface GuildRaidRecord {
   guild_id: string;
   score: number;
   rank: string;
+  member_score_median?: number;
 }
 
 export default function AllianceRaidRecord() {
   const { t } = useTranslation(['raid', 'translation']);
+  const navigate = useNavigate();
   const { db, currentUser } = useAppContext();
 
   const [seasons, setSeasons] = useState<RaidSeason[]>([]);
@@ -36,17 +39,8 @@ export default function AllianceRaidRecord() {
   const [newSeason, setNewSeason] = useState({ season_number: 1, period_text: '', description: '' });
 
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
-  const [downloadConfig, setDownloadConfig] = useState<{
-    type: 'single' | 'consecutive' | 'all',
-    singleSeasonId: string,
-    startSeasonId: string,
-    endSeasonId: string
-  }>({
-    type: 'single',
-    singleSeasonId: '',
-    startSeasonId: '',
-    endSeasonId: ''
-  });
+  const [downloadConfig, setDownloadConfig] = useState<{ singleSeasonId: string }>({ singleSeasonId: '' });
+  const [includeScore, setIncludeScore] = useState(false);
 
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -84,12 +78,7 @@ export default function AllianceRaidRecord() {
 
   useEffect(() => {
     if (seasons.length > 0) {
-      setDownloadConfig(prev => ({
-        ...prev,
-        singleSeasonId: seasons[0].id,
-        startSeasonId: seasons[1]?.id || seasons[0].id,
-        endSeasonId: seasons[0].id
-      }));
+      setDownloadConfig({ singleSeasonId: seasons[0].id });
     }
   }, [seasons]);
 
@@ -224,6 +213,7 @@ export default function AllianceRaidRecord() {
       const dataUrl = await toPng(exportRef.current, {
         backgroundColor: '#1c1917', // stone-900
         pixelRatio: 2,
+        skipFonts: true, // Fix for "can't access property 'trim', font is undefined"
         style: {
           transform: 'scale(1)',
           transformOrigin: 'top left'
@@ -244,28 +234,8 @@ export default function AllianceRaidRecord() {
   };
 
   const selectedSeasonsForExport = useMemo(() => {
-    if (downloadConfig.type === 'all') return [...seasons].reverse();
     const sorted = [...seasons].sort((a, b) => a.season_number - b.season_number);
-
-    if (downloadConfig.type === 'single') {
-      return sorted.filter(s => s.id === downloadConfig.singleSeasonId);
-    }
-
-    if (downloadConfig.type === 'consecutive') {
-      const start = sorted.find(s => s.id === downloadConfig.startSeasonId);
-      const end = sorted.find(s => s.id === downloadConfig.endSeasonId);
-      if (!start || !end) return [];
-
-      const startNum = start.season_number;
-      const endNum = end.season_number;
-
-      const min = Math.min(startNum, endNum);
-      const max = Math.max(startNum, endNum);
-
-      return sorted.filter(s => s.season_number >= min && s.season_number <= max);
-    }
-
-    return sorted;
+    return sorted.filter(s => s.id === downloadConfig.singleSeasonId);
   }, [seasons, downloadConfig]);
 
   return (
@@ -290,6 +260,13 @@ export default function AllianceRaidRecord() {
             >
               <Download className="w-4 h-4" />
               <span>{t('alliance_raid.download_record')}</span>
+            </button>
+            <button
+              onClick={() => navigate('/raid-manager')}
+              className="flex items-center justify-center p-2 bg-stone-200 dark:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-lg hover:bg-stone-300 dark:hover:bg-stone-600 transition-colors"
+              title={t('header.guild_raid_manager', '公會聯合戰管理')}
+            >
+              <Undo2 className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -392,7 +369,7 @@ export default function AllianceRaidRecord() {
                                       max="1000000"
                                       value={editRecordData.score}
                                       onChange={e => setEditRecordData(prev => ({ ...prev, score: e.target.value ? Number(e.target.value) : '' }))}
-                                      className="flex-1 min-w-0 px-1 py-0.5 text-xs border border-stone-300 dark:border-stone-600 rounded bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100"
+                                      className="flex-1 min-w-0 px-1 py-0.5 text-xs border border-stone-300 dark:border-stone-600 rounded bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                       placeholder="Score"
                                     />
                                   </div>
@@ -545,64 +522,28 @@ export default function AllianceRaidRecord() {
             </div>
 
             <div className="p-4 space-y-4">
-              <div className="flex gap-2 p-1 bg-stone-100 dark:bg-stone-900 rounded-lg">
-                {(['single', 'consecutive', 'all'] as const).map(type => (
-                  <button
-                    key={type}
-                    onClick={() => setDownloadConfig(prev => ({ ...prev, type }))}
-                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-all ${downloadConfig.type === type
-                      ? 'bg-white dark:bg-stone-700 text-amber-600 shadow-sm'
-                      : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
-                      }`}
-                  >
-                    {type === 'single' ? t('alliance_raid.single_season') : type === 'consecutive' ? t('alliance_raid.consecutive_season') : t('alliance_raid.all_seasons')}
-                  </button>
-                ))}
+              <div>
+                <label className="block text-xs font-medium text-stone-500 mb-1 uppercase">{t('alliance_raid.select_season')}</label>
+                <select
+                  value={downloadConfig.singleSeasonId}
+                  onChange={e => setDownloadConfig({ singleSeasonId: e.target.value })}
+                  className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 text-sm"
+                >
+                  {seasons.map(s => (
+                    <option key={s.id} value={s.id}>S{s.season_number} ({s.period_text})</option>
+                  ))}
+                </select>
               </div>
 
-              {downloadConfig.type === 'single' && (
-                <div>
-                  <label className="block text-xs font-medium text-stone-500 mb-1 uppercase">{t('alliance_raid.select_season')}</label>
-                  <select
-                    value={downloadConfig.singleSeasonId}
-                    onChange={e => setDownloadConfig(prev => ({ ...prev, singleSeasonId: e.target.value }))}
-                    className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 text-sm"
-                  >
-                    {seasons.map(s => (
-                      <option key={s.id} value={s.id}>S{s.season_number} ({s.period_text})</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {downloadConfig.type === 'consecutive' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-stone-500 mb-1 uppercase">{t('alliance_raid.start_season')}</label>
-                    <select
-                      value={downloadConfig.startSeasonId}
-                      onChange={e => setDownloadConfig(prev => ({ ...prev, startSeasonId: e.target.value }))}
-                      className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 text-sm"
-                    >
-                      {seasons.map(s => (
-                        <option key={s.id} value={s.id}>S{s.season_number}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-stone-500 mb-1 uppercase">{t('alliance_raid.end_season')}</label>
-                    <select
-                      value={downloadConfig.endSeasonId}
-                      onChange={e => setDownloadConfig(prev => ({ ...prev, endSeasonId: e.target.value }))}
-                      className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 text-sm"
-                    >
-                      {seasons.map(s => (
-                        <option key={s.id} value={s.id}>S{s.season_number}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
+              <label className="flex items-center gap-2 cursor-pointer mt-2">
+                <input
+                  type="checkbox"
+                  checked={includeScore}
+                  onChange={(e) => setIncludeScore(e.target.checked)}
+                  className="w-4 h-4 text-amber-600 rounded border-stone-300 focus:ring-amber-500"
+                />
+                <span className="text-sm text-stone-700 dark:text-stone-300">{t('alliance_raid.include_score', '包含分數')}</span>
+              </label>
 
               <div className="pt-4">
                 <button
@@ -629,7 +570,7 @@ export default function AllianceRaidRecord() {
       )}
 
       {/* Hidden Export View */}
-      <div className="fixed -left-[9999px] top-0">
+      <div className="absolute -left-[9999px] top-0">
         <div
           ref={exportRef}
           className="bg-stone-900 p-12 text-stone-100"
@@ -681,7 +622,7 @@ export default function AllianceRaidRecord() {
                                       ? 'bg-gradient-to-r from-amber-400 to-orange-600 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(245,158,11,0.6)] scale-110 transform origin-right'
                                       : 'text-amber-500'
                                       }`}>{record?.rank || '-'}</div>
-                                    {record && record.score > 0 && <div className="text-[10px] text-stone-400 font-mono">({record.score.toLocaleString()})</div>}
+                                    {includeScore && record && record.score > 0 && <div className="text-[10px] text-stone-400 font-mono">({record.score.toLocaleString()})</div>}
                                   </div>
                                 </div>
                               );
@@ -722,7 +663,7 @@ export default function AllianceRaidRecord() {
                                       ? 'bg-gradient-to-r from-amber-400 to-orange-600 bg-clip-text text-transparent drop-shadow-[0_0_10px_rgba(245,158,11,0.6)] scale-110 transform origin-right'
                                       : 'text-amber-500'
                                       }`}>{record?.rank || '-'}</div>
-                                    {record && record.score > 0 && <div className="text-[10px] text-stone-400 font-mono">({record.score.toLocaleString()})</div>}
+                                    {includeScore && record && record.score > 0 && <div className="text-[10px] text-stone-400 font-mono">({record.score.toLocaleString()})</div>}
                                   </div>
                                 </div>
                               );
@@ -738,7 +679,7 @@ export default function AllianceRaidRecord() {
           </div>
 
           <div className="mt-12 pt-8 border-t border-stone-800 text-center text-stone-600 text-xs uppercase tracking-[0.5em]">
-            Kazran Alliance Management System • Official Record
+            Kazran Alliance System • Raid Record
           </div>
         </div>
       </div>

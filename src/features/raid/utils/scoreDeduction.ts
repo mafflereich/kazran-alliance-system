@@ -5,7 +5,7 @@ export interface DeductionResult {
   borrow: number;
 }
 
-export function deduceScore(targetScore: number): string {
+export function deduceScore(targetScore: number, t: (key: string, defaultValue?: string) => string): string {
   if (targetScore === 0) return '';
 
   const LANCELOT_SCORE = 49;
@@ -38,7 +38,7 @@ export function deduceScore(targetScore: number): string {
     }
   }
 
-  if (foundResults.length === 0) return '不明';
+  if (foundResults.length === 0) return t('raid.deduction_unknown', '不明');
 
   // Sort results by level (desc) then turn (asc) then borrow (asc)
   return foundResults
@@ -47,6 +47,6 @@ export function deduceScore(targetScore: number): string {
       if (a.turn !== b.turn) return a.turn - b.turn;
       return a.borrow - b.borrow;
     })
-    .map(res => `Lv${res.level} ${res.turn}T 借${res.borrow}`)
+    .map(res => `Lv${res.level} ${res.turn}T ${t('raid.deduction_borrow', '借')}${res.borrow}`)
     .join('\n');
 }
