@@ -3,11 +3,24 @@ import { useAppContext } from '@/store';
 import { RefreshCw, Trash2, Save, Download, Upload, AlertCircle, Wand2 } from 'lucide-react';
 import ConfirmModal from '@shared/ui/ConfirmModal';
 import { useTranslation } from 'react-i18next';
+import { supabase } from '@/shared/api/supabase';
+import { useRestoreDiff } from '../hooks/useRestoreDiff';
+import RestorePreviewModal from './RestorePreviewModal';
 
 export default function ToolsManager() {
   const { t } = useTranslation(['admin', 'translation']);
-  const { db, addMember, deleteMember, updateMember, fetchAllMembers, archiveMember, restoreData, showToast } = useAppContext();
+  const { db, addMember, deleteMember, updateMember, fetchAllMembers, archiveMember, showToast } = useAppContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    isDiffing,
+    isRestoring,
+    diffSummary,
+    isModalOpen,
+    calculateDiff,
+    executeRestore,
+    cancelRestore
+  } = useRestoreDiff();
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
@@ -195,10 +208,29 @@ export default function ToolsManager() {
     });
   };
 
-  const handleBackup = () => {
+  const handleBackup = async () => {
+    setIsProcessing(true);
     try {
+      const tables = [
+        'apply_mail',
+        'characters',
+        'costumes',
+        'guilds',
+        'member_notes',
+        'members',
+        'members_archive_history'
+      ];
+      
+      const backupData: Record<string, any> = {};
+      
+      for (const table of tables) {
+        const { data, error } = await supabase.from(table).select('*');
+        if (error) throw error;
+        backupData[table] = data;
+      }
+
       const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
-        JSON.stringify(db, null, 2)
+        JSON.stringify(backupData, null, 2)
       )}`;
       const link = document.createElement("a");
       link.href = jsonString;
@@ -207,6 +239,40 @@ export default function ToolsManager() {
     } catch (error) {
       console.error("Backup failed:", error);
       showToast(t('backup.backup_failed'), 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRaidBackup = async () => {
+    setIsProcessing(true);
+    try {
+      const tables = [
+        'guild_raid_records',
+        'member_raid_records',
+        'raid_seasons'
+      ];
+      
+      const backupData: Record<string, any> = {};
+      
+      for (const table of tables) {
+        const { data, error } = await supabase.from(table).select('*');
+        if (error) throw error;
+        backupData[table] = data;
+      }
+
+      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+        JSON.stringify(backupData, null, 2)
+      )}`;
+      const link = document.createElement("a");
+      link.href = jsonString;
+      link.download = `kazran_raid_backup_${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+    } catch (error) {
+      console.error("Raid backup failed:", error);
+      showToast(t('backup.backup_failed'), 'error');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -220,10 +286,8 @@ export default function ToolsManager() {
         const text = e.target?.result;
         if (typeof text === 'string') {
           const restoredDb = JSON.parse(text);
-          // Basic validation
-          if (restoredDb.guilds && restoredDb.members && restoredDb.costumes) {
-            await restoreData(restoredDb);
-            showToast(t('backup.restore_success'), 'success');
+          if (typeof restoredDb === 'object' && restoredDb !== null) {
+            await calculateDiff(restoredDb);
           } else {
             showToast(t('backup.invalid_format'), 'error');
           }
@@ -231,9 +295,23 @@ export default function ToolsManager() {
       } catch (error) {
         console.error("Restore failed:", error);
         showToast(t('backup.restore_failed'), 'error');
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleConfirmRestore = async () => {
+    try {
+      await executeRestore();
+      showToast(t('backup.restore_success'), 'success');
+      await fetchAllMembers();
+    } catch (error) {
+      showToast(t('backup.restore_failed'), 'error');
+    }
   };
 
   return (
@@ -287,7 +365,7 @@ export default function ToolsManager() {
             <Save className="w-6 h-6 text-amber-600" />
             {t('nav.backup_restore')}
           </h2>
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-3 gap-6">
             <div className="bg-stone-50 dark:bg-stone-700 p-8 rounded-2xl border border-stone-200 dark:border-stone-600 flex flex-col items-center justify-center text-center">
               <div className="p-4 bg-blue-100 dark:bg-blue-900/50 rounded-full text-blue-600 mb-4">
                 <Download className="w-8 h-8" />
@@ -298,9 +376,27 @@ export default function ToolsManager() {
               </p>
               <button
                 onClick={handleBackup}
-                className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md"
+                disabled={isProcessing}
+                className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {t('backup.download_btn')}
+                {isProcessing ? t('common.processing') : t('backup.download_btn')}
+              </button>
+            </div>
+
+            <div className="bg-stone-50 dark:bg-stone-700 p-8 rounded-2xl border border-stone-200 dark:border-stone-600 flex flex-col items-center justify-center text-center">
+              <div className="p-4 bg-purple-100 dark:bg-purple-900/50 rounded-full text-purple-600 mb-4">
+                <Download className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('backup.download_raid_backup')}</h3>
+              <p className="text-stone-500 dark:text-stone-400 mb-6 max-w-md">
+                {t('backup.download_raid_desc')}
+              </p>
+              <button
+                onClick={handleRaidBackup}
+                disabled={isProcessing}
+                className="px-8 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-all active:scale-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isProcessing ? t('common.processing') : t('backup.download_raid_btn')}
               </button>
             </div>
 
@@ -315,9 +411,10 @@ export default function ToolsManager() {
               <input type="file" accept=".json" onChange={handleRestore} ref={fileInputRef} className="hidden" />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="px-8 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-all active:scale-95 shadow-md"
+                disabled={isDiffing || isRestoring}
+                className="px-8 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-all active:scale-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {t('backup.restore_btn')}
+                {isDiffing ? t('common.processing') : t('backup.restore_btn')}
               </button>
             </div>
           </div>
@@ -471,6 +568,13 @@ export default function ToolsManager() {
           </div>
         </div>
       )}
+      <RestorePreviewModal
+        isOpen={isModalOpen}
+        isRestoring={isRestoring}
+        diffSummary={diffSummary}
+        onConfirm={handleConfirmRestore}
+        onCancel={cancelRestore}
+      />
     </div>
   );
 }
