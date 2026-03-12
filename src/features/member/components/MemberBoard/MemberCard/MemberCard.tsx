@@ -117,8 +117,8 @@ export default function MemberCard({
 
         const checkTruncation = () => {
             if (noteRef.current) {
-                const { scrollWidth, clientWidth } = noteRef.current;
-                setIsNoteTruncated(scrollWidth > clientWidth + 1);
+                const { scrollHeight, clientHeight } = noteRef.current;
+                setIsNoteTruncated(scrollHeight > clientHeight + 1);
             }
         };
 
@@ -131,13 +131,10 @@ export default function MemberCard({
         // 觀察 ref 元素本身
         observer.observe(noteRef.current);
 
-        // 也可以觀察整個卡片（如果寬度變化來自父層）
-        // observer.observe(nameRef.current.parentElement!);
-
         return () => {
             observer.disconnect();
         };
-    }, [member.note]);
+    }, [member.note, member.seasonNote]);
 
     return (
         <TooltipProvider delayDuration={200}>
