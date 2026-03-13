@@ -135,7 +135,7 @@ export default function MemberStatsModal({ member, onClose }: MemberStatsModalPr
       onClick={onClose}
     >
       <div 
-        className="bg-white dark:bg-stone-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
+        className="bg-white dark:bg-stone-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center p-4 border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-700/50">
@@ -182,6 +182,7 @@ export default function MemberStatsModal({ member, onClose }: MemberStatsModalPr
                         <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('common.guild', '公會')}</th>
                         <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('raid.column_score', '個人總分')}</th>
                         <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('raid.guild_median', '公會中位數')}</th>
+                        <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('raid.season_note', '賽季備註')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-200 dark:divide-stone-700">
@@ -211,6 +212,9 @@ export default function MemberStatsModal({ member, onClose }: MemberStatsModalPr
                             </td>
                             <td className="px-4 py-3 font-mono text-stone-700 dark:text-stone-300">
                               {item.gRecord?.member_score_median?.toLocaleString() || '-'}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-stone-600 dark:text-stone-400 whitespace-pre-wrap break-words max-w-[200px]">
+                              {item.mRecord?.season_note || '-'}
                             </td>
                           </tr>
                         );

@@ -76,10 +76,10 @@
   "backup": {
     "title": "Backup & Restore",
     "download_backup": "Download Backup",
-    "download_desc": "Download the specified tables as a JSON file: apply_mail, characters, costumes, guilds, member_notes, members, members_archive_history.",
+    "download_desc": "Download core system data backup, including: apply mail, characters, costumes, guilds, member notes, members, archive history, and ghost records.",
     "download_btn": "Download Backup File",
     "download_raid_backup": "Download Raid Backup",
-    "download_raid_desc": "Download the raid-related tables as a JSON file: guild_raid_records, member_raid_records, raid_seasons.",
+    "download_raid_desc": "Download raid-related data backup, including: guild raid records, member raid records, and raid seasons.",
     "download_raid_btn": "Download Raid Backup File",
     "restore_backup": "Restore from File",
     "restore_from_file": "Restore from File",

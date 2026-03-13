@@ -235,7 +235,8 @@ export default function ToolsManager() {
         'guilds',
         'member_notes',
         'members',
-        'members_archive_history'
+        'members_archive_history',
+        'ghost_records'
       ];
       
       const backupData: Record<string, any> = {};

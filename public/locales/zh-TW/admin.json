@@ -76,10 +76,10 @@
   "backup": {
     "title": "備份與還原",
     "download_backup": "下載備份",
-    "download_desc": "將指定的資料表下載為 JSON 檔案：apply_mail, characters, costumes, guilds, member_notes, members, members_archive_history。",
+    "download_desc": "下載系統核心資料備份，包含：申請郵件、角色、服裝、公會、成員備註、成員名單、封存歷史及招魂記錄。",
     "download_btn": "下載備份檔",
     "download_raid_backup": "下載公會聯合戰備份",
-    "download_raid_desc": "將公會聯合戰相關的資料表下載為 JSON 檔案：guild_raid_records, member_raid_records, raid_seasons。",
+    "download_raid_desc": "下載公會聯合戰相關資料備份，包含：公會戰紀錄、成員戰績及賽季資訊。",
     "download_raid_btn": "下載公會聯合戰備份檔",
     "restore_backup": "從檔案還原",
     "restore_from_file": "從檔案還原",
