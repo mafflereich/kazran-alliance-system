@@ -432,7 +432,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchAllMembers = async () => {
     if (isOffline) return;
 
-    const { data, error } = await supabase.from('members').select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, archive_remark, member_notes(note, is_reserved), member_raid_records(score, season_note)');
+    // First, get the max ID from raid_seasons
+    const { data: seasonData, error: seasonError } = await supabase
+      .from('raid_seasons')
+      .select('id')
+      .order('id', { ascending: false })
+      .limit(1);
+
+    if (seasonError) {
+      console.error("Error fetching raid seasons:", seasonError);
+    }
+
+    const maxSeasonId = seasonData?.[0]?.id || null;
+
+    // Now fetch members with filtered member_raid_records
+    // If maxSeasonId is null (no seasons in database), use a non-existent UUID to ensure no records are matched
+    // This will result in all members having empty member_raid_records arrays, which will return score=0 and seasonNote=""
+    const seasonFilterId = maxSeasonId || '00000000-0000-0000-0000-000000000000';
+    
+    const { data, error } = await supabase
+      .from('members')
+      .select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, archive_remark, member_notes(note, is_reserved), member_raid_records(score, season_note)')
+      .eq('member_raid_records.season_id', seasonFilterId);
 
     if (error) {
       console.error("Error fetching all members:", error);
