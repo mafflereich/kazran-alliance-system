@@ -53,7 +53,7 @@ const TopControlBar: React.FC<TopControlBarProps> = ({
           }`}
         >
           <Users className="w-4 h-4" />
-          <span>成員調配</span>
+          <span>{t('raid.button_team_assign', '成員調配')}</span>
         </button>
 
         <button
@@ -66,7 +66,7 @@ const TopControlBar: React.FC<TopControlBarProps> = ({
           }`}
         >
           <Settings className="w-4 h-4" />
-          <span>賽季操作</span>
+          <span>{t('raid.season_actions_title', '賽季操作')}</span>
         </button>
 
         <button

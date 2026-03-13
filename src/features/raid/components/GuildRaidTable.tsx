@@ -317,7 +317,7 @@ export default function GuildRaidTable({
                               ? 'text-amber-500 hover:bg-stone-100 dark:hover:bg-stone-700 opacity-100'
                               : 'text-stone-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-stone-100 dark:hover:bg-stone-700 opacity-0 group-hover/member:opacity-100'
                           }`}
-                          title="招魂紀錄"
+                          title={t('raid.ghost_log_tooltip', '招魂紀錄')}
                         >
                           <Ghost className="w-3 h-3" />
                           {(ghostRecords[member.id!]?.length || 0) > 0 && (
@@ -411,7 +411,7 @@ export default function GuildRaidTable({
             <div className="flex items-center justify-between p-4 border-b border-stone-200 dark:border-stone-700">
               <h3 className="text-lg font-bold text-stone-800 dark:text-stone-100 flex items-center gap-2">
                 <Ghost className="w-5 h-5 text-amber-500" />
-                {ghostModalMember.name} - 招魂紀錄
+                {ghostModalMember.name} - {t('raid.ghost_log_title', '招魂紀錄')}
               </h3>
               <div className="flex items-center gap-2">
                 <button
@@ -419,7 +419,7 @@ export default function GuildRaidTable({
                   className="px-3 py-1.5 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-600 transition-colors flex items-center gap-1"
                 >
                   <Ghost className="w-4 h-4" />
-                  招魂
+                  {t('raid.ghost_log_button', '招魂')}
                 </button>
                 <button
                   onClick={() => setGhostModalMember(null)}
@@ -434,8 +434,12 @@ export default function GuildRaidTable({
                 <table className="w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-stone-200 dark:border-stone-700">
-                      <th className="py-2 font-medium text-stone-500 dark:text-stone-400">賽季</th>
-                      <th className="py-2 font-medium text-stone-500 dark:text-stone-400">日期</th>
+                      <th className="py-2 font-medium text-stone-500 dark:text-stone-400">
+                        {t('alliance_raid.season_label', '賽季')}
+                      </th>
+                      <th className="py-2 font-medium text-stone-500 dark:text-stone-400">
+                        {t('common.date', '日期')}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -456,7 +460,7 @@ export default function GuildRaidTable({
               ) : (
                 <div className="text-center py-8 text-stone-500 dark:text-stone-400">
                   <Ghost className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                  <p>目前沒有招魂紀錄</p>
+                  <p>{t('raid.ghost_log_empty', '目前沒有招魂紀錄')}</p>
                 </div>
               )}
             </div>

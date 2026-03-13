@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface GuildSelectionProps {
   guildsByTier: Record<number, any[]>;
@@ -21,6 +22,7 @@ const GuildSelection: React.FC<GuildSelectionProps> = ({
   guildMemberCounts = {},
 }) => {
   const [copied, setCopied] = useState(false);
+  const { t } = useTranslation(['raid', 'translation']);
 
   const handleCopy = () => {
     const lines: string[] = [];
@@ -50,6 +52,32 @@ const GuildSelection: React.FC<GuildSelectionProps> = ({
   return (
     <div className="mb-4">
       <div className="space-y-1">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="text-xs font-semibold text-stone-700 dark:text-stone-200 tracking-wide">
+            {t('raid.guild_selection_title', '選擇公會')}
+          </div>
+          <button
+            onClick={handleCopy}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors
+              ${copied
+                ? 'border-emerald-500/40 text-emerald-500 bg-transparent'
+                : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:bg-stone-100/60 dark:hover:bg-stone-800/60'
+              }`}
+            title={t('raid.guild_selection_copy_title', '複製各公會缺少人數')}
+          >
+            {copied ? (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                <span>{t('raid.guild_selection_copied', '已複製')}</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                <span>{t('raid.guild_selection_copy', '複製缺少人數')}</span>
+              </>
+            )}
+          </button>
+        </div>
         {Object.entries(guildsByTier)
           .sort(([a], [b]) => Number(a) - Number(b))
           .map(([tierStr, guilds]) => {
@@ -91,16 +119,6 @@ const GuildSelection: React.FC<GuildSelectionProps> = ({
               </div>
             );
           })}
-        
-        <div className="mt-2 flex justify-start">
-          <button
-            onClick={handleCopy}
-            className="p-1.5 text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200 transition-colors"
-            title="複製缺少人數"
-          >
-            {copied ? <Check size={16} /> : <Copy size={16} />}
-          </button>
-        </div>
       </div>
     </div>
   );
