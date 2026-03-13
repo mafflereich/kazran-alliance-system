@@ -16,6 +16,7 @@
     "end_season": "End Season",
     "start_download": "Start Download Image",
     "generating": "Generating...",
+    "include_score": "Include Score",
     "no_records": "No season records available.",
     "export_failed": "Failed to generate image",
     "history_title": "Alliance Raid History",
@@ -32,7 +33,17 @@
     "column_deduction": "Deduction",
     "column_note": "Member Note",
     "column_season_note": "Season Note",
-    "stats": "Stats",
-    "no_stats": "No stats available"
+    "stats": "Member Info",
+    "no_stats": "No member info available",
+    "archive_season": "Archive Season",
+    "season_archived": "Archived",
+    "archive_season_confirm_title": "Confirm Archive Season?",
+    "archive_season_confirm_desc": "Once archived, the records for this season can no longer be modified. Are you sure you want to archive?",
+    "median": "Median",
+    "recent_season_records": "Recent Season Records",
+    "guild_median": "Guild Median",
+    "no_season_records": "No season records available",
+    "deduction_unknown": "Unknown",
+    "deduction_borrow": "Borrow "
   }
 }

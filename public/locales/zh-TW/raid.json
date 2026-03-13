@@ -16,6 +16,7 @@
     "end_season": "結束賽季",
     "start_download": "開始下載圖片",
     "generating": "生成中...",
+    "include_score": "包含分數",
     "no_records": "目前沒有任何賽季記錄。",
     "export_failed": "生成圖片失敗",
     "history_title": "聯盟成績歷史",
@@ -32,11 +33,17 @@
     "column_deduction": "推算",
     "column_note": "成員備註",
     "column_season_note": "賽季備註",
-    "stats": "練度資訊",
-    "no_stats": "尚無練度資料",
+    "stats": "成員資訊",
+    "no_stats": "尚無成員資訊",
     "archive_season": "封存賽季",
     "season_archived": "已封存",
     "archive_season_confirm_title": "確認封存賽季？",
-    "archive_season_confirm_desc": "封存後，此賽季的成績將無法再被修改。您確定要封存嗎？"
+    "archive_season_confirm_desc": "封存後，此賽季的成績將無法再被修改。您確定要封存嗎？",
+    "median": "中位數",
+    "recent_season_records": "最近賽季紀錄",
+    "guild_median": "公會中位數",
+    "no_season_records": "尚無賽季紀錄",
+    "deduction_unknown": "不明",
+    "deduction_borrow": "借"
   }
 }

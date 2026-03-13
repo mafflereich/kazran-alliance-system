@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
-import { X, Swords } from 'lucide-react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { X, Swords, Loader2, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getImageUrl } from '@/shared/lib/utils';
 import { useAppContext } from '@/store';
+import { supabase } from '@/shared/api/supabase';
 
 interface MemberStatsModalProps {
   member: any;
@@ -12,6 +13,91 @@ interface MemberStatsModalProps {
 export default function MemberStatsModal({ member, onClose }: MemberStatsModalProps) {
   const { t, i18n } = useTranslation(['raid', 'translation']);
   const { db } = useAppContext();
+
+  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyLimit, setHistoryLimit] = useState(4);
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      if (!member?.id) return;
+      setLoadingHistory(true);
+      try {
+        // 1. Get seasons based on historyLimit
+        const { data: seasons, error: seasonsError, count } = await supabase
+          .from('raid_seasons')
+          .select('*', { count: 'exact' })
+          .order('season_number', { ascending: false })
+          .limit(historyLimit);
+        
+        if (seasonsError) throw seasonsError;
+        if (!seasons || seasons.length === 0) {
+          setHistoryData([]);
+          setHasMoreHistory(false);
+          return;
+        }
+
+        setHasMoreHistory(count ? seasons.length < count : false);
+
+        const seasonIds = seasons.map(s => s.id);
+
+        // 2. Get member records for these seasons
+        const { data: memberRecords, error: memberRecordsError } = await supabase
+          .from('member_raid_records')
+          .select('*')
+          .eq('member_id', member.id)
+          .in('season_id', seasonIds);
+        
+        if (memberRecordsError) throw memberRecordsError;
+
+        // 3. Get guild records for these seasons (to get medians)
+        const { data: guildRecords, error: guildRecordsError } = await supabase
+          .from('guild_raid_records')
+          .select('*')
+          .in('season_id', seasonIds);
+        
+        if (guildRecordsError) throw guildRecordsError;
+
+        // Combine data
+        const history = seasons.map(season => {
+          const mRecord = memberRecords?.find(r => r.season_id === season.id);
+          
+          // Determine which guild ID to use for looking up the median
+          const targetGuildId = !season.is_archived 
+            ? member.guildId 
+            : mRecord?.season_guild;
+
+          const gRecord = guildRecords?.find(r => r.season_id === season.id && r.guild_id === targetGuildId);
+          
+          return {
+            season,
+            mRecord,
+            gRecord
+          };
+        });
+
+        setHistoryData(history);
+      } catch (err) {
+        console.error('Error fetching member history:', err);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+
+    fetchHistory();
+  }, [member?.id, member?.guildId, historyLimit]);
+
+  const getTierColor = (tier: number) => {
+    switch (tier) {
+      case 1: return 'bg-orange-500 text-white';
+      case 2: return 'bg-blue-500 text-white';
+      case 3: return 'bg-stone-500 text-white';
+      case 4: return 'bg-green-500 text-white';
+      default: return 'bg-stone-100 dark:bg-stone-700 text-stone-600 dark:text-stone-400';
+    }
+  };
 
   const costumesByCharacter = useMemo(() => {
     if (!member?.records) return [];
@@ -54,7 +140,7 @@ export default function MemberStatsModal({ member, onClose }: MemberStatsModalPr
       >
         <div className="flex justify-between items-center p-4 border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-700/50">
           <h3 className="text-lg font-bold text-stone-800 dark:text-stone-100 flex items-center gap-2">
-            {member.name} {t('raid.stats', '練度資訊')}
+            {member.name} {t('raid.stats', '成員資訊')}
           </h3>
           <button
             onClick={onClose}
@@ -65,6 +151,97 @@ export default function MemberStatsModal({ member, onClose }: MemberStatsModalPr
         </div>
         
         <div className="p-6 overflow-y-auto">
+          {/* History Table */}
+          <div className="mb-8">
+            <button 
+              onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+              className="w-full text-sm font-bold text-stone-700 dark:text-stone-300 mb-3 flex items-center justify-between group"
+            >
+              <div className="flex items-center gap-2">
+                <Swords className="w-4 h-4" />
+                {t('raid.recent_season_records', '最近賽季紀錄')}
+              </div>
+              <div className="text-xs font-normal text-stone-400 group-hover:text-stone-600 transition-colors flex items-center gap-1">
+                {isHistoryOpen ? t('common.collapse', '收起') : t('common.expand', '展開')}
+                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isHistoryOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+            
+            {isHistoryOpen && (
+              loadingHistory && historyData.length === 0 ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
+                </div>
+              ) : historyData.length > 0 ? (
+                <div className="overflow-hidden rounded-xl border border-stone-200 dark:border-stone-700">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-stone-50 dark:bg-stone-700/50 text-stone-500 dark:text-stone-400 font-medium">
+                      <tr>
+                        <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('alliance_raid.season_label', '賽季')}</th>
+                        <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('alliance_raid.period', '期間')}</th>
+                        <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('common.guild', '公會')}</th>
+                        <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('raid.column_score', '個人總分')}</th>
+                        <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('raid.guild_median', '公會中位數')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-200 dark:divide-stone-700">
+                      {historyData.map((item) => {
+                        const guild = !item.season.is_archived 
+                          ? (member.guildId ? db.guilds[member.guildId] : null)
+                          : (item.mRecord?.season_guild ? db.guilds[item.mRecord.season_guild] : null);
+                        return (
+                          <tr key={item.season.id} className="bg-white dark:bg-stone-800">
+                            <td className="px-4 py-3 font-bold text-stone-800 dark:text-stone-200">
+                              S{item.season.season_number}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-stone-500">
+                              {item.season.period_text}
+                            </td>
+                            <td className="px-4 py-3">
+                              {guild ? (
+                                <span className={`px-2 py-0.5 rounded text-xs font-bold ${getTierColor(guild.tier || 1)}`}>
+                                  {guild.name}
+                                </span>
+                              ) : (
+                                <span className="text-stone-400">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 font-mono text-stone-700 dark:text-stone-300">
+                              {item.mRecord?.score?.toLocaleString() || '-'}
+                            </td>
+                            <td className="px-4 py-3 font-mono text-stone-700 dark:text-stone-300">
+                              {item.gRecord?.member_score_median?.toLocaleString() || '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {hasMoreHistory && (
+                    <div className="bg-stone-50 dark:bg-stone-800/50 border-t border-stone-200 dark:border-stone-700 p-2 text-center">
+                      <button
+                        onClick={() => setHistoryLimit(prev => prev + 4)}
+                        disabled={loadingHistory}
+                        className="text-sm font-medium text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-full py-1"
+                      >
+                        {loadingHistory ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4" />
+                        )}
+                        {t('common.load_more', '載入更多')}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4 text-stone-400 text-xs italic border border-dashed border-stone-200 dark:border-stone-700 rounded-xl">
+                  {t('raid.no_season_records', '尚無賽季紀錄')}
+                </div>
+              )
+            )}
+          </div>
+
           <div className="flex flex-wrap items-start gap-x-6 gap-y-6">
             {costumesByCharacter.map(({ character, costumes }) => (
               <div key={character?.id || 'unknown'} className="flex flex-col gap-3">
