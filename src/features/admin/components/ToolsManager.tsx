@@ -423,7 +423,7 @@ export default function ToolsManager() {
             .insert({
               member_id: memberId,
               from_guild_id: guildId,
-              archive_reason: `賽季${season_number}後不在公會了`,
+              archive_reason: t('tools.csv_archive_reason', { season: season_number, defaultValue: `賽季${season_number}後不在公會了` }),
               archived_at: new Date().toISOString()
             });
           if (archiveError) throw archiveError;
@@ -472,11 +472,11 @@ export default function ToolsManager() {
         successCount++;
       }
       
-      showToast(t('tools.csv_import_success', { count: successCount, skip: skipCount, defaultValue: `成功匯入 ${successCount} 筆資料 (略過 ${skipCount} 筆)` }), 'success');
+      showToast(t('tools.csv_import_success', { count: successCount, skip: skipCount }), 'success');
       await fetchAllMembers();
     } catch (error: any) {
       console.error("CSV Import failed:", error);
-      showToast(t('tools.csv_import_failed', { error: error.message, defaultValue: `匯入失敗: ${error.message}` }), 'error');
+      showToast(t('tools.csv_import_failed', { error: error.message }), 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -565,7 +565,7 @@ export default function ToolsManager() {
         }
       } catch (error: any) {
         console.error("CSV Parse failed:", error);
-        showToast(t('tools.csv_import_failed', { error: error.message, defaultValue: `解析失敗: ${error.message}` }), 'error');
+        showToast(t('tools.csv_import_failed', { error: error.message }), 'error');
       } finally {
         setIsProcessing(false);
         if (csvInputRef.current) {
@@ -625,23 +625,23 @@ export default function ToolsManager() {
         <section>
           <h2 className="text-2xl font-bold mb-6 text-stone-800 dark:text-stone-200 flex items-center gap-2">
             <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
-            {t('tools.csv_batch_processing', '公會戰紀錄批次處理')}
+            {t('tools.csv_batch_processing')}
           </h2>
           <div className="grid md:grid-cols-2 gap-6">
             <div className="bg-stone-50 dark:bg-stone-700 p-8 rounded-2xl border border-stone-200 dark:border-stone-600 flex flex-col items-center justify-center text-center">
               <div className="p-4 bg-emerald-100 dark:bg-emerald-900/50 rounded-full text-emerald-600 mb-4">
                 <Download className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('tools.export_csv_template', '匯出空白 CSV 檔')}</h3>
+              <h3 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('tools.export_csv_template')}</h3>
               <p className="text-stone-500 dark:text-stone-400 mb-6 max-w-md">
-                {t('tools.export_csv_template_desc', '下載包含正確標題格式的空白 CSV 檔案，用於批次匯入公會戰紀錄。')}
+                {t('tools.export_csv_template_desc')}
               </p>
               <button
                 onClick={handleExportCsvTemplate}
                 disabled={isProcessing}
                 className="px-8 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all active:scale-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isProcessing ? t('common.processing', '處理中...') : t('tools.export_btn', '匯出 CSV')}
+                {isProcessing ? t('common.processing', '處理中...') : t('tools.export_btn')}
               </button>
             </div>
 
@@ -649,9 +649,9 @@ export default function ToolsManager() {
               <div className="p-4 bg-teal-100 dark:bg-teal-900/50 rounded-full text-teal-600 mb-4">
                 <FileUp className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('tools.import_csv', '匯入 CSV 檔')}</h3>
+              <h3 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('tools.import_csv')}</h3>
               <p className="text-stone-500 dark:text-stone-400 mb-6 max-w-md">
-                {t('tools.import_csv_desc', '上傳填寫好的 CSV 檔案，系統將自動配對公會與成員，並寫入公會戰紀錄。')}
+                {t('tools.import_csv_desc')}
               </p>
               <input type="file" accept=".csv" onChange={handleImportCsv} ref={csvInputRef} className="hidden" />
               <button
@@ -659,7 +659,7 @@ export default function ToolsManager() {
                 disabled={isProcessing}
                 className="px-8 py-3 bg-teal-600 text-white rounded-xl font-bold hover:bg-teal-700 transition-all active:scale-95 shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isProcessing ? t('common.processing', '處理中...') : t('tools.import_btn', '匯入 CSV')}
+                {isProcessing ? t('common.processing', '處理中...') : t('tools.import_btn')}
               </button>
             </div>
           </div>
@@ -878,10 +878,10 @@ export default function ToolsManager() {
 
       <ConfirmModal
         isOpen={csvImportState.isOpen}
-        title={t('tools.csv_import_confirm_new_members', '發現未知的成員')}
+        title={t('tools.csv_import_confirm_new_members')}
         message={
           <div className="space-y-4">
-            <p>{t('tools.csv_import_confirm_desc', '以下成員在系統中找不到，將會自動建立並標記為已封存：')}</p>
+            <p>{t('tools.csv_import_confirm_desc')}</p>
             <div className="max-h-60 overflow-y-auto bg-stone-50 dark:bg-stone-900/50 rounded-lg border border-stone-200 dark:border-stone-700 p-4">
               <ul className="list-disc pl-5 space-y-1">
                 {csvImportState.missingMembers.map((m, i) => (
@@ -892,7 +892,7 @@ export default function ToolsManager() {
               </ul>
             </div>
             <p className="text-amber-600 dark:text-amber-400 font-medium">
-              {t('tools.csv_import_confirm_ask', '確定要建立這些成員並繼續匯入嗎？')}
+              {t('tools.csv_import_confirm_ask')}
             </p>
           </div>
         }

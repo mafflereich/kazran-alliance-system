@@ -132,7 +132,21 @@
     "remove_success": "移除重複成員成功",
     "remove_failed": "移除重複成員失敗",
     "import_success": "匯入服裝表成功",
-    "import_failed": "匯入服裝表失敗"
+    "import_failed": "匯入服裝表失敗",
+    "csv_batch_processing": "公會戰紀錄批次處理",
+    "export_csv_template": "匯出空白 CSV 檔",
+    "export_csv_template_desc": "下載包含正確標題格式的空白 CSV 檔案，用於批次匯入公會戰紀錄。",
+    "export_btn": "匯出 CSV",
+    "import_csv": "匯入 CSV 檔",
+    "import_csv_desc": "上傳填寫好的 CSV 檔案，系統將自動配對公會與成員，並寫入公會戰紀錄。",
+    "import_btn": "匯入 CSV",
+    "csv_import_confirm_new_members": "發現未知的成員",
+    "csv_import_confirm_desc": "以下成員在系統中找不到，將會自動建立並標記為已封存：",
+    "csv_import_confirm_ask": "確定要建立這些成員並繼續匯入嗎？",
+    "csv_import_success": "成功匯入 {{count}} 筆資料 (略過 {{skip}} 筆)",
+    "csv_import_failed": "匯入失敗: {{error}}",
+    "csv_empty": "CSV 檔案為空或缺少資料",
+    "csv_archive_reason": "賽季{{season}}後不在公會了"
   },
   "passwords": {
     "single_update": "單一密碼修改",

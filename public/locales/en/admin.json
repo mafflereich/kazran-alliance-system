@@ -132,7 +132,21 @@
     "remove_success": "Remove duplicate members successfully",
     "remove_failed": "Failed to remove duplicate members",
     "import_success": "Import costume table successfully",
-    "import_failed": "Failed to import costume table"
+    "import_failed": "Failed to import costume table",
+    "csv_batch_processing": "Raid Records Batch Processing",
+    "export_csv_template": "Export Blank CSV File",
+    "export_csv_template_desc": "Download a blank CSV file with the correct header format for batch importing raid records.",
+    "export_btn": "Export CSV",
+    "import_csv": "Import CSV File",
+    "import_csv_desc": "Upload a filled CSV file, the system will automatically match guilds and members, and write raid records.",
+    "import_btn": "Import CSV",
+    "csv_import_confirm_new_members": "Unknown Members Found",
+    "csv_import_confirm_desc": "The following members cannot be found in the system and will be automatically created and marked as archived:",
+    "csv_import_confirm_ask": "Are you sure you want to create these members and continue importing?",
+    "csv_import_success": "Successfully imported {{count}} records (skipped {{skip}})",
+    "csv_import_failed": "Import failed: {{error}}",
+    "csv_empty": "CSV file is empty or missing data",
+    "csv_archive_reason": "Not in guild after season {{season}}"
   },
   "passwords": {
     "single_update": "Single Password Update",
