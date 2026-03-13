@@ -81,6 +81,14 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
         }
     };
 
+    // 輔助函數：確保 selectedIds 正確設定後再執行 action
+    const withSelectedId = (action: () => void) => {
+        if (!isMultiSelectMode && selectedIds.size === 0) {
+            setSelectedIds(new Set([member.id!]));
+        }
+        action();
+    };
+
     const isReserved = member.isReserved;
 
     return (
@@ -117,7 +125,11 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
 
                         <button
                             disabled={isReserved}
-                            onClick={() => { setShowRoleMenu(!showRoleMenu); setShowGuildMenu(false); setShowColorMenu(false); }}
+                            onClick={() => { 
+                                withSelectedId(() => {
+                                    setShowRoleMenu(!showRoleMenu); setShowGuildMenu(false); setShowColorMenu(false); 
+                                });
+                            }}
                             className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 ${isReserved ? 'text-gray-600 cursor-not-allowed' : 'hover:bg-gray-800 text-gray-200 cursor-pointer'}`}
                         >
                             <Crown size={14} /> 切換身分
@@ -127,7 +139,11 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
 
                         <button
                             disabled={isReserved}
-                            onClick={() => { setShowColorMenu(!showColorMenu); setShowGuildMenu(false); setShowRoleMenu(false); }}
+                            onClick={() => { 
+                                withSelectedId(() => {
+                                    setShowColorMenu(!showColorMenu); setShowGuildMenu(false); setShowRoleMenu(false); 
+                                });
+                            }}
                             className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 ${isReserved ? 'text-gray-600 cursor-not-allowed' : 'hover:bg-gray-800 text-gray-200 cursor-pointer'}`}
                         >
                             <Palette size={14} /> 標記顏色
@@ -144,7 +160,11 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
                         </button>
                         <button
                             disabled={isReserved}
-                            onClick={() => { setShowGuildMenu(!showGuildMenu); setShowColorMenu(false); setShowRoleMenu(false); }}
+                            onClick={() => { 
+                                withSelectedId(() => {
+                                    setShowGuildMenu(!showGuildMenu); setShowColorMenu(false); setShowRoleMenu(false); 
+                                });
+                            }}
                             className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 ${isReserved ? 'text-gray-600 cursor-not-allowed' : 'hover:bg-indigo-900/50 text-indigo-300 cursor-pointer'}`}
                         >
                             <MoveHorizontal size={14} /> 移動到其他公會
@@ -221,9 +241,11 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
                                 <button
                                     key={g.id}
                                     onClick={() => {
-                                        batchMoveToGuild(g.id!);
-                                        setShowGuildMenu(false);
-                                        setShowContextMenu(false);
+                                        withSelectedId(() => {
+                                            batchMoveToGuild(g.id!);
+                                            setShowGuildMenu(false);
+                                            setShowContextMenu(false);
+                                        });
                                     }}
                                     className="w-full text-left px-4 py-2 text-sm hover:bg-indigo-900/50 text-gray-200 cursor-pointer"
                                 >
@@ -252,9 +274,11 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
                             <button
                                 key={color.id}
                                 onClick={() => {
-                                    batchUpdateColor(color.id === 'default' ? undefined : color.id);
-                                    setShowColorMenu(false);
-                                    setShowContextMenu(false);
+                                    withSelectedId(() => {
+                                        batchUpdateColor(color.id === 'default' ? undefined : color.id);
+                                        setShowColorMenu(false);
+                                        setShowContextMenu(false);
+                                    });
                                 }}
                                 title={color.name}
                                 className={`w-6 h-6 rounded-full border ${color.buttonBg} ${color.buttonBorder} hover:scale-110 transition-transform`}
@@ -280,9 +304,11 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
                     >
                         <button
                             onClick={() => {
-                                batchUpdateRole('leader');
-                                setShowRoleMenu(false);
-                                setShowContextMenu(false);
+                                withSelectedId(() => {
+                                    batchUpdateRole('leader');
+                                    setShowRoleMenu(false);
+                                    setShowContextMenu(false);
+                                });
                             }}
                             className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 ${member.role === 'leader' ? 'text-yellow-400' : 'text-gray-200 hover:bg-gray-800'}`}
                         >
@@ -290,9 +316,11 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
                         </button>
                         <button
                             onClick={() => {
-                                batchUpdateRole('coleader');
-                                setShowRoleMenu(false);
-                                setShowContextMenu(false);
+                                withSelectedId(() => {
+                                    batchUpdateRole('coleader');
+                                    setShowRoleMenu(false);
+                                    setShowContextMenu(false);
+                                });
                             }}
                             className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 ${member.role === 'coleader' ? 'text-purple-400' : 'text-gray-200 hover:bg-gray-800'}`}
                         >
@@ -300,9 +328,11 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
                         </button>
                         <button
                             onClick={() => {
-                                batchUpdateRole('member');
-                                setShowRoleMenu(false);
-                                setShowContextMenu(false);
+                                withSelectedId(() => {
+                                    batchUpdateRole('member');
+                                    setShowRoleMenu(false);
+                                    setShowContextMenu(false);
+                                });
                             }}
                             className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 ${member.role === 'member' ? 'text-gray-400' : 'text-gray-200 hover:bg-gray-800'}`}
                         >

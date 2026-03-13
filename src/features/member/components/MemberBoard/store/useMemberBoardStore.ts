@@ -231,7 +231,8 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
             initialMemberStates: {
                 ...state.initialMemberStates,
                 [member.id!]: { guildId: member.guildId, note: member.note }
-            }
+            },
+            ...saveHistory(state),
         }));
     },
 
@@ -439,7 +440,9 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
 
     clearSelection: () => set({ selectedIds: new Set() }),
 
-    setSelectedIds: (ids: Set<string>) => set({ selectedIds: ids }),
+    setSelectedIds: (ids: Set<string>) => {
+        set({ selectedIds: ids });
+    },
 
     clearDeletedMembers: () => set({ deletedMembers: [] }),
 
