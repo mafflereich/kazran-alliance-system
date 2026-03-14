@@ -222,7 +222,7 @@ export default function GuildRaidTable({
         {loading ? (
           <div className="p-8 text-center text-stone-500">{t('common.loading', '載入中...')}</div>
         ) : (
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse max-md:min-w-[800px]">
             <thead 
               ref={theadRef}
               style={isComparisonMode && theadHeight ? { height: `${theadHeight}px` } : {}}

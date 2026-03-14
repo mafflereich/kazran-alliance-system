@@ -173,54 +173,56 @@ export default function MemberStatsModal({ member, onClose }: MemberStatsModalPr
                   <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
                 </div>
               ) : historyData.length > 0 ? (
-                <div className="overflow-hidden rounded-xl border border-stone-200 dark:border-stone-700">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-stone-50 dark:bg-stone-700/50 text-stone-500 dark:text-stone-400 font-medium">
-                      <tr>
-                        <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('alliance_raid.season_label', '賽季')}</th>
-                        <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('alliance_raid.period', '期間')}</th>
-                        <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('common.guild', '公會')}</th>
-                        <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('raid.column_score', '個人總分')}</th>
-                        <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('raid.guild_median', '公會中位數')}</th>
-                        <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('raid.season_note', '賽季備註')}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-stone-200 dark:divide-stone-700">
-                      {historyData.map((item) => {
-                        const guild = !item.season.is_archived 
-                          ? (member.guildId ? db.guilds[member.guildId] : null)
-                          : (item.mRecord?.season_guild ? db.guilds[item.mRecord.season_guild] : null);
-                        return (
-                          <tr key={item.season.id} className="bg-white dark:bg-stone-800">
-                            <td className="px-4 py-3 font-bold text-stone-800 dark:text-stone-200">
-                              S{item.season.season_number}
-                            </td>
-                            <td className="px-4 py-3 text-xs text-stone-500">
-                              {item.season.period_text}
-                            </td>
-                            <td className="px-4 py-3">
-                              {guild ? (
-                                <span className={`px-2 py-0.5 rounded text-xs font-bold ${getTierColor(guild.tier || 1)}`}>
-                                  {guild.name}
-                                </span>
-                              ) : (
-                                <span className="text-stone-400">-</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 font-mono text-stone-700 dark:text-stone-300">
-                              {item.mRecord?.score?.toLocaleString() || '-'}
-                            </td>
-                            <td className="px-4 py-3 font-mono text-stone-700 dark:text-stone-300">
-                              {item.gRecord?.member_score_median?.toLocaleString() || '-'}
-                            </td>
-                            <td className="px-4 py-3 text-xs text-stone-600 dark:text-stone-400 whitespace-pre-wrap break-words max-w-[200px]">
-                              {item.mRecord?.season_note || '-'}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                <div className="rounded-xl border border-stone-200 dark:border-stone-700 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left max-md:min-w-[600px]">
+                      <thead className="bg-stone-50 dark:bg-stone-700/50 text-stone-500 dark:text-stone-400 font-medium">
+                        <tr>
+                          <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('alliance_raid.season_label', '賽季')}</th>
+                          <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('alliance_raid.period', '期間')}</th>
+                          <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('common.guild', '公會')}</th>
+                          <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('raid.column_score', '個人總分')}</th>
+                          <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('raid.guild_median', '公會中位數')}</th>
+                          <th className="px-4 py-2 border-b border-stone-200 dark:border-stone-700">{t('raid.season_note', '賽季備註')}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-200 dark:divide-stone-700">
+                        {historyData.map((item) => {
+                          const guild = !item.season.is_archived 
+                            ? (member.guildId ? db.guilds[member.guildId] : null)
+                            : (item.mRecord?.season_guild ? db.guilds[item.mRecord.season_guild] : null);
+                          return (
+                            <tr key={item.season.id} className="bg-white dark:bg-stone-800">
+                              <td className="px-4 py-3 font-bold text-stone-800 dark:text-stone-200">
+                                S{item.season.season_number}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-stone-500">
+                                {item.season.period_text}
+                              </td>
+                              <td className="px-4 py-3">
+                                {guild ? (
+                                  <span className={`px-2 py-0.5 rounded text-xs font-bold ${getTierColor(guild.tier || 1)}`}>
+                                    {guild.name}
+                                  </span>
+                                ) : (
+                                  <span className="text-stone-400">-</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 font-mono text-stone-700 dark:text-stone-300">
+                                {item.mRecord?.score?.toLocaleString() || '-'}
+                              </td>
+                              <td className="px-4 py-3 font-mono text-stone-700 dark:text-stone-300">
+                                {item.gRecord?.member_score_median?.toLocaleString() || '-'}
+                              </td>
+                              <td className="px-4 py-3 text-xs text-stone-600 dark:text-stone-400 whitespace-pre-wrap break-words max-w-[200px]">
+                                {item.mRecord?.season_note || '-'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                   {hasMoreHistory && (
                     <div className="bg-stone-50 dark:bg-stone-800/50 border-t border-stone-200 dark:border-stone-700 p-2 text-center">
                       <button
