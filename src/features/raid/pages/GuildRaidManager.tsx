@@ -810,6 +810,37 @@ export default function GuildRaidManager() {
     }
   };
 
+  const handleDeleteGhostRecord = async (memberId: string, record: any) => {
+    try {
+      let query = supabase.from('ghost_records').delete();
+      
+      if (record.id) {
+        query = query.eq('id', record.id);
+      } else if (record.uid) {
+        query = query.eq('uid', record.uid);
+      } else if (record.created_at) {
+        query = query.eq('member_id', memberId).eq('created_at', record.created_at);
+      } else {
+        console.error('Cannot delete ghost record: no unique identifier found');
+        return;
+      }
+
+      const { error } = await query;
+      if (error) throw error;
+      
+      setGhostRecords(prev => ({
+        ...prev,
+        [memberId]: (prev[memberId] || []).filter(r => {
+          if (record.id) return r.id !== record.id;
+          if (record.uid) return r.uid !== record.uid;
+          return r.created_at !== record.created_at;
+        })
+      }));
+    } catch (err) {
+      console.error('Error deleting ghost record:', err);
+    }
+  };
+
   if (!canManage) {
     return (
       <div className="h-screen flex flex-col">
@@ -913,6 +944,7 @@ export default function GuildRaidManager() {
                 highlightedMemberIds={highlightedMemberIds}
                 ghostRecords={ghostRecords}
                 onAddGhostRecord={handleAddGhostRecord}
+                onDeleteGhostRecord={handleDeleteGhostRecord}
               />
             );
           })}

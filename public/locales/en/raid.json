@@ -51,6 +51,8 @@
     "ghost_log_button": "Awaken",
     "ghost_log_empty": "No Awaken records yet.",
     "ghost_log_tooltip": "Awaken record",
+    "ghost_log_delete_title": "Delete Awaken Record",
+    "ghost_log_delete_desc": "Are you sure you want to delete this Awaken record? This action cannot be undone.",
     "season_actions_title": "Season Actions",
     "tab_add_season": "Add Season",
     "tab_archive_season": "Archive Season",

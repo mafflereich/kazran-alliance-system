@@ -51,6 +51,8 @@
     "ghost_log_button": "招魂",
     "ghost_log_empty": "目前沒有招魂紀錄",
     "ghost_log_tooltip": "招魂紀錄",
+    "ghost_log_delete_title": "刪除招魂紀錄",
+    "ghost_log_delete_desc": "確定要刪除這筆招魂紀錄嗎？此操作無法復原。",
     "season_actions_title": "賽季操作",
     "tab_add_season": "新增賽季",
     "tab_archive_season": "封存賽季",

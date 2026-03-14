@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Pencil, Save, X, ArrowDownWideNarrow, ArrowDownNarrowWide, Copy, Check, Ghost } from 'lucide-react';
+import { Search, Pencil, Save, X, ArrowDownWideNarrow, ArrowDownNarrowWide, Copy, Check, Ghost, Ban } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Member, Guild } from '@/entities/member/types';
 import { deduceScore } from '../utils/scoreDeduction';
+import ConfirmModal from '@shared/ui/ConfirmModal';
 
 interface MemberRaidRecord {
   id?: string;
@@ -48,6 +49,7 @@ interface GuildRaidTableProps {
   highlightedMemberIds?: Set<string>;
   ghostRecords?: Record<string, any[]>;
   onAddGhostRecord?: (memberId: string) => void;
+  onDeleteGhostRecord?: (memberId: string, record: any) => void;
 }
 
 export default function GuildRaidTable({
@@ -76,7 +78,8 @@ export default function GuildRaidTable({
   onTheadHeightChange,
   highlightedMemberIds,
   ghostRecords = {},
-  onAddGhostRecord
+  onAddGhostRecord,
+  onDeleteGhostRecord
 }: GuildRaidTableProps) {
   const { t } = useTranslation(['raid', 'translation']);
   const guildName = guild?.name || '';
@@ -91,6 +94,19 @@ export default function GuildRaidTable({
   const [guildNoteInput, setGuildNoteInput] = useState('');
   const [copiedMemberId, setCopiedMemberId] = useState<string | null>(null);
   const [ghostModalMember, setGhostModalMember] = useState<Member | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
+
+  const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
   const displayGuildNote = guildRaidRecord?.note || '';
 
@@ -440,18 +456,41 @@ export default function GuildRaidTable({
                       <th className="py-2 font-medium text-stone-500 dark:text-stone-400">
                         {t('common.date', '日期')}
                       </th>
+                      <th className="py-2 font-medium text-stone-500 dark:text-stone-400 w-10 text-center">
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {[...ghostRecords[ghostModalMember.id!]]
                       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                       .map((record, idx) => (
-                        <tr key={record.uid || idx} className="border-b border-stone-100 dark:border-stone-700/50">
+                        <tr key={record.id || record.uid || idx} className="border-b border-stone-100 dark:border-stone-700/50 group/ghost">
                           <td className="py-2 text-stone-800 dark:text-stone-200">
                             {record.season_number ? `S${record.season_number}` : '-'}
                           </td>
                           <td className="py-2 text-stone-600 dark:text-stone-400">
                             {new Date(record.created_at).toLocaleString()}
+                          </td>
+                          <td className="py-2 text-center">
+                            <button
+                              onClick={() => {
+                                setConfirmModal({
+                                  isOpen: true,
+                                  title: t('raid.ghost_log_delete_title', '刪除招魂紀錄'),
+                                  message: t('raid.ghost_log_delete_desc', '確定要刪除這筆招魂紀錄嗎？此操作無法復原。'),
+                                  onConfirm: () => {
+                                    if (onDeleteGhostRecord) {
+                                      onDeleteGhostRecord(ghostModalMember.id!, record);
+                                    }
+                                    closeConfirmModal();
+                                  }
+                                });
+                              }}
+                              className="p-1 text-stone-400 hover:text-red-500 rounded hover:bg-red-50 dark:hover:bg-red-900/30 opacity-0 group-hover/ghost:opacity-100 transition-all"
+                              title={t('common.delete', '刪除')}
+                            >
+                              <Ban className="w-4 h-4" />
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -467,6 +506,14 @@ export default function GuildRaidTable({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.onConfirm}
+        onCancel={closeConfirmModal}
+      />
     </div>
   );
 }
