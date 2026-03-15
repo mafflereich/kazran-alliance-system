@@ -15,6 +15,7 @@ interface RaidSeason {
   season_number: number;
   period_text: string;
   description: string;
+  even_rounds: boolean;
   is_archived?: boolean;
 }
 
@@ -73,7 +74,7 @@ export default function GuildRaidManager() {
 
   const [isSeasonPanelOpen, setIsSeasonPanelOpen] = useState(false);
   const [activeSeasonTab, setActiveSeasonTab] = useState<'add' | 'archive' | 'delete'>('add');
-  const [newSeason, setNewSeason] = useState({ season_number: 1, period_text: '', description: '' });
+  const [newSeason, setNewSeason] = useState({ season_number: 1, period_text: '', description: '', even_rounds: false });
   const [keepScores, setKeepScores] = useState(true);
   const [keepSeasonNotes, setKeepSeasonNotes] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -740,7 +741,7 @@ export default function GuildRaidManager() {
 
         setIsSeasonPanelOpen(false);
         const nextSeasonNumber = createdSeason.season_number + 1;
-        setNewSeason({ season_number: nextSeasonNumber, period_text: '', description: '' });
+        setNewSeason({ season_number: nextSeasonNumber, period_text: '', description: '', even_rounds: false });
         setKeepScores(true);
         setKeepSeasonNotes(false);
       }
@@ -927,6 +928,7 @@ export default function GuildRaidManager() {
                 isComparisonMode={isComparisonMode}
                 isArchived={isSelectedSeasonArchived}
                 seasonId={selectedSeasonId}
+                evenRounds={selectedSeason?.even_rounds ?? true}
                 loading={loading}
                 saving={saving}
                 sortConfig={sortConfig}

@@ -7,8 +7,8 @@ interface ManagerActionsModalProps {
   onClose: () => void;
   activeTab: 'add' | 'archive' | 'delete';
   onTabChange: (tab: 'add' | 'archive' | 'delete') => void;
-  newSeason: { season_number: number; period_text: string; description: string };
-  setNewSeason: React.Dispatch<React.SetStateAction<{ season_number: number; period_text: string; description: string }>>;
+  newSeason: { season_number: number; period_text: string; description: string; even_rounds: boolean };
+  setNewSeason: React.Dispatch<React.SetStateAction<{ season_number: number; period_text: string; description: string; even_rounds: boolean }>>;
   keepScores: boolean;
   setKeepScores: (val: boolean) => void;
   keepSeasonNotes: boolean;
@@ -194,6 +194,17 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
                 </div>
 
                 <div className="flex flex-col gap-2 pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newSeason.even_rounds}
+                      onChange={e => setNewSeason(prev => ({ ...prev, even_rounds: e.target.checked }))}
+                      className="w-4 h-4 text-indigo-600 rounded border-stone-300 focus:ring-indigo-500 dark:border-stone-600 dark:bg-stone-700"
+                    />
+                    <span className="text-sm text-stone-700 dark:text-stone-300">
+                      {t('common.even_rounds')}
+                    </span>
+                  </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"

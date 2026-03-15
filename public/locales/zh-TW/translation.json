@@ -53,6 +53,7 @@
     "role": "角色",
     "name": "名稱",
     "description": "描述",
+    "even_rounds": "雙數回合",
     "note": "備註",
     "date": "日期",
     "time": "時間",

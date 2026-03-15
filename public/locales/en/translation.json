@@ -53,6 +53,7 @@
     "role": "Role",
     "name": "Name",
     "description": "Description",
+    "even_rounds": "Even Rounds",
     "note": "Note",
     "date": "Date",
     "time": "Time",

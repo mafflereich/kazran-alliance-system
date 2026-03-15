@@ -16,6 +16,7 @@ interface RaidSeason {
   season_number: number;
   period_text: string;
   description: string;
+  even_rounds: boolean;
 }
 
 interface GuildRaidRecord {
@@ -40,7 +41,7 @@ export default function AllianceRaidRecord() {
   // Modals state
   const [isSeasonModalOpen, setIsSeasonModalOpen] = useState(false);
   const [editingSeasonId, setEditingSeasonId] = useState<string | null>(null);
-  const [newSeason, setNewSeason] = useState({ season_number: 1, period_text: '', description: '' });
+  const [newSeason, setNewSeason] = useState({ season_number: 1, period_text: '', description: '', even_rounds: false });
 
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [downloadConfig, setDownloadConfig] = useState<{ singleSeasonId: string }>({ singleSeasonId: '' });
@@ -142,7 +143,7 @@ export default function AllianceRaidRecord() {
       }
       setIsSeasonModalOpen(false);
       setEditingSeasonId(null);
-      setNewSeason({ season_number: (seasons[0]?.season_number || 0) + 1, period_text: '', description: '' });
+      setNewSeason({ season_number: (seasons[0]?.season_number || 0) + 1, period_text: '', description: '', even_rounds: false });
     } catch (err: any) {
       setError(`Error saving season: ${err.message}`);
     }
@@ -357,7 +358,12 @@ export default function AllianceRaidRecord() {
                           <button
                             onClick={() => {
                               setEditingSeasonId(season.id);
-                              setNewSeason({ season_number: season.season_number, period_text: season.period_text, description: season.description });
+                              setNewSeason({ 
+                                season_number: season.season_number, 
+                                period_text: season.period_text, 
+                                description: season.description,
+                                even_rounds: season.even_rounds || false
+                              });
                               setIsSeasonModalOpen(true);
                             }}
                             className="absolute top-1 right-1 p-1 text-stone-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded opacity-0 group-hover:opacity-100 transition-all"

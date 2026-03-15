@@ -11,11 +11,13 @@ interface AllianceRaidSeasonModalProps {
     season_number: number;
     period_text: string;
     description: string;
+    even_rounds: boolean;
   };
   setNewSeason: React.Dispatch<React.SetStateAction<{
     season_number: number;
     period_text: string;
     description: string;
+    even_rounds: boolean;
   }>>;
 }
 
@@ -84,6 +86,19 @@ export default function AllianceRaidSeasonModal({
               onChange={e => setNewSeason(prev => ({ ...prev, description: e.target.value }))}
               className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100"
             />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="even_rounds"
+              checked={newSeason.even_rounds}
+              onChange={e => setNewSeason(prev => ({ ...prev, even_rounds: e.target.checked }))}
+              className="w-4 h-4 text-amber-600 rounded border-stone-300 focus:ring-amber-500 dark:border-stone-600 dark:bg-stone-700"
+            />
+            <label htmlFor="even_rounds" className="text-sm font-medium text-stone-700 dark:text-stone-300 cursor-pointer">
+              {t('common.even_rounds')}
+            </label>
           </div>
 
           <div className="pt-4 flex justify-end gap-3">

@@ -5,7 +5,7 @@ export interface DeductionResult {
   borrow: number;
 }
 
-export function deduceScore(targetScore: number, t: any): string {
+export function deduceScore(targetScore: number, t: any, evenRounds: boolean = true): string {
   if (targetScore === 0) return '';
 
   const LANCELOT_SCORE = 49;
@@ -25,6 +25,7 @@ export function deduceScore(targetScore: number, t: any): string {
 
     // Turns: 1 to 28
     for (let turn = 1; turn <= 28; turn++) {
+      if (!evenRounds && turn % 2 === 0) continue;
       const turnScore = 80 - (turn - 1) * 3;
       if (turnScore <= 0) continue;
 

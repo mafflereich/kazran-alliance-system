@@ -32,6 +32,7 @@ interface GuildRaidTableProps {
   isComparisonMode: boolean;
   isArchived?: boolean;
   seasonId: string;
+  evenRounds?: boolean;
   loading: boolean;
   saving: boolean;
   sortConfig: { key: 'default' | 'score', order: 'asc' | 'desc' };
@@ -62,6 +63,7 @@ export default function GuildRaidTable({
   isComparisonMode,
   isArchived,
   seasonId,
+  evenRounds = true,
   loading,
   saving,
   sortConfig,
@@ -364,7 +366,7 @@ export default function GuildRaidTable({
                     {!isComparisonMode && (
                       <td className="py-0.5 px-2">
                         <div className="px-2 py-0.5 text-[10px] text-stone-600 dark:text-stone-400 font-mono whitespace-pre-line leading-tight">
-                          {deduceScore(record.score || 0, t)}
+                          {deduceScore(record.score || 0, t, evenRounds)}
                         </div>
                       </td>
                     )}
