@@ -9,7 +9,13 @@ export function deduceScore(targetScore: number, t: any): string {
   if (targetScore === 0) return '';
 
   const LANCELOT_SCORE = 49;
-  const remainingScore = targetScore - LANCELOT_SCORE;
+
+  // 賽季7限定，先扣450分。賽季7完結後刪此段
+  const SEASON_7_DEDUCTION = 450;
+  const adjustedTargetScore = targetScore - SEASON_7_DEDUCTION;
+  const remainingScore = adjustedTargetScore - LANCELOT_SCORE;
+  
+  // 賽季8開始用此段：const remainingScore = targetScore - LANCELOT_SCORE;
   const foundResults: DeductionResult[] = [];
 
   // Difficulty: Lv 1 to 10
