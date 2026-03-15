@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { X, Swords, Loader2, ChevronDown } from 'lucide-react';
+import { X, Swords, Loader2, ChevronDown, ArrowBigUp, ArrowBigDown, ArrowBigRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getImageUrl } from '@/shared/lib/utils';
 import { useAppContext } from '@/store';
@@ -209,7 +209,20 @@ export default function MemberStatsModal({ member, onClose }: MemberStatsModalPr
                                 )}
                               </td>
                               <td className="px-4 py-3 font-mono text-stone-700 dark:text-stone-300">
-                                {item.mRecord?.score?.toLocaleString() || '-'}
+                                <div className="flex items-center gap-1">
+                                  {item.mRecord?.score?.toLocaleString() || '-'}
+                                  {item.mRecord?.score && item.gRecord?.member_score_median && (
+                                    <>
+                                      {item.mRecord.score > item.gRecord.member_score_median ? (
+                                        <ArrowBigUp className="w-4 h-4 text-emerald-500 fill-emerald-500" />
+                                      ) : item.mRecord.score < item.gRecord.member_score_median ? (
+                                        <ArrowBigDown className="w-4 h-4 text-rose-500 fill-rose-500" />
+                                      ) : (
+                                        <ArrowBigRight className="w-4 h-4 text-stone-400 fill-stone-400" />
+                                      )}
+                                    </>
+                                  )}
+                                </div>
                               </td>
                               <td className="px-4 py-3 font-mono text-stone-700 dark:text-stone-300">
                                 {item.gRecord?.member_score_median?.toLocaleString() || '-'}
