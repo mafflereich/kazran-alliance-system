@@ -270,16 +270,19 @@ export default function MemberStatsModal({ member, onClose }: MemberStatsModalPr
                 <div className="flex flex-wrap gap-4">
                   {costumes.map(costume => {
                     const record = member.records[costume.id];
-                    const isOwned = record && record.level >= 0;
-                    const level = isOwned ? record.level : -1;
+                    const rawLevel = record?.level;
+                    const isOwned = record && rawLevel !== undefined && rawLevel !== null && Number(rawLevel) >= 0;
+                    const level = isOwned ? Number(rawLevel) : -1;
                     const hasWeapon = member.exclusiveWeapons?.[costume.characterId];
                     
                     let levelColorClass = "bg-orange-400 text-stone-900";
-                    if (level <= 0) levelColorClass = "bg-stone-300 text-stone-900";
+                    if (level < 0) levelColorClass = "bg-stone-100 dark:bg-stone-800 text-stone-400";
+                    else if (level === 0) levelColorClass = "bg-stone-300 text-stone-900";
                     else if (level === 1) levelColorClass = "bg-blue-300 text-stone-900";
                     else if (level === 2) levelColorClass = "bg-blue-400 text-stone-900";
                     else if (level === 3) levelColorClass = "bg-purple-300 text-stone-900";
                     else if (level === 4) levelColorClass = "bg-purple-400 text-stone-900";
+                    else if (level >= 5) levelColorClass = "bg-orange-400 text-stone-900 font-black";
 
                     return (
                       <div key={costume.id} className={`w-24 bg-stone-50 dark:bg-stone-700/50 rounded-xl p-3 border border-stone-200 dark:border-stone-700 flex flex-col items-center gap-2 relative ${!isOwned ? 'opacity-60 grayscale' : ''}`}>
