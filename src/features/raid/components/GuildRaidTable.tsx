@@ -365,7 +365,7 @@ export default function GuildRaidTable({
                     </td>
                     {!isComparisonMode && (
                       <td className="py-0.5 px-2">
-                        <div className="px-2 py-0.5 text-[10px] text-stone-600 dark:text-stone-400 font-mono whitespace-pre-line leading-tight">
+                        <div className="px-2 py-0.5 text-xs font-medium text-stone-800 dark:text-stone-200 whitespace-pre-line leading-tight">
                           {deduceScore(record.score || 0, t, evenRounds)}
                         </div>
                       </td>

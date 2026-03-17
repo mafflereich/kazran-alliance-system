@@ -220,7 +220,9 @@
     "update_success": "Updated successfully",
     "update_failed": "Update failed",
     "submit": "Submit",
-    "restore": "Restore"
+    "restore": "Restore",
+    "new_version_title": "A new version is detected.",
+    "update_now": "Update now (Reload page)"
   },
   "header": {
     "application_mailbox": "Application Mailbox",

@@ -8,6 +8,8 @@ import Footer from '@shared/ui/Footer';
 import Toaster from '@shared/ui/Toast';
 import BgmPlayer from '@shared/ui/BgmPlayer';
 import { logPageView } from '@/analytics';
+import { useVersionCheck } from '@/hooks/useVersionCheck';
+import { VersionUpdateToast } from '@/components/VersionUpdateToast';
 
 function App() {
   return (
@@ -23,6 +25,7 @@ function App() {
 
 function AppContent() {
   const location = useLocation();
+  const { hasNewVersion, reloadPage } = useVersionCheck(5); // 檢查間隔：5分鐘
 
   useEffect(() => {
     logPageView(location.pathname + location.search);
@@ -37,6 +40,7 @@ function AppContent() {
       </main>
       <Footer />
       <Toaster />
+      <VersionUpdateToast hasNewVersion={hasNewVersion} onReload={reloadPage} />
     </div>
   );
 }
