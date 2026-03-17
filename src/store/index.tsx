@@ -460,8 +460,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const memberNotes = Array.isArray(camelMember.memberNotes) ? camelMember.memberNotes[0] : camelMember.memberNotes;
       // Filter member_raid_records to only include records for the max season ID
       const allRaidRecords = Array.isArray(camelMember.memberRaidRecords) ? camelMember.memberRaidRecords : [];
-      const filteredRaidRecords = maxSeasonId 
-        ? allRaidRecords.filter((r: any) => r.seasonId === maxSeasonId)
+      const filteredRaidRecords = maxSeasonId
+        ? allRaidRecords.filter((r: any) => r.season_id === maxSeasonId)
         : []; // If no max season, return empty array (will result in score=0, seasonNote="")
       const memberRaidRecords = filteredRaidRecords[0];
       // member_notes keys are in snake_case since toCamel uses { deep: false }
@@ -508,32 +508,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { data: [], total: 0 };
     }
 
-    return { 
+    return {
       data: (data as any[]).map(m => {
         const camelMember = toCamel<any>(m);
         const memberNotes = Array.isArray(camelMember.memberNotes) ? camelMember.memberNotes[0] : camelMember.memberNotes;
         const memberRaidRecords = Array.isArray(camelMember.memberRaidRecords) ? camelMember.memberRaidRecords[0] : camelMember.memberRaidRecords;
-       // member_notes keys are in snake_case since toCamel uses { deep: false }
-       const note = memberNotes?.note || '';
-       const isReserved = memberNotes?.is_reserved || false;
-       const seasonNote = memberRaidRecords?.seasonNote || memberRaidRecords?.season_note || '';
-       const score = memberRaidRecords?.score ?? m.score ?? 0;
-         const mappedMember: Member = {
-           ...camelMember,
-           note,
-           isReserved,
-           seasonNote,
-           score,
-         };
-         delete (mappedMember as any).memberNotes;
-         delete (mappedMember as any).memberRaidRecords;
-         return mappedMember;
-       }), 
-      total: count || 0 
+        // member_notes keys are in snake_case since toCamel uses { deep: false }
+        const note = memberNotes?.note || '';
+        const isReserved = memberNotes?.is_reserved || false;
+        const seasonNote = memberRaidRecords?.seasonNote || memberRaidRecords?.season_note || '';
+        const score = memberRaidRecords?.score ?? m.score ?? 0;
+        const mappedMember: Member = {
+          ...camelMember,
+          note,
+          isReserved,
+          seasonNote,
+          score,
+        };
+        delete (mappedMember as any).memberNotes;
+        delete (mappedMember as any).memberRaidRecords;
+        return mappedMember;
+      }),
+      total: count || 0
     };
   };
 
-   // Cleanup subscription on unmount
+  // Cleanup subscription on unmount
   useEffect(() => {
     return () => {
       if (memberUnsub) memberUnsub();
@@ -692,7 +692,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateMember = async (memberId: string, data: Partial<Member>) => {
     const now = Date.now();
     const { note, isReserved, ...memberData } = data;
-    
+
     const { error } = await supabaseUpdate('members', { ...memberData, updatedAt: now }, { id: memberId });
 
     // Check if any member_notes fields are being updated
@@ -855,7 +855,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const archivedMember = toCamel(archivedData) as any;
     const historyArray = archivedMember.membersArchiveHistory ? toCamel(archivedMember.membersArchiveHistory) as any[] : [];
-    
+
     // Sort by archived_at descending to get the latest
     historyArray.sort((a, b) => new Date(b.archivedAt).getTime() - new Date(a.archivedAt).getTime());
 
