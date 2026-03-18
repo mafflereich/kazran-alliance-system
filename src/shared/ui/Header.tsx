@@ -19,7 +19,7 @@ const DOMAIN_SUFFIX = '@kazran.com';
 
 function LoginModal({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
-  const { setCurrentUser, fetchAllMembers } = useAppContext();
+  const { setCurrentUser, fetchAllMembers, fetchInitialData } = useAppContext();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
