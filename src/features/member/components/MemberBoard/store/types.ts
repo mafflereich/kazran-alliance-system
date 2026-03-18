@@ -58,8 +58,6 @@ export type MemberBoardActions = {
     updateArchiveMemberReason: (id: string, reason: string) => void;
     confirmArchiveAndSave: () => Promise<void>;
     saveToDatabase: () => Promise<void>;
-    clearLocalStorage: () => void;
-    discardChanges: (members: Member[], guilds: Guild[]) => void;
 };
 
 export type MemberBoardStore = MemberBoardState & MemberBoardActions;

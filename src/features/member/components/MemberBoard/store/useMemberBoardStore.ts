@@ -148,12 +148,23 @@ const initialState = {
     },
 };
 
-const saveHistory = (state: typeof initialState & { archiveModal: typeof initialState.archiveModal }) => ({
-    history: [...state.history, { local: state.localMembers, staging: state.stagingMembers, deleted: state.deletedMembers }],
-    redoStack: [],
-    selectedIds: new Set<string>(),
-    skipPersistUntilModified: false,
-});
+const MAX_HISTORY_STEPS = 30;
+
+const saveHistory = (state: typeof initialState & { archiveModal: typeof initialState.archiveModal }) => {
+    const nextHistory = [...state.history, { local: state.localMembers, staging: state.stagingMembers, deleted: state.deletedMembers }];
+    if (nextHistory.length > MAX_HISTORY_STEPS) {
+        nextHistory.shift();
+    }
+
+    const nextRedo = state.redoStack.length > MAX_HISTORY_STEPS ? state.redoStack.slice(state.redoStack.length - MAX_HISTORY_STEPS) : state.redoStack;
+
+    return {
+        history: nextHistory,
+        redoStack: nextRedo,
+        selectedIds: new Set<string>(),
+        skipPersistUntilModified: false,
+    };
+};
 
 const updateMembersBySelection = (
     members: Member[],
@@ -206,51 +217,6 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
             )
         }
     })),
-
-    clearLocalStorage: () => {
-        clearPersistedDraft();
-        set({
-            isDraftInitialized: false,
-            notification: {
-                isOpen: true,
-                title: '已放棄變更',
-                message: '本機暫存已清除。',
-                type: 'success',
-            },
-        });
-    },
-
-    discardChanges: (members, guilds) => {
-        clearPersistedDraft();
-
-        const initialStates: Record<string, { guildId: string; note?: string; role?: Role; color?: string }> = {};
-        members.forEach(m => {
-            if (m.id) {
-                initialStates[m.id] = { guildId: m.guildId, note: m.note, role: m.role, color: m.color };
-            }
-        });
-
-        set({
-            localMembers: members,
-            localGuilds: guilds,
-            stagingMembers: [],
-            deletedMembers: [],
-            history: [],
-            redoStack: [],
-            selectedIds: new Set(),
-            isMultiSelectMode: false,
-            initialMemberStates: initialStates,
-            isDraftInitialized: true,
-            skipPersistUntilModified: true,
-            notification: {
-                isOpen: true,
-                title: '已放棄變更',
-                message: '已清除暫存並重置為原始資料',
-                type: 'success',
-            },
-        });
-    },
-
     confirmArchiveAndSave: async () => {
         const state = get();
         const { localMembers, localGuilds, deletedMembers, initialMemberStates, archiveModal } = state;

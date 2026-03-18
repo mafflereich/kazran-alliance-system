@@ -25,7 +25,6 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
         localMembers,
         localGuilds,
         saveToDatabase,
-        clearLocalStorage,
         isMultiSelectMode,
         setMultiSelectMode,
         selectedIds,
@@ -36,7 +35,6 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
         redo,
         history,
         redoStack,
-        discardChanges,
     } = useMemberBoardStore();
 
     useEffect(() => {
@@ -198,16 +196,6 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
                     className="px-5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium shadow transition"
                 >
                     上傳變更
-                </button>
-                <button
-                    onClick={() => {
-                        if (window.confirm('確認放棄變更並清除本地暫存？')) {
-                            discardChanges(initialMembers, initialGuilds);
-                        }
-                    }}
-                    className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-medium shadow transition"
-                >
-                    放棄變更
                 </button>
             </div>
             <TransformWrapper
