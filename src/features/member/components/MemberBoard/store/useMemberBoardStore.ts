@@ -55,11 +55,20 @@ const persistDraft = (state: any) => {
         localGuilds: state.localGuilds,
         stagingMembers: state.stagingMembers,
         deletedMembers: state.deletedMembers,
-        history: state.history,
-        redoStack: state.redoStack,
         initialMemberStates: state.initialMemberStates,
     };
-    localStorage.setItem(MEMBER_BOARD_STORAGE_KEY, JSON.stringify(data));
+
+    try {
+        localStorage.setItem(MEMBER_BOARD_STORAGE_KEY, JSON.stringify(data));
+    } catch (error) {
+        if (error instanceof DOMException && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+            console.warn('localStorage quota exceeded for memberBoardDraft, skipping persistence: ', error);
+            // 若有需要，可以在這裡呼叫 clearPersistedDraft() 當回退機制
+            // clearPersistedDraft();
+        } else {
+            console.error('無法寫入 memberBoardDraft 本地存儲', error);
+        }
+    }
 };
 
 const sendApiAndNotify = (
