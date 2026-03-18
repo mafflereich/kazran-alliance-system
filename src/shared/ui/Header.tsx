@@ -44,6 +44,7 @@ function LoginModal({ onClose }: { onClose: () => void }) {
 
       setCurrentUser(username.toLowerCase());
       await fetchAllMembers();
+      if (fetchInitialData) await fetchInitialData(); // 確保登入後能立即抓取最新資料
       onClose();
     } catch (error: any) {
       setError(error.message);

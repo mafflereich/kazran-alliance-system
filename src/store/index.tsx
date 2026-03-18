@@ -38,6 +38,9 @@ interface AppContextType {
   currentUser: string | null;
   setCurrentUser: React.Dispatch<React.SetStateAction<string | null>>;
 
+  // Initial data loading
+  fetchInitialData: () => Promise<void>;
+
   // Member functions
   fetchMembers: (guildId: string, columns?: string) => void;
   fetchAllMembers: () => Promise<void>;
@@ -267,6 +270,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setToasts(prev => prev.filter(t => t.id !== id));
   };
 
+  // 初始資料抓取函數
+  const fetchInitialData = async () => {
+    try {
+      const [guildsRes, charactersRes, costumesRes, settingsRes, accessControlRes] = await Promise.all([
+        supabase ? supabase.from('guilds').select('*') : { data: [], error: null },
+        supabase ? supabase.from('characters').select('*') : { data: [], error: null },
+        supabase ? supabase.from('costumes').select('*') : { data: [], error: null },
+        supabase ? supabase.from('settings').select('*') : { data: [], error: null },
+        supabase ? supabase.from('access_control').select('*') : { data: [], error: null },
+      ]);
+
+      if (guildsRes.error) throw guildsRes.error;
+      if (charactersRes.error) throw charactersRes.error;
+      if (costumesRes.error) throw costumesRes.error;
+      if (settingsRes.error) throw settingsRes.error;
+      // access_control might not exist yet, handle gracefully
+      const accessControlData = accessControlRes.error ? [] : accessControlRes.data;
+
+      const guilds = (guildsRes.data as any[] || []).reduce((acc, guild) => ({ ...acc, [guild.id]: toCamel(guild) }), {});
+      const characters = (charactersRes.data as any[] || []).reduce((acc, char) => ({ ...acc, [char.id]: toCamel(char) }), {});
+      const costumes = (costumesRes.data as any[] || []).reduce((acc, costume) => ({ ...acc, [costume.id]: toCamel(costume) }), {});
+      const settings = (settingsRes.data as any[] || []).reduce((acc, setting) => ({ ...acc, [setting.id]: toCamel(setting) }), {});
+      const accessControl = (accessControlData as any[] || []).reduce((acc, ac) => {
+        const camelAc = toCamel<AccessControl>(ac);
+        return { ...acc, [camelAc.page]: camelAc };
+      }, {});
+
+      setDbState(prev => ({
+        ...prev,
+        guilds,
+        characters,
+        costumes,
+        settings,
+        accessControl,
+      }));
+
+      setLoadedStates({ global: true, guilds: true, costumes: true, characters: true, users: true });
+
+    } catch (error) {
+      console.error("Error fetching initial data:", error);
+      setIsOffline(true);
+      setLoadedStates({ global: true, guilds: true, costumes: true, characters: true, users: true });
+    }
+  };
+
   // Subscribe to global data (costumes, users) and guilds
   useEffect(() => {
     const initAuth = async () => {
@@ -306,50 +354,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       subscription = data.subscription;
     }
-
-    const fetchInitialData = async () => {
-      try {
-        const [guildsRes, charactersRes, costumesRes, settingsRes, accessControlRes] = await Promise.all([
-          supabase ? supabase.from('guilds').select('*') : { data: [], error: null },
-          supabase ? supabase.from('characters').select('*') : { data: [], error: null },
-          supabase ? supabase.from('costumes').select('*') : { data: [], error: null },
-          supabase ? supabase.from('settings').select('*') : { data: [], error: null },
-          supabase ? supabase.from('access_control').select('*') : { data: [], error: null },
-        ]);
-
-        if (guildsRes.error) throw guildsRes.error;
-        if (charactersRes.error) throw charactersRes.error;
-        if (costumesRes.error) throw costumesRes.error;
-        if (settingsRes.error) throw settingsRes.error;
-        // access_control might not exist yet, handle gracefully
-        const accessControlData = accessControlRes.error ? [] : accessControlRes.data;
-
-        const guilds = (guildsRes.data as any[] || []).reduce((acc, guild) => ({ ...acc, [guild.id]: toCamel(guild) }), {});
-        const characters = (charactersRes.data as any[] || []).reduce((acc, char) => ({ ...acc, [char.id]: toCamel(char) }), {});
-        const costumes = (costumesRes.data as any[] || []).reduce((acc, costume) => ({ ...acc, [costume.id]: toCamel(costume) }), {});
-        const settings = (settingsRes.data as any[] || []).reduce((acc, setting) => ({ ...acc, [setting.id]: toCamel(setting) }), {});
-        const accessControl = (accessControlData as any[] || []).reduce((acc, ac) => {
-          const camelAc = toCamel<AccessControl>(ac);
-          return { ...acc, [camelAc.page]: camelAc };
-        }, {});
-
-        setDbState(prev => ({
-          ...prev,
-          guilds,
-          characters,
-          costumes,
-          settings,
-          accessControl,
-        }));
-
-        setLoadedStates({ global: true, guilds: true, costumes: true, characters: true, users: true });
-
-      } catch (error) {
-        console.error("Error fetching initial data:", error);
-        setIsOffline(true);
-        setLoadedStates({ global: true, guilds: true, costumes: true, characters: true, users: true });
-      }
-    };
 
     fetchInitialData();
 
@@ -1289,6 +1293,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{
       db, setDb, currentView, setCurrentView, currentUser, setCurrentUser,
       fetchMembers, fetchAllMembers, searchMembers, addMember, updateMember, deleteMember, archiveMember, unarchiveMember, updateMemberCostumeLevel, updateMemberExclusiveWeapon,
+      fetchInitialData,
       addGuild, updateGuild, deleteGuild,
       addCharacter, updateCharacter, deleteCharacter, updateCharactersOrder,
       addCostume, updateCostume, deleteCostume, updateCostumesOrder,
