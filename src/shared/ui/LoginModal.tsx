@@ -16,7 +16,7 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
             const { error: authError } = await supabase.auth.signInWithOAuth({
                 provider: 'discord',
                 options: {
-                    redirectTo: `${window.location.origin}${window.location.pathname}`,
+                    redirectTo: `${window.location.origin}${window.location.pathname}#/`,
                     scopes: 'guilds.members.read',
                 },
             });
