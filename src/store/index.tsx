@@ -186,9 +186,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const discordUsername = user.user_metadata?.full_name || user.user_metadata?.name;
 
+      const token = session.access_token;
+      console.log("準備傳送的 Token 長度:", token?.length);
+      console.log("Token 前 20 碼:", token?.substring(0, 20));
       const { data, error: invokeError } = await supabase.functions.invoke('sync-discord-roles', {
         headers: {
-          'Authorization': `Bearer ${supabaseKey}`,
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
         },
         body: {
