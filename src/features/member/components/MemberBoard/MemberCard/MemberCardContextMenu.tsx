@@ -96,6 +96,7 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
             <Popover.Root open={showContextMenu} onOpenChange={handleOpenChange}>
                 <Popover.Portal>
                     <Popover.Content
+                        onPointerDown={(e) => e.stopPropagation()}
                         className="bg-gray-900 border border-gray-700 rounded-lg shadow-2xl py-1 z-[10000] min-w-[160px] max-h-[400px] overflow-y-auto"
                         sideOffset={5}
                         align="start"
@@ -216,6 +217,7 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
             <Popover.Root open={showGuildMenu} onOpenChange={setShowGuildMenu}>
                 <Popover.Portal>
                     <Popover.Content
+                        onPointerDown={(e) => e.stopPropagation()}
                         className="bg-gray-900 border border-gray-700 rounded-lg shadow-2xl py-1 z-[10001] min-w-[200px] max-h-64 overflow-y-auto"
                         side="right"
                         align="start"
@@ -260,6 +262,7 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
             <Popover.Root open={showColorMenu} onOpenChange={setShowColorMenu}>
                 <Popover.Portal>
                     <Popover.Content
+                        onPointerDown={(e) => e.stopPropagation()}
                         className="bg-gray-900 border border-gray-700 rounded-lg shadow-2xl py-2 px-2 z-[10001] w-[140px] grid grid-cols-4 gap-1"
                         side="right"
                         align="start"
@@ -292,6 +295,7 @@ export default function MemberCardContextMenu({ member, contextMenuPosition, onC
             <Popover.Root open={showRoleMenu} onOpenChange={setShowRoleMenu}>
                 <Popover.Portal>
                     <Popover.Content
+                        onPointerDown={(e) => e.stopPropagation()}
                         className="bg-gray-900 border border-gray-700 rounded-lg shadow-2xl py-1 z-[10001] min-w-[120px]"
                         side="right"
                         align="start"

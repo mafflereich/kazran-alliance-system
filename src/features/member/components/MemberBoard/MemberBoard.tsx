@@ -25,6 +25,7 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
         localMembers,
         localGuilds,
         saveToDatabase,
+        clearLocalStorage,
         isMultiSelectMode,
         setMultiSelectMode,
         selectedIds,
@@ -136,7 +137,9 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
             // Clear selection on background click
             if (selectedIds.size > 0) {
                 const target = e.target as HTMLElement;
-                const isInteractive = target.closest('.member-card, .guild-section, .staging-area, .deletion-area, .batch-action-bar, .top-controls, button, [role="button"], [data-radix-popper-content-wrapper]');
+                const isInteractive = target.closest(
+                    '.member-card, .guild-section, .staging-area, .deletion-area, .batch-action-bar, .top-controls, button, [role="button"], [data-radix-popper-content-wrapper], .radix-popover-content, [data-radix-popover-content], .radix-dropdown-menu, [data-radix-dropdown-menu]'
+                );
                 if (!isInteractive) {
                     clearSelection();
                 }
@@ -177,8 +180,8 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
                 <button
                     onClick={() => setMultiSelectMode(!isMultiSelectMode)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all border ${isMultiSelectMode
-                            ? 'bg-indigo-700 text-white border-indigo-500'
-                            : 'bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700'
+                        ? 'bg-indigo-700 text-white border-indigo-500'
+                        : 'bg-gray-800 text-gray-300 border-gray-600 hover:bg-gray-700'
                         }`}
                 >
                     {isMultiSelectMode ? <CheckSquare size={14} /> : <Square size={14} />}
@@ -193,7 +196,18 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
                     onClick={handleSave}
                     className="px-5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium shadow transition"
                 >
-                    儲存變更
+                    上傳變更
+                </button>
+                <button
+                    onClick={() => {
+                        if (window.confirm('確認放棄變更並清除本地暫存？')) {
+                            clearLocalStorage();
+                            init(initialMembers, initialGuilds);
+                        }
+                    }}
+                    className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-medium shadow transition"
+                >
+                    放棄變更
                 </button>
             </div>
             <TransformWrapper

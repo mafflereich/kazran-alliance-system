@@ -4,6 +4,8 @@ import type { Member, Guild, Role } from '@entities/member/types';
 import { supabase } from '@/shared/api/supabase';
 import type { MemberBoardStore } from './types';
 
+const MEMBER_BOARD_STORAGE_KEY = 'memberBoardDraft';
+
 const buildGuildGroups = (members: Member[], guilds: Guild[], getGuildId: (m: Member) => string): Record<string, string[]> => {
     const groups: Record<string, string[]> = {};
     members.forEach(m => {
@@ -15,6 +17,49 @@ const buildGuildGroups = (members: Member[], guilds: Guild[], getGuildId: (m: Me
         }
     });
     return groups;
+};
+
+const getPersistedDraft = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+        const raw = localStorage.getItem(MEMBER_BOARD_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return null;
+        const isValidData = Array.isArray(parsed.localMembers) && Array.isArray(parsed.localGuilds);
+        if (!isValidData) return null;
+
+        // 若 localMembers/localGuilds 都空，視作無 draft（避免初始化空值覆蓋）
+        if (parsed.localMembers.length === 0 && parsed.localGuilds.length === 0) {
+            return null;
+        }
+
+        return parsed;
+    } catch {
+        console.warn('無法讀取 member board localStorage');
+        return null;
+    }
+};
+
+const clearPersistedDraft = () => {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(MEMBER_BOARD_STORAGE_KEY);
+};
+
+const persistDraft = (state: any) => {
+    if (typeof window === 'undefined') return;
+    if (!state.isDraftInitialized) return;
+
+    const data = {
+        localMembers: state.localMembers,
+        localGuilds: state.localGuilds,
+        stagingMembers: state.stagingMembers,
+        deletedMembers: state.deletedMembers,
+        history: state.history,
+        redoStack: state.redoStack,
+        initialMemberStates: state.initialMemberStates,
+    };
+    localStorage.setItem(MEMBER_BOARD_STORAGE_KEY, JSON.stringify(data));
 };
 
 const sendApiAndNotify = (
@@ -80,6 +125,7 @@ const initialState = {
     selectedIds: new Set<string>(),
     isMultiSelectMode: false,
     initialMemberStates: {} as Record<string, { guildId: string; note?: string; role?: Role; color?: string }>,
+    isDraftInitialized: false,
     notification: {
         isOpen: false,
         title: '',
@@ -150,6 +196,18 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
         }
     })),
 
+    clearLocalStorage: () => {
+        clearPersistedDraft();
+        set({
+            notification: {
+                isOpen: true,
+                title: '已放棄變更',
+                message: '本機暫存已清除，請確認已重新載入原始資料。',
+                type: 'success',
+            },
+        });
+    },
+
     confirmArchiveAndSave: async () => {
         const state = get();
         const { localMembers, localGuilds, deletedMembers, initialMemberStates, archiveModal } = state;
@@ -206,12 +264,32 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
         if (currentState.archiveModal.isOpen) {
             return;
         }
-        const initialStates: Record<string, { guildId: string; note?: string; role?: Role; color?: string }> = {};
+
+        const resolvedInitialStates: Record<string, { guildId: string; note?: string; role?: Role; color?: string }> = {};
         members.forEach(m => {
             if (m.id) {
-                initialStates[m.id] = { guildId: m.guildId, note: m.note, role: m.role, color: m.color };
+                resolvedInitialStates[m.id] = { guildId: m.guildId, note: m.note, role: m.role, color: m.color };
             }
         });
+
+        const persisted = getPersistedDraft();
+
+        if (persisted) {
+            set({
+                localMembers: persisted.localMembers ?? members,
+                localGuilds: persisted.localGuilds ?? guilds,
+                stagingMembers: persisted.stagingMembers ?? [],
+                deletedMembers: persisted.deletedMembers ?? [],
+                history: persisted.history ?? [],
+                redoStack: persisted.redoStack ?? [],
+                selectedIds: new Set(),
+                isMultiSelectMode: false,
+                initialMemberStates: persisted.initialMemberStates ?? resolvedInitialStates,
+                isDraftInitialized: true,
+            });
+            return;
+        }
+
         set({
             localMembers: members,
             localGuilds: guilds,
@@ -221,7 +299,8 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
             redoStack: [],
             selectedIds: new Set(),
             isMultiSelectMode: false,
-            initialMemberStates: initialStates,
+            initialMemberStates: resolvedInitialStates,
+            isDraftInitialized: true,
         });
     },
 
@@ -617,3 +696,20 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
         }
     },
 }));
+
+// persist changes to localStorage
+useMemberBoardStore.subscribe(
+    (state) => ({
+        localMembers: state.localMembers,
+        localGuilds: state.localGuilds,
+        stagingMembers: state.stagingMembers,
+        deletedMembers: state.deletedMembers,
+        history: state.history,
+        redoStack: state.redoStack,
+        initialMemberStates: state.initialMemberStates,
+        isDraftInitialized: state.isDraftInitialized,
+    }),
+    (selectedState) => {
+        persistDraft(selectedState);
+    }
+);
