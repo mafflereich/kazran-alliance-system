@@ -5,17 +5,27 @@ export function buildTieredData(members: Member[], guilds: Guild[]): TieredData[
 
     const tierMap = new Map<number, { guild: Guild; members: Member[] }[]>();
 
-    members.forEach(m => {
-        const guild = guildMap.get(m.guildId);
-        if (!guild?.tier) return;
+    // 先把所有公會初始化到對應 tier，確保空公會也能顯示
+    guilds.forEach(guild => {
+        if (!guild.tier) return;
 
         if (!tierMap.has(guild.tier)) {
             tierMap.set(guild.tier, []);
         }
 
         const tierEntries = tierMap.get(guild.tier)!;
-        let guildEntry = tierEntries.find(e => e.guild.id === guild.id);
+        tierEntries.push({ guild, members: [] });
+    });
 
+    // 再把成員加入到對應公會
+    members.forEach(m => {
+        const guild = guildMap.get(m.guildId);
+        if (!guild?.tier) return;
+
+        const tierEntries = tierMap.get(guild.tier);
+        if (!tierEntries) return;
+
+        let guildEntry = tierEntries.find(e => e.guild.id === guild.id);
         if (!guildEntry) {
             guildEntry = { guild, members: [] };
             tierEntries.push(guildEntry);
