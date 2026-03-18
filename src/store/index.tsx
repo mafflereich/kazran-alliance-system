@@ -159,7 +159,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
       if (error || !session?.user) return;
-
+      console.log(session);
       const user = session.user;
       if (user.app_metadata?.provider !== 'discord') return;
 
