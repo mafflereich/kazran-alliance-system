@@ -37,6 +37,8 @@ interface AppContextType {
   setuserGuildRoles: React.Dispatch<React.SetStateAction<string[]>>;
   userRole: User['role'] | null;
 
+  loadDiscordRoles: () => Promise<void>;
+
   // Initial data loading
   fetchInitialData: () => Promise<void>;
 
@@ -1214,6 +1216,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{
       db, setDb, currentView, setCurrentView, currentUser, setCurrentUser, currentAvatar, userGuildRoles, setuserGuildRoles, userRole,
       fetchMembers, fetchAllMembers, searchMembers, addMember, updateMember, deleteMember, archiveMember, unarchiveMember, updateMemberCostumeLevel, updateMemberExclusiveWeapon,
+      loadDiscordRoles,
       fetchInitialData,
       addGuild, updateGuild, deleteGuild,
       addCharacter, updateCharacter, deleteCharacter, updateCharactersOrder,
