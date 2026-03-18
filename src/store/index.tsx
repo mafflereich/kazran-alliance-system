@@ -188,7 +188,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const { data, error: invokeError } = await supabase.functions.invoke('sync-discord-roles', {
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${supabaseKey}`,
           'Content-Type': 'application/json'
         },
         body: {
