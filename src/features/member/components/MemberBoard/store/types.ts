@@ -7,6 +7,22 @@ export type ArchiveMember = {
     reason: string;
 };
 
+export type MemberMoveAction = 'move' | 'kick';
+
+export type MemberMovePayloadItem = {
+    id?: string;
+    name: string;
+    sourceGuild?: string;
+    targetGuild?: string;
+    action: MemberMoveAction;
+};
+
+export type MemberMovePayload = {
+    guildName: string;
+    members: MemberMovePayloadItem[];
+    archiveReason?: string;
+};
+
 export type MemberBoardState = {
     localMembers: Member[];
     localGuilds: Guild[];
@@ -65,7 +81,9 @@ export type MemberBoardActions = {
     setSelectedIds: (ids: Set<string>) => void;
     clearDeletedMembers: () => void;
     pasteMembers: (pasted: Member[]) => void;
+    buildApiPayload: () => MemberMovePayload[];
     closeNotification: () => void;
+    showNotification: (title: string, message: string, type?: 'success' | 'error' | 'info', copyContent?: string) => void;
     openArchiveModal: (members: ArchiveMember[]) => void;
     closeArchiveModal: () => void;
     updateArchiveMemberReason: (id: string, reason: string) => void;

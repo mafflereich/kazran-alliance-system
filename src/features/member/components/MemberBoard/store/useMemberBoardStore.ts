@@ -2,25 +2,9 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { Member, Guild, Role } from '@entities/member/types';
 import { supabase } from '@/shared/api/supabase';
-import type { MemberBoardStore } from './types';
+import type { MemberBoardStore, MemberMovePayload, MemberMovePayloadItem } from './types';
 
 const MEMBER_BOARD_STORAGE_KEY = 'memberBoardDraft';
-
-type MemberMoveAction = 'move' | 'kick';
-
-type MemberMovePayloadItem = {
-    id?: string;
-    name: string;
-    sourceGuild?: string;
-    targetGuild?: string;
-    action: MemberMoveAction;
-};
-
-type MemberMovePayload = {
-    guildName: string;
-    members: MemberMovePayloadItem[];
-    archiveReason?: string;
-};
 
 const buildGuildGroups = (members: Member[], guilds: Guild[], getGuildId: (m: Member) => string): Record<string, string[]> => {
     const groups: Record<string, string[]> = {};
@@ -80,11 +64,57 @@ const persistDraft = (state: any) => {
         if (error instanceof DOMException && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
             console.warn('localStorage quota exceeded for memberBoardDraft, skipping persistence: ', error);
             // 若有需要，可以在這裡呼叫 clearPersistedDraft() 當回退機制
-            // clearPersistedDraft();
+            // clearPersistDraft();
         } else {
             console.error('無法寫入 memberBoardDraft 本地存儲', error);
         }
     }
+};
+
+const makeApiPayload = (
+    localMembers: Member[],
+    deletedMembers: Member[],
+    localGuilds: Guild[],
+    initialMemberStates: Record<string, { guildId: string; note?: string; role?: Role; color?: string }>
+): MemberMovePayload[] => {
+    const movedItems: MemberMovePayloadItem[] = localMembers
+        .filter(m => m.id && initialMemberStates[m.id!]?.guildId !== m.guildId)
+        .map(m => {
+            const sourceGuildName = localGuilds.find(g => g.id === initialMemberStates[m.id!]?.guildId)?.name || '未知公會';
+            const targetGuildName = localGuilds.find(g => g.id === m.guildId)?.name || '未知公會';
+            return {
+                id: m.id,
+                name: m.name,
+                sourceGuild: sourceGuildName,
+                targetGuild: targetGuildName,
+                action: 'move' as const
+            };
+        });
+
+    const archivedItems: MemberMovePayloadItem[] = deletedMembers
+        .filter(m => m.id && initialMemberStates[m.id!])
+        .map(m => ({
+            id: m.id,
+            name: m.name,
+            sourceGuild: localGuilds.find(g => g.id === initialMemberStates[m.id!]?.guildId)?.name || '未知公會',
+            action: 'kick' as const
+        }));
+
+    const groupItemsBySource = (items: MemberMovePayloadItem[]) =>
+        items.reduce((acc, item) => {
+            const key = item.sourceGuild || '未知公會';
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(item);
+            return acc;
+        }, {} as Record<string, MemberMovePayloadItem[]>);
+
+    const movedGroups = groupItemsBySource(movedItems);
+    const archivedGroups = groupItemsBySource(archivedItems);
+
+    return [
+        ...Object.entries(movedGroups).map(([guildName, members]) => ({ guildName, members })),
+        ...Object.entries(archivedGroups).map(([guildName, members]) => ({ guildName, members })),
+    ];
 };
 
 const sendApiAndNotify = (
@@ -99,7 +129,7 @@ const sendApiAndNotify = (
         return;
     }
 
-    const localMessage = apiPayload.map(group => {
+    const buildGroupText = (group: { guildName: string; members: MemberMovePayloadItem[] }) => {
         const membersText = group.members.map(member => {
             if (member.action === 'kick') {
                 return `${member.name} (踢出)`;
@@ -108,8 +138,20 @@ const sendApiAndNotify = (
             return `${member.name} (${targetName})`;
         }).join(' ');
 
+        const isApplicantList = group.guildName === '申請者清單';
+        if (isApplicantList) {
+            return `# ${group.guildName}\n${membersText}`;
+        }
         return `# ${group.guildName}\n${membersText}\n請 {會長} {副會長} 今天送出他們`;
-    }).join('\n\n');
+    };
+
+    const applicantGroup = apiPayload.find((group) => group.guildName === '申請者清單');
+    const otherGroups = apiPayload.filter((group) => group.guildName !== '申請者清單');
+
+    const localMessage = [
+        ...otherGroups.map(buildGroupText),
+        ...(applicantGroup ? [buildGroupText(applicantGroup)] : []),
+    ].join('\n\n');
 
     fetch('https://chaosop.duckdns.org/api/memberMoveMessage', {
         method: 'POST',
@@ -237,6 +279,26 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
 
     closeNotification: () => set((state) => ({ notification: { ...state.notification, isOpen: false } })),
 
+    showNotification: (title, message, type = 'info', copyContent) => {
+        if (typeof window !== 'undefined' && copyContent) {
+            navigator.clipboard.writeText(copyContent).catch(() => { });
+        }
+        set({
+            notification: {
+                isOpen: true,
+                title,
+                message,
+                type,
+                copyContent
+            }
+        });
+    },
+
+    buildApiPayload: () => {
+        const state = get();
+        return makeApiPayload(state.localMembers, state.deletedMembers, state.localGuilds, state.initialMemberStates);
+    },
+
     openArchiveModal: (members) => set({
         archiveModal: {
             isOpen: true,
@@ -264,62 +326,23 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
         const membersToArchive = deletedMembers.filter(m => m.id && m.id in archiveReasons);
 
         if (membersToArchive.length > 0) {
-            await Promise.all([
-                supabase.from('members_archive_history').insert(
-                    membersToArchive.map(m => ({
-                        member_id: m.id,
-                        from_guild_id: initialMemberStates[m.id!]?.guildId || m.guildId,
-                        archive_reason: archiveReasons[m.id!]
-                    }))
-                ),
-                supabase.from('members').update({ status: 'archived', guild_id: null })
-                    .in('id', membersToArchive.map(m => m.id!)),
-                ...membersToArchive.map(m =>
-                    supabase.from('member_notes').update({ archive_remark: archiveReasons[m.id!] })
-                        .eq('member_id', m.id)
-                )
-            ]);
-        }
+            const archivePayload = membersToArchive.map(m => ({
+                member_id: m.id,
+                from_guild_id: initialMemberStates[m.id!]?.guildId || m.guildId,
+                reason: archiveReasons[m.id!]
+            }));
 
-        const changedMembers = localMembers
-            .filter(m => m.id && initialMemberStates[m.id!]?.guildId !== m.guildId)
-            .map(m => {
-                const sourceGuildName = localGuilds.find(g => g.id === initialMemberStates[m.id!]?.guildId)?.name || '未知公會';
-                const targetGuildName = localGuilds.find(g => g.id === m.guildId)?.name || '未知公會';
-                return {
-                    id: m.id,
-                    name: m.name,
-                    sourceGuild: sourceGuildName,
-                    targetGuild: targetGuildName,
-                    action: 'move' as const
-                };
+            // 只要呼叫一次 API！完美解決效能、錯誤捕捉與資料一致性問題
+            const { error } = await supabase.rpc('archive_members_bulk', {
+                payload: archivePayload
             });
 
-        const archivedMemberItems = membersToArchive.map(m => {
-            const sourceGuildName = localGuilds.find(g => g.id === initialMemberStates[m.id!]?.guildId)?.name || '未知公會';
-            return {
-                id: m.id,
-                name: m.name,
-                sourceGuild: sourceGuildName,
-                action: 'kick' as const
-            };
-        });
+            if (error) {
+                throw new Error(`歸檔失敗: ${error.message}`);
+            }
+        }
 
-        const groupItemsBySource = (items: MemberMovePayloadItem[]) =>
-            items.reduce((acc, item) => {
-                const key = item.sourceGuild || '未知公會';
-                if (!acc[key]) acc[key] = [];
-                acc[key].push(item);
-                return acc;
-            }, {} as Record<string, MemberMovePayloadItem[]>);
-
-        const movedGroups = groupItemsBySource(changedMembers);
-        const archivedGroups = groupItemsBySource(archivedMemberItems);
-
-        const apiPayload: MemberMovePayload[] = [
-            ...Object.entries(movedGroups).map(([guildName, members]) => ({ guildName, members })),
-            ...Object.entries(archivedGroups).map(([guildName, members]) => ({ guildName, members }))
-        ];
+        const apiPayload = makeApiPayload(localMembers, membersToArchive, localGuilds, initialMemberStates);
 
         const closeModal = () => set({
             archiveModal: { isOpen: false, members: [] },
@@ -769,47 +792,7 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
                 return;
             }
 
-            const movedItems = localMembers
-                .filter(m => m.id && initialMemberStates[m.id!]?.guildId !== m.guildId)
-                .map(m => {
-                    const sourceGuildName = localGuilds.find(g => g.id === initialMemberStates[m.id!]?.guildId)?.name || '未知公會';
-                    const targetGuildName = localGuilds.find(g => g.id === m.guildId)?.name || '未知公會';
-                    return {
-                        id: m.id,
-                        name: m.name,
-                        sourceGuild: sourceGuildName,
-                        targetGuild: targetGuildName,
-                        action: 'move' as const
-                    };
-                });
-            const archivedMemberItems = deletedMembers
-                .filter(m => m.id && initialMemberStates[m.id!])
-                .map(m => {
-                    const sourceGuildName = localGuilds.find(g => g.id === initialMemberStates[m.id!]?.guildId)?.name || '未知公會';
-                    return {
-                        id: m.id,
-                        name: m.name,
-                        sourceGuild: sourceGuildName,
-                        action: 'kick' as const
-                    };
-                });
-
-            const groupItemsBySource = (items: MemberMovePayloadItem[]) =>
-                items.reduce((acc, item) => {
-                    const key = item.sourceGuild || '未知公會';
-                    if (!acc[key]) acc[key] = [];
-                    acc[key].push(item);
-                    return acc;
-                }, {} as Record<string, MemberMovePayloadItem[]>);
-
-            const movedGroups = groupItemsBySource(movedItems);
-            const archivedGroups = groupItemsBySource(archivedMemberItems);
-
-            const apiPayload: MemberMovePayload[] = [
-                ...Object.entries(movedGroups).map(([guildName, members]) => ({ guildName, members })),
-                ...Object.entries(archivedGroups).map(([guildName, members]) => ({ guildName, members }))
-            ];
-
+            const apiPayload = makeApiPayload(localMembers, deletedMembers, localGuilds, initialMemberStates);
             sendApiAndNotify(set, apiPayload, localMembers.length);
         } catch (err: unknown) {
             set({

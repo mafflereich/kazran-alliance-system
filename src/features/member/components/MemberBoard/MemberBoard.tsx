@@ -1,5 +1,5 @@
 // src/components/MemberBoard/MemberBoard.tsx
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { useMemberBoardStore } from './store/useMemberBoardStore';
 import { buildTieredData } from './utils/dataUtils';
@@ -37,16 +37,53 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
         redo,
         history,
         redoStack,
+        buildApiPayload,
+        showNotification,
     } = useMemberBoardStore();
 
     useEffect(() => {
         init(initialMembers, initialGuilds);
     }, [initialMembers, initialGuilds, init]);
 
+    const [isPreviewing, setIsPreviewing] = useState<boolean>(false);
+
     const handleSave = async () => {
         await saveToDatabase();
         if (onSave) {
             onSave();
+        }
+    };
+
+    const handlePreview = async () => {
+        const apiPayload = buildApiPayload();
+
+        if (!apiPayload || apiPayload.length === 0) {
+            const message = '目前沒有變更，無需預覽公告';
+            showNotification('公告預覽', message, 'info', message);
+            return;
+        }
+
+        setIsPreviewing(true);
+        try {
+            const response = await fetch('https://chaosop.duckdns.org/api/memberMoveMessage', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(apiPayload),
+            });
+
+            const text = await response.text();
+            if (!response.ok) {
+                const message = `預覽 API 錯誤：${response.status}，內容：${text}`;
+                showNotification('公告預覽失敗', message, 'error', message);
+            } else {
+                const message = text || '收到空公告';
+                showNotification('公告預覽', message, 'success', message);
+            }
+        } catch (error) {
+            const message = `API 連線錯誤：${(error as Error).message}`;
+            showNotification('公告預覽錯誤', message, 'error', message);
+        } finally {
+            setIsPreviewing(false);
         }
     };
 
@@ -206,6 +243,13 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
                     className="px-5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium shadow transition"
                 >
                     上傳變更
+                </button>
+                <button
+                    onClick={handlePreview}
+                    disabled={isPreviewing}
+                    className="px-5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-sm font-medium shadow transition"
+                >
+                    {isPreviewing ? '預覽中...' : '公告預覽'}
                 </button>
             </div>
             <TransformWrapper
