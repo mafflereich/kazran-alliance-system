@@ -196,7 +196,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const discordId = user.identities?.find((i: any) => i.provider === 'discord')?.id || user.user_metadata?.sub;
       if (!discordId) return;
 
-      // 已有 profile 時不再呼叫
+      const discordUsername = user.user_metadata?.full_name || user.user_metadata?.name;
+
+      try {
+        const { data, error: invokeError } = await supabase.functions.invoke('sync-discord-roles', {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: {
+            user_id: user.id,
+            discord_id: discordId,
+            username: discordUsername
+          }
+        });
+
+        if (invokeError) {
+          console.error('Edge function returned an error:', invokeError);
+        } else {
+          console.log('Edge function synced successfully:', data);
+        }
+      } catch (error) {
+        console.error('Error invoking edge function:', error);
+      }
+
+      // Always fetch from the database to get the latest profile, whether edge function succeeded or failed
       const { data: existingProfile, error: profileError } = await supabase
         .from('profiles')
         .select('id, user_role, user_guilds, display_name, avatar_url')
@@ -205,38 +229,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (!profileError && existingProfile) {
         setCurrentAvatarState(existingProfile.avatar_url);
-        setCurrentUser(existingProfile.display_name);
-        setUserRole(existingProfile.user_role);
+        setCurrentUser(existingProfile.display_name || discordUsername || 'User');
+        setUserRole(existingProfile.user_role || 'member');
         setuserGuildRolesState(existingProfile.user_guilds ? existingProfile.user_guilds.split(',').map((r: string) => r.trim()) : []);
-        return;
-      }
-
-
-      const discordUsername = user.user_metadata?.full_name || user.user_metadata?.name;
-
-      const { data, error: invokeError } = await supabase.functions.invoke('sync-discord-roles', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: {
-          user_id: user.id,
-          discord_id: discordId,
-          username: discordUsername
-        }
-      });
-
-      if (invokeError) {
-        console.error('Edge function returned an error:', invokeError);
-      } else if (data) {
-        const roles = data.guildRoles ? data.guildRoles.split(',').map((r: string) => r.trim()) : [];
-        setCurrentAvatarState(data.avatarUrl);
-        setCurrentUser(data.displayName);
-        setuserGuildRolesState(roles);
-        if (data.role) setUserRole(data.role);
+      } else {
+        // Fallback if profile doesn't exist yet
+        setCurrentUser(discordUsername || 'User');
+        setUserRole('member');
       }
     } catch (error) {
-      console.error('Error invoking edge function:', error);
+      console.error('Error in loadDiscordRoles:', error);
     } finally {
       setIsRoleLoading(false);
     }

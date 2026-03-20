@@ -13,7 +13,7 @@ import { logEvent } from '@/analytics';
 export default function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { db, fetchAllMembers, isRoleLoading, userGuildRoles, userRole } = useAppContext();
+  const { db, fetchAllMembers, isRoleLoading, userGuildRoles, userRole, currentUser } = useAppContext();
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -22,7 +22,7 @@ export default function Login() {
 
   useEffect(() => {
     fetchAllMembers();
-  }, [userRole]);
+  }, [userRole, userGuildRoles, currentUser]);
 
   const handleGuildSelect = async (guildId: string) => {
     if (userRole) {
