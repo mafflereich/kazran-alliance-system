@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Database, Guild, Member, Costume, Role, User, Character, ArchivedMember, ArchiveHistory, Toast, ToastType, Setting, ApplyMail, AccessControl } from '@/entities/member/types';
 import { supabase, supabaseInsert, supabaseKey, supabaseUpdate, supabaseUpsert, toCamel } from '@/shared/api/supabase';
 import { v4 as uuidv4 } from 'uuid';
@@ -132,6 +132,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [currentAvatar, setCurrentAvatarState] = useState<string | null>(null);
   const [currentUser, setCurrentUserState] = useState<string | null>(null);
+  const currentUserRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
   const [userGuildRoles, setuserGuildRolesState] = useState<string[]>([]);
   const [userRole, setUserRole] = useState<User['role'] | null>(null);
 
@@ -154,7 +159,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const loadDiscordRoles = async () => {
-    if (currentUser) return;
+    if (currentUserRef.current) return;
     if (!supabase) return;
 
     setIsRoleLoading(true);
@@ -178,7 +183,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (!profileError && existingProfile) {
         setCurrentAvatarState(existingProfile.avatar_url);
-        setCurrentUserState(existingProfile.display_name);
+        setCurrentUser(existingProfile.display_name);
         setUserRole(existingProfile.user_role);
         setuserGuildRolesState(existingProfile.user_guilds ? existingProfile.user_guilds.split(',').map((r: string) => r.trim()) : []);
         return;
@@ -204,7 +209,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else if (data) {
         const roles = data.guildRoles ? data.guildRoles.split(',').map((r: string) => r.trim()) : [];
         setCurrentAvatarState(data.avatarUrl);
-        setCurrentUserState(data.displayName);
+        setCurrentUser(data.displayName);
         setuserGuildRolesState(roles);
         if (data.role) setUserRole(data.role);
       }
@@ -308,7 +313,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setCurrentUser(null);
             setCurrentView(null);
           }
-        } else if (!session && currentUser) {
+        } else if (!session && currentUserRef.current) {
           // No session but we have a local user, clear it to stay in sync
           setCurrentUser(null);
           setCurrentView(null);
@@ -329,11 +334,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           loadDiscordRoles();
         }
       } else {
-        setCurrentUserState(null);
-        setuserGuildRolesState([]);
-        setUserRole(null);
-        setCurrentViewState(null);
-        setCurrentAvatarState(null);
+        setCurrentUser(null);
+        setCurrentView(null);
       }
     });
 
