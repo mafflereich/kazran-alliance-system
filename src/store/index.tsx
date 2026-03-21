@@ -158,7 +158,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setuserGuildRolesState(roles);
   };
 
-  const loadDiscordRoles = async () => {
+  const loadDiscordRoles = async (forceSync: boolean = false) => {
     if (currentUserRef.current) return;
     if (!supabase) return;
 
@@ -198,26 +198,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const discordUsername = user.user_metadata?.full_name || user.user_metadata?.name;
 
-      try {
-        const { data, error: invokeError } = await supabase.functions.invoke('sync-discord-roles', {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          },
-          body: {
-            user_id: user.id,
-            discord_id: discordId,
-            username: discordUsername
-          }
-        });
+      if (forceSync) {
+        try {
+          const { data, error: invokeError } = await supabase.functions.invoke('sync-discord-roles', {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json'
+            },
+            body: {
+              user_id: user.id,
+              discord_id: discordId,
+              username: discordUsername
+            }
+          });
 
-        if (invokeError) {
-          console.error('Edge function returned an error:', invokeError);
-        } else {
-          console.log('Edge function synced successfully:', data);
+          if (invokeError) {
+            console.error('Edge function returned an error:', invokeError);
+          } else {
+            console.log('Edge function synced successfully:', data);
+          }
+        } catch (error) {
+          console.error('Error invoking edge function:', error);
         }
-      } catch (error) {
-        console.error('Error invoking edge function:', error);
       }
 
       // Always fetch from the database to get the latest profile, whether edge function succeeded or failed
@@ -353,9 +355,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const token = session?.access_token;
 
       if (session?.user && token && token.split('.').length === 3) {
-        // 當 Discord 用戶第一次登入時，觸發 sync-discord-roles（註冊流程）
-        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-          loadDiscordRoles();
+        // 當 Discord 用戶主動登入時，觸發 sync-discord-roles（註冊/更新流程）
+        if (event === 'SIGNED_IN') {
+          loadDiscordRoles(true);
+        } else if (event === 'INITIAL_SESSION') {
+          // 重新整理網頁時，只從資料庫讀取，不呼叫 Edge Function
+          loadDiscordRoles(false);
         }
       } else {
         setCurrentUser(null);
