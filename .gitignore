@@ -10,3 +10,4 @@ dev_readme.md
 tests/
 test-results/
 *playwright*
+public/meta.json

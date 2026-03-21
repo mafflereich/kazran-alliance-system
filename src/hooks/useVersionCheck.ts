@@ -16,7 +16,7 @@ export function useVersionCheck(checkIntervalMinutes: number = 5) {
       try {
         // 加上時間戳記強迫繞過瀏覽器快取 (Cache Busting)
         const timestamp = new Date().getTime();
-        const response = await fetch(`/meta.json?t=${timestamp}`, {
+        const response = await fetch(`${import.meta.env.BASE_URL}meta.json?t=${timestamp}`, {
           cache: 'no-store',
         });
         
