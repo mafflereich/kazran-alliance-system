@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 export default function SettingsManager() {
   const { t } = useTranslation(['admin', 'translation']);
-  const { db, updateSetting, showToast, fetchSettings } = useAppContext();
+  const { db, updateSetting, showToast, fetchSettings, updateGuild } = useAppContext();
   const firstSettingId = db.settings && Object.keys(db.settings).length > 0 ? Object.keys(db.settings)[0] : 'default';
   const [bgmUrl, setBgmUrl] = useState(db.settings?.[firstSettingId]?.bgmUrl || '');
   const [bgmDefaultVolume, setBgmDefaultVolume] = useState(db.settings?.[firstSettingId]?.bgmDefaultVolume ?? 50);
@@ -19,6 +19,7 @@ export default function SettingsManager() {
     getSafeIndexPercentType(db.settings?.[firstSettingId]?.indexPercentType)
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [isUpdatingPercent, setIsUpdatingPercent] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -47,6 +48,50 @@ export default function SettingsManager() {
     }
   };
 
+  const handleUpdatePercentShown = async () => {
+    setIsUpdatingPercent(true);
+    try {
+      if (indexPercentType === 'new_costumes_owned') {
+        const newCostume = Object.values(db.costumes).find((costume) => costume.isNew);
+        if (!newCostume) {
+          showToast(t('settings.no_new_costume_found', '找不到新服裝'), 'error');
+          setIsUpdatingPercent(false);
+          return;
+        }
+
+        const updatePromises = Object.entries(db.guilds).map(async ([id]) => {
+          const membersInGuild = Object.values(db.members).filter((member) => member.guildId === id && member.status === "active");
+          
+          if (membersInGuild.length === 0) {
+            await updateGuild(id, { percentShown: 0 });
+            return;
+          }
+
+          const ownedCount = membersInGuild.filter((member) =>
+            member.records && member.records[newCostume.id] && (+member.records[newCostume.id].level) >= 0
+          ).length;
+
+          const rate = Math.round((ownedCount / membersInGuild.length) * 100);
+          await updateGuild(id, { percentShown: rate });
+        });
+
+        await Promise.all(updatePromises);
+        showToast(t('settings.update_percent_success', '成功更新公會百分比'), 'success');
+      } else {
+        const updatePromises = Object.entries(db.guilds).map(async ([id]) => {
+          await updateGuild(id, { percentShown: 0 });
+        });
+        await Promise.all(updatePromises);
+        showToast(t('settings.update_percent_success', '成功更新公會百分比'), 'success');
+      }
+    } catch (error: any) {
+      console.error("Error updating percent shown:", error);
+      showToast(`${t('settings.update_percent_failed', '更新失敗')}: ${error.message}`, 'error');
+    } finally {
+      setIsUpdatingPercent(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center mb-6">
@@ -70,14 +115,23 @@ export default function SettingsManager() {
             <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">
               {t('settings.guild_percentage_calculation')}
             </label>
-            <select
-              value={indexPercentType}
-              onChange={(e) => setIndexPercentType(e.target.value as 'empty' | 'new_costumes_owned')}
-              className="w-full p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
-            >
-              <option value="empty">{t('settings.none')}</option>
-              <option value="new_costumes_owned">{t('settings.new_costume_ownership_rate')}</option>
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={indexPercentType}
+                onChange={(e) => setIndexPercentType(e.target.value as 'empty' | 'new_costumes_owned')}
+                className="flex-1 p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
+              >
+                <option value="empty">{t('settings.none')}</option>
+                <option value="new_costumes_owned">{t('settings.new_costume_ownership_rate')}</option>
+              </select>
+              <button
+                onClick={handleUpdatePercentShown}
+                disabled={isUpdatingPercent}
+                className="px-4 py-2 bg-stone-200 dark:bg-stone-600 text-stone-800 dark:text-stone-200 rounded-lg font-bold hover:bg-stone-300 dark:hover:bg-stone-500 transition-all active:scale-95 shadow-sm disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+              >
+                {isUpdatingPercent ? t('common.updating', '更新中...') : t('settings.update_values', '更新數值')}
+              </button>
+            </div>
           </div>
 
           <div>

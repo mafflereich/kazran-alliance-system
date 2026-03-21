@@ -49,37 +49,20 @@ export default function Login() {
     });
   }, [db.guilds]);
 
-  const newCostume = React.useMemo(() => {
-    return Object.values(db.costumes).find((costume) => costume.isNew);
-  }, [db.costumes]);
-
   const guildStats = React.useMemo(() => {
     const stats: Record<string, { rate: number; is100: boolean; count: number }> = {};
 
-    if (!newCostume) return stats;
-
-    Object.entries(db.guilds).forEach(([id]) => {
-      const membersInGuild = Object.values(db.members).filter((member) => member.guildId === id && member.status === "active");
-
-      if (membersInGuild.length === 0) {
-        stats[id] = { rate: 0, is100: false, count: 0 };
-        return;
-      }
-
-      const ownedCount = membersInGuild.filter((member) =>
-        member.records && member.records[newCostume.id] && (+member.records[newCostume.id].level) >= 0
-      ).length;
-
-      const rate = Math.round((ownedCount / membersInGuild.length) * 100);
+    Object.entries(db.guilds).forEach(([id, guild]) => {
+      const rate = guild.percentShown ?? 0;
       stats[id] = {
         rate,
-        is100: rate === 100,
-        count: membersInGuild.length
+        is100: rate >= 100,
+        count: 0
       };
     });
 
     return stats;
-  }, [db.guilds, db.members, newCostume]);
+  }, [db.guilds]);
 
   const indexPercentType = db.settings && Object.values(db.settings)[0]?.indexPercentType;
 
@@ -126,12 +109,12 @@ export default function Login() {
                         {tierGuilds.map(([id, guild]: [string, any]) => {
                           const isDisabled = userRole && !canSeeAllGuilds && !userGuildRoles.includes(guild.username) && !userGuildRoles.includes(guild.name);
                           const stats = guildStats[id] || { rate: 0, is100: false, count: 0 };
-                          const { rate: newCostumeRate, is100 } = stats;
+                          const { rate: percentShown, is100 } = stats;
 
                           // Determine classes based on state and tier
                           let buttonClasses = "w-full flex items-center justify-between p-4 bg-white dark:bg-stone-800 border rounded-xl transition-all group overflow-hidden relative disabled:opacity-50";
 
-                          const showPercent = userRole && indexPercentType === 'new_costumes_owned';
+                          const showPercent = userRole && indexPercentType && indexPercentType !== 'empty';
 
                           let textClasses = (showPercent && is100) ? getTierTextColor(tier) : `font-medium transition-colors ${getTierTextHoverClass(tier)}`;
                           let iconClasses = `w-5 h-5 transition-colors ${isDisabled ? 'text-stone-300 dark:text-stone-600' : getTierTextHoverClass(tier)}`;
@@ -170,7 +153,7 @@ export default function Login() {
                                       ? 'bg-stone-300 dark:bg-stone-600 opacity-20'
                                       : 'bg-stone-400 opacity-10 dark:opacity-20'
                                     }`}
-                                  style={{ width: `${newCostumeRate}%` }}
+                                  style={{ width: `${percentShown}%` }}
                                 />
                               )}
 
@@ -182,7 +165,7 @@ export default function Login() {
                               <div className="relative z-10 flex items-center gap-2">
                                 {showPercent && (
                                   <span className={`text-sm font-black ${is100 ? 'text-amber-500' : isDisabled ? 'text-stone-300 dark:text-stone-600' : 'text-stone-400'}`}>
-                                    {newCostumeRate}%
+                                    {percentShown}%
                                   </span>
                                 )}
                                 <ChevronRight className={iconClasses} />

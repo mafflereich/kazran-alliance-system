@@ -8,6 +8,7 @@ export interface Guild {
   username?: string;
   isDisplay?: boolean;
   serial?: string | number;
+  percentShown?: number;
 }
 
 export interface CostumeRecord {
