@@ -46,6 +46,13 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
 
   const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
   const closeArchiveModal = () => setArchiveModal(prev => ({ ...prev, isOpen: false }));
+  
+  const appendArchiveReason = (text: string) => {
+    setArchiveModal(prev => ({
+      ...prev,
+      reason: prev.reason ? `${prev.reason}, ${text}` : text
+    }));
+  };
 
   useEffect(() => {
     fetchMembers(guildId);
@@ -441,7 +448,7 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
                     <div className="flex justify-end gap-1">
                       <button
                         onClick={() => startEdit(id)}
-                        className="p-2 text-stone-500 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-lg transition-colors"
+                        className="p-2 text-stone-500 dark:text-stone-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded-lg transition-colors"
                         title={t('common.edit')}
                       >
                         <Edit2 className="w-4 h-4" />
@@ -455,7 +462,7 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
                       </button>
                       <button
                         onClick={() => handleDeleteMember(id)}
-                        className="p-2 text-stone-500 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-lg transition-colors"
+                        className="p-2 text-stone-500 dark:text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                         title={t('common.delete')}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -519,6 +526,32 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
                   value={archiveModal.reason}
                   onChange={(e) => setArchiveModal(prev => ({ ...prev, reason: e.target.value }))}
                 />
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <button
+                    onClick={() => appendArchiveReason('退坑')}
+                    className="px-2 py-1 text-xs bg-stone-100 dark:bg-stone-600 text-stone-600 dark:text-stone-300 rounded hover:bg-stone-200 dark:hover:bg-stone-500 transition-colors"
+                  >
+                    退坑
+                  </button>
+                  <button
+                    onClick={() => appendArchiveReason('退DC')}
+                    className="px-2 py-1 text-xs bg-stone-100 dark:bg-stone-600 text-stone-600 dark:text-stone-300 rounded hover:bg-stone-200 dark:hover:bg-stone-500 transition-colors"
+                  >
+                    退DC
+                  </button>
+                  <button
+                    onClick={() => appendArchiveReason('公會轉移')}
+                    className="px-2 py-1 text-xs bg-stone-100 dark:bg-stone-600 text-stone-600 dark:text-stone-300 rounded hover:bg-stone-200 dark:hover:bg-stone-500 transition-colors"
+                  >
+                    公會轉移
+                  </button>
+                  <button
+                    onClick={() => appendArchiveReason('失聯')}
+                    className="px-2 py-1 text-xs bg-stone-100 dark:bg-stone-600 text-stone-600 dark:text-stone-300 rounded hover:bg-stone-200 dark:hover:bg-stone-500 transition-colors"
+                  >
+                    失聯
+                  </button>
+                </div>
               </div>
 
               <div className="pt-4 flex gap-3">

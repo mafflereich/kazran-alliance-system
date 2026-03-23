@@ -228,5 +228,36 @@
     "fetch_failed": "無法取得未匹配資料",
     "select_profile_first": "請先從左側選擇一個未匹配的使用者",
     "start_search_hint": "輸入成員名稱開始搜尋"
+  },
+  "guilds": {
+    "add_guild": "新增公會",
+    "guild_name": "公會名稱",
+    "serial": "序號",
+    "tier": "梯隊",
+    "order": "順序",
+    "member_count": "成員數",
+    "actions": "操作",
+    "edit_guild": "編輯公會",
+    "delete_guild": "刪除公會",
+    "confirm_delete": "確定要刪除此公會嗎？此動作無法復原。",
+    "add_success": "新增公會成功",
+    "add_failed": "新增公會失敗",
+    "update_success": "更新公會成功",
+    "update_failed": "更新公會失敗",
+    "save_failed": "儲存失敗",
+    "delete_success": "刪除公會成功",
+    "delete_failed": "刪除公會失敗",
+    "auth_account_notice": "使用系統開新公會後，要在 Supabase Auth 開一個帳號"
+  },
+  "nav": {
+    "guild_management": "公會管理",
+    "costume_database": "服裝資料庫",
+    "archived_members": "封存成員",
+    "backup_restore": "備份與還原",
+    "tools": "便利小功能",
+    "access_control": "存取控制",
+    "settings": "網頁設定",
+    "identity_binding": "身份手動匹配",
+    "costume_db": "服裝資料庫"
   }
 }

@@ -228,5 +228,36 @@
     "fetch_failed": "Failed to fetch unmatched profiles",
     "select_profile_first": "Please select an unmatched user from the left first",
     "start_search_hint": "Enter member name to start searching"
+  },
+  "guilds": {
+    "add_guild": "Add Guild",
+    "guild_name": "Guild Name",
+    "serial": "Serial",
+    "tier": "Tier",
+    "order": "Order",
+    "member_count": "Members",
+    "actions": "Actions",
+    "edit_guild": "Edit Guild",
+    "delete_guild": "Delete Guild",
+    "confirm_delete": "Are you sure you want to delete this guild? This action cannot be undone.",
+    "add_success": "Guild added successfully",
+    "add_failed": "Failed to add guild",
+    "update_success": "Guild updated successfully",
+    "update_failed": "Failed to update guild",
+    "save_failed": "Failed to save",
+    "delete_success": "Guild deleted successfully",
+    "delete_failed": "Failed to delete guild",
+    "auth_account_notice": "After creating a new guild using the system, you need to create an account in Supabase Auth"
+  },
+  "nav": {
+    "guild_management": "Guild Management",
+    "costume_database": "Costume Database",
+    "archived_members": "Archived Members",
+    "backup_restore": "Backup & Restore",
+    "tools": "Tools",
+    "access_control": "Access Control",
+    "settings": "Settings",
+    "identity_binding": "Identity Binding",
+    "costume_db": "Costume Database"
   }
 }
