@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/store';
 import { supabase } from '@/shared/api/supabase';
-import { Search, Link as LinkIcon, User as UserIcon, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Search, Link as LinkIcon, User as UserIcon, Loader2, CheckCircle2, AlertCircle, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Member } from '@/entities/member/types';
 import ConfirmModal from '@/shared/ui/ConfirmModal';
@@ -152,15 +152,28 @@ export default function BindingManager() {
                     className="w-12 h-12 rounded-full border-2 border-white dark:border-stone-700 shadow-sm"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="text-left">
-                    <p className="font-bold text-stone-800 dark:text-stone-100">{profile.display_name}</p>
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                      <p className="text-xs text-stone-500 dark:text-stone-400 font-mono">{profile.discord_id}</p>
-                      {profile.discord_username && (
-                        <p className="text-xs text-indigo-500 dark:text-indigo-400 font-medium italic">@{profile.discord_username}</p>
-                      )}
+                    <div className="text-left flex-1">
+                      <p className="font-bold text-stone-800 dark:text-stone-100">{profile.display_name}</p>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <p className="text-xs text-stone-500 dark:text-stone-400 font-mono">{profile.discord_id}</p>
+                        {profile.discord_username && (
+                          <div className="flex items-center gap-1">
+                            <p className="text-xs text-indigo-500 dark:text-indigo-400 font-medium italic">@{profile.discord_username}</p>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(profile.discord_username);
+                                showToast(t('common.copied', '已複製'), 'success');
+                              }}
+                              className="p-1 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-md transition-colors text-stone-400 hover:text-indigo-500"
+                              title={t('common.copy', '複製')}
+                            >
+                              <Copy className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
                 </button>
               ))}
             </div>
