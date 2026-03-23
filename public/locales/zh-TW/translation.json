@@ -258,6 +258,7 @@
     "no_login_account": "此公會尚未設定登入帳號",
     "wrong_password": "密碼錯誤",
     "login_failed": "公會登入失敗:",
+    "not_in_guild": "登入失敗：您不在指定的公會聯盟中",
     "system_title": "Kazran 聯盟系統",
     "select_guild": "選擇公會",
     "no_guilds": "目前沒有任何公會",

@@ -258,6 +258,7 @@
     "no_login_account": "This guild has not set up a login account",
     "wrong_password": "Wrong password",
     "login_failed": "Guild login failed:",
+    "not_in_guild": "Login failed: You are not in the specified guild alliance",
     "system_title": "Kazran Alliance System",
     "select_guild": "Select Guild",
     "no_guilds": "No guilds available",

@@ -279,7 +279,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         
         // 延遲一點點顯示 Toast，確保畫面已經準備好
         setTimeout(() => {
-          showToast('登入失敗：您不在指定的公會中', 'error');
+          showToast(t('not_in_guild'), 'error');
         }, 500);
       }
     } catch (error) {
