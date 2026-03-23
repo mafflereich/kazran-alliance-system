@@ -101,6 +101,8 @@ serve(async (req) => {
       }
     );
 
+    console.log(response);
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`Discord API Error (${response.status}):`, errorText);
@@ -194,6 +196,7 @@ serve(async (req) => {
     // 3. 準備資料列 (這段已經移出 if 外面，保證一定會執行)
     const dataRow = {
       discord_id: discord_id,
+      discord_username: username, // 新增：儲存 Discord 的 username
       id: matchedId, // 比對成功會有值，失敗或沒比對就是 null
       auth_id: user_id || null,
       user_role: role || null,

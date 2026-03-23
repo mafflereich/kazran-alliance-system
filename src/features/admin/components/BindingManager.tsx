@@ -9,6 +9,7 @@ import ConfirmModal from '@/shared/ui/ConfirmModal';
 interface Profile {
   id: string | null;
   discord_id: string;
+  discord_username: string;
   display_name: string;
   avatar_url: string;
   user_role: string;
@@ -153,7 +154,12 @@ export default function BindingManager() {
                   />
                   <div className="text-left">
                     <p className="font-bold text-stone-800 dark:text-stone-100">{profile.display_name}</p>
-                    <p className="text-xs text-stone-500 dark:text-stone-400 font-mono">{profile.discord_id}</p>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      <p className="text-xs text-stone-500 dark:text-stone-400 font-mono">{profile.discord_id}</p>
+                      {profile.discord_username && (
+                        <p className="text-xs text-indigo-500 dark:text-indigo-400 font-medium italic">@{profile.discord_username}</p>
+                      )}
+                    </div>
                   </div>
                 </button>
               ))}
