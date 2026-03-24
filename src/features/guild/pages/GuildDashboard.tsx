@@ -95,18 +95,13 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
   const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
 
   const handleEditClick = (id: string, memberName: string) => {
+    const isCurrentUser = userProfileId && userProfileId.split(',').map(uid => uid.trim()).filter(Boolean).includes(id);
+    const canEdit = isCurrentUser;
+    
+    if (!canEdit) return;
+
     logEvent('GuildDashboard', 'Edit Member', memberName);
-    setConfirmModal({
-      isOpen: true,
-      title: t('dashboard.identity_confirm'),
-      message: <>{t('dashboard.are_you')} 「<b>{memberName}</b>」 {t('dashboard.question_mark')}</>,
-      isDanger: false,
-      confirmText: t('common.yes'),
-      onConfirm: () => {
-        setEditingMemberId(id);
-        closeConfirmModal();
-      }
-    });
+    setEditingMemberId(id);
   };
 
   const canSeeAllGuilds = userRole === 'admin' || userRole === 'creator' || userRole === 'manager';
@@ -450,9 +445,9 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
                         {members.map(([id, member]: [string, any]) => {
                           const isCurrentUser = userProfileId && userProfileId.split(',').map(uid => uid.trim()).filter(Boolean).includes(id);
                           return (
-                          <tr key={id} className="border-b border-stone-100 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-700 transition-colors group">
+                          <tr key={id} className={`border-b border-stone-100 dark:border-stone-700 transition-colors group ${isCurrentUser ? 'hover:bg-stone-50 dark:hover:bg-stone-700' : ''}`}>
                             <td
-                              className="p-3 font-medium text-stone-800 dark:text-stone-200 sticky left-0 bg-white dark:bg-stone-800 group-hover:bg-stone-50 dark:group-hover:bg-stone-700 border-r border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c] transition-colors cursor-pointer"
+                              className={`p-3 font-medium text-stone-800 dark:text-stone-200 sticky left-0 bg-white dark:bg-stone-800 border-r border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c] transition-colors ${isCurrentUser ? 'cursor-pointer group-hover:bg-stone-50 dark:group-hover:bg-stone-700' : ''}`}
                               onClick={() => handleEditClick(id, member.name)}
                             >
                               <div className="flex flex-col">
