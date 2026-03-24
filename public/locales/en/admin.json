@@ -214,7 +214,11 @@
   },
   "binding": {
     "title": "Manual Identity Binding",
+    "single_match": "Single Match",
+    "multi_match": "Multi Match",
     "unmatched_profiles": "Unmatched Users",
+    "select_bound_profile": "Select Bound Profile",
+    "search_bound_members": "Search bound members...",
     "search_members": "Search Members",
     "search_placeholder": "Enter member name to search...",
     "no_unmatched": "No unmatched users found",
@@ -224,10 +228,18 @@
     "bind_success": "Identity bound successfully!",
     "bind_failed": "Binding failed: {{error}}",
     "already_bound": "This member is already bound to another Discord account",
+    "already_bound_to_this": "Bound",
+    "already_bound_to_other": "Bound to another account",
     "guild": "Guild",
-    "fetch_failed": "Failed to fetch unmatched profiles",
-    "select_profile_first": "Please select an unmatched user from the left first",
-    "start_search_hint": "Enter member name to start searching"
+    "fetch_failed": "Failed to fetch profiles",
+    "select_profile_first": "Please select a profile from the left first",
+    "start_search_hint": "Enter member name to start searching",
+    "bound_members": "Bound Members",
+    "unbind": "Unbind",
+    "cannot_unbind_last": "Must keep at least one bound member",
+    "save_changes": "Save Changes",
+    "restore": "Restore",
+    "unsaved_changes": "Unsaved changes"
   },
   "guilds": {
     "add_guild": "Add Guild",
@@ -258,6 +270,31 @@
     "access_control": "Access Control",
     "settings": "Settings",
     "identity_binding": "Identity Binding",
-    "costume_db": "Costume Database"
+    "costume_db": "Costume Database",
+    "system_logs": "System Logs"
+  },
+  "system_logs": {
+    "title": "System Logs",
+    "refresh": "Refresh",
+    "search_placeholder": "Search message, Discord ID, action...",
+    "time": "Time",
+    "level": "Level",
+    "source_action": "Source / Action",
+    "message": "Message",
+    "related_id": "Related ID",
+    "actions": "Actions",
+    "loading": "Loading...",
+    "no_results": "No matching logs found",
+    "view_details": "View Details",
+    "log_details": "Log Details",
+    "source_module": "Source Module",
+    "action_category": "Action Category",
+    "details_json": "Details (JSON)",
+    "none": "None"
+  },
+  "common": {
+    "refresh": "Refresh",
+    "copy": "Copy",
+    "back": "Back"
   }
 }

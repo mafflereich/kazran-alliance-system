@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/store';
-import { Menu, X, Shield, Swords, ArrowDownNarrowWide, ArrowDownWideNarrow, Search } from 'lucide-react';
+import { Menu, X, Shield, Swords, ArrowDownNarrowWide, ArrowDownWideNarrow, Search, User } from 'lucide-react';
 import MemberEditModal from '../components/MemberEditModal';
 import MemberSearchModal from '../components/MemberSearchModal';
 import ConfirmModal from '@shared/ui/ConfirmModal';
@@ -13,7 +13,7 @@ import { supabase } from '@/shared/api/supabase';
 export default function GuildDashboard({ guildId }: { guildId: string }) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { db, isMembersLoading, userGuildRoles, userRole, fetchMembers } = useAppContext();
+  const { db, isMembersLoading, userGuildRoles, userRole, fetchMembers, userProfileId } = useAppContext();
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -73,7 +73,6 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
 
   const getTruncatedName = (name: string, role: string) => {
     if (!isMobile) return truncateName(name, 20);
-    if (role === 'leader' || role === 'coleader') return truncateName(name, 8);
     return truncateName(name, 14);
   };
 
@@ -162,9 +161,17 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
 
   const guild = db.guilds[guildId];
   const members = React.useMemo(() => {
+    const userMemberIds = userProfileId ? userProfileId.split(',').map(id => id.trim()).filter(Boolean) : [];
+
     return Object.entries(db.members)
       .filter(([_, m]: [string, any]) => m.guildId === guildId)
       .sort((a: [string, any], b: [string, any]) => {
+        const isUserA = userMemberIds.includes(a[0]);
+        const isUserB = userMemberIds.includes(b[0]);
+
+        if (isUserA && !isUserB) return -1;
+        if (!isUserA && isUserB) return 1;
+
         const roleOrder: Record<string, number> = {
           'leader': 1,
           'coleader': 2,
@@ -207,7 +214,7 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
           return getTieBreak();
         }
       });
-  }, [db.members, guildId, sortConfig]);
+  }, [db.members, guildId, sortConfig, userProfileId]);
 
   const costumes = React.useMemo(() => {
     return Object.values(db.costumes).sort((a, b) => {
@@ -440,7 +447,9 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {members.map(([id, member]: [string, any]) => (
+                        {members.map(([id, member]: [string, any]) => {
+                          const isCurrentUser = userProfileId && userProfileId.split(',').map(uid => uid.trim()).filter(Boolean).includes(id);
+                          return (
                           <tr key={id} className="border-b border-stone-100 dark:border-stone-700 hover:bg-stone-50 dark:hover:bg-stone-700 transition-colors group">
                             <td
                               className="p-3 font-medium text-stone-800 dark:text-stone-200 sticky left-0 bg-white dark:bg-stone-800 group-hover:bg-stone-50 dark:group-hover:bg-stone-700 border-r border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c] transition-colors cursor-pointer"
@@ -448,12 +457,19 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
                             >
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-2">
-                                  <span title={member.name}>{getTruncatedName(member.name, member.role)}</span>
-                                  {(member.role === 'leader' || member.role === 'coleader') && (
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${member.role === 'leader' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'}`}>
-                                      {member.role === 'leader' ? t('roles.leader') : t('roles.coleader')}
-                                    </span>
-                                  )}
+                                  {isCurrentUser && <User className="w-4 h-4 text-indigo-500 dark:text-indigo-400 shrink-0" />}
+                                  <span 
+                                    title={member.name}
+                                    className={
+                                      member.role === 'leader' 
+                                        ? 'px-1.5 py-0.5 rounded bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' 
+                                        : member.role === 'coleader'
+                                          ? 'px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                                          : ''
+                                    }
+                                  >
+                                    {getTruncatedName(member.name, member.role)}
+                                  </span>
                                 </div>
                                 {member.updatedAt && (
                                   <span className="text-[10px] text-stone-400 mt-0.5">
@@ -499,7 +515,8 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
                               );
                             })}
                           </tr>
-                        ))}
+                          );
+                        })}
                         {members.length === 0 && (
                           <tr>
                             <td colSpan={costumes.length + 1} className="p-8 text-center text-stone-500 dark:text-stone-400">

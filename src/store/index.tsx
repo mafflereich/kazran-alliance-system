@@ -36,6 +36,7 @@ interface AppContextType {
   userGuildRoles: string[];
   setuserGuildRoles: React.Dispatch<React.SetStateAction<string[]>>;
   userRole: User['role'] | null;
+  userProfileId: string | null;
 
   loadDiscordRoles: () => Promise<void>;
 
@@ -141,6 +142,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [currentUser]);
   const [userGuildRoles, setuserGuildRolesState] = useState<string[]>([]);
   const [userRole, setUserRole] = useState<User['role'] | null>(null);
+  const [userProfileId, setUserProfileId] = useState<string | null>(null);
 
   const [isRoleLoading, setIsRoleLoading] = useState(false);
   const [isMembersLoading, setIsMembersLoading] = useState(false);
@@ -159,7 +161,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setuserGuildRolesState([]);
       setCurrentAvatarState(null);
       setUserRole(null);
-
+      setUserProfileId(null);
     }
   };
 
@@ -194,10 +196,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setCurrentUser(existingProfile.display_name || user.email || 'Admin');
           setUserRole(existingProfile.user_role || 'admin');
           setuserGuildRolesState(existingProfile.user_guilds ? existingProfile.user_guilds.split(',').map((r: string) => r.trim()) : []);
+          setUserProfileId(existingProfile.id);
         } else {
           // Fallback if no profile exists for the email user
           setCurrentUser(user.email || 'User');
           setUserRole('member');
+          setUserProfileId(null);
         }
         return;
       }
@@ -255,6 +259,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentUser(existingProfile.display_name || discordUsername || 'User');
         setUserRole(existingProfile.user_role || 'member');
         setuserGuildRolesState(existingProfile.user_guilds ? existingProfile.user_guilds.split(',').map((r: string) => r.trim()) : []);
+        setUserProfileId(existingProfile.id);
       } else {
         // 如果同步後還是沒有 profile，代表他不在公會內，或是發生了其他錯誤
         console.warn('Unauthorized login attempt: User not in guild or profile missing.');
@@ -276,6 +281,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUserRole(null);
         setuserGuildRolesState([]);
         setCurrentAvatarState(null);
+        setUserProfileId(null);
         
         // 延遲一點點顯示 Toast，確保畫面已經準備好
         setTimeout(() => {
@@ -1311,7 +1317,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{
-      db, setDb, currentView, setCurrentView, currentUser, setCurrentUser, currentAvatar, userGuildRoles, setuserGuildRoles, userRole,
+      db, setDb, currentView, setCurrentView, currentUser, setCurrentUser, currentAvatar, userGuildRoles, setuserGuildRoles, userRole, userProfileId,
       fetchMembers, fetchAllMembers, searchMembers, addMember, updateMember, deleteMember, archiveMember, unarchiveMember, updateMemberCostumeLevel, updateMemberExclusiveWeapon,
       loadDiscordRoles,
       fetchInitialData,

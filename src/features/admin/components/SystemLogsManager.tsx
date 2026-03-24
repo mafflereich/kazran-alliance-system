@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/shared/api/supabase';
 import { RefreshCw, AlertTriangle, Info, XCircle, AlertOctagon, Search, X, Eye } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface SystemLog {
   id: string;
@@ -15,6 +16,7 @@ interface SystemLog {
 }
 
 export default function SystemLogsManager() {
+  const { t } = useTranslation('admin');
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState<SystemLog | null>(null);
@@ -96,14 +98,14 @@ export default function SystemLogsManager() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-xl font-bold text-stone-800 dark:text-stone-100">系統日誌 (System Logs)</h2>
+        <h2 className="text-xl font-bold text-stone-800 dark:text-stone-100">{t('system_logs.title', '系統日誌')}</h2>
         <button 
           onClick={fetchLogs}
           disabled={loading}
           className="flex items-center gap-2 px-4 py-2 bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-lg transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          重新整理
+          {t('system_logs.refresh', '重新整理')}
         </button>
       </div>
 
@@ -112,7 +114,7 @@ export default function SystemLogsManager() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
           <input 
             type="text" 
-            placeholder="搜尋訊息、Discord ID、動作..." 
+            placeholder={t('system_logs.search_placeholder', '搜尋訊息、Discord ID、動作...')} 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 dark:text-stone-200"
@@ -141,25 +143,25 @@ export default function SystemLogsManager() {
           <table className="w-full text-left text-sm">
             <thead className="bg-stone-50 dark:bg-stone-900/50 text-stone-500 dark:text-stone-400 border-b border-stone-200 dark:border-stone-700">
               <tr>
-                <th className="px-4 py-3 font-medium">時間</th>
-                <th className="px-4 py-3 font-medium">層級</th>
-                <th className="px-4 py-3 font-medium">來源 / 動作</th>
-                <th className="px-4 py-3 font-medium">訊息</th>
-                <th className="px-4 py-3 font-medium">關聯 ID</th>
-                <th className="px-4 py-3 font-medium text-right">操作</th>
+                <th className="px-4 py-3 font-medium">{t('system_logs.time', '時間')}</th>
+                <th className="px-4 py-3 font-medium">{t('system_logs.level', '層級')}</th>
+                <th className="px-4 py-3 font-medium">{t('system_logs.source_action', '來源 / 動作')}</th>
+                <th className="px-4 py-3 font-medium">{t('system_logs.message', '訊息')}</th>
+                <th className="px-4 py-3 font-medium">{t('system_logs.related_id', '關聯 ID')}</th>
+                <th className="px-4 py-3 font-medium text-right">{t('system_logs.actions', '操作')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100 dark:divide-stone-700/50">
               {loading && logs.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-stone-500 dark:text-stone-400">
-                    載入中...
+                    {t('system_logs.loading', '載入中...')}
                   </td>
                 </tr>
               ) : filteredLogs.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-stone-500 dark:text-stone-400">
-                    找不到符合的日誌
+                    {t('system_logs.no_results', '找不到符合的日誌')}
                   </td>
                 </tr>
               ) : (
@@ -188,7 +190,7 @@ export default function SystemLogsManager() {
                       <button 
                         onClick={() => setSelectedLog(log)}
                         className="p-1.5 text-stone-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded transition-colors"
-                        title="查看詳情"
+                        title={t('system_logs.view_details', '查看詳情')}
                       >
                         <Eye className="w-4 h-4" />
                       </button>
@@ -211,7 +213,7 @@ export default function SystemLogsManager() {
                   {getLevelIcon(selectedLog.level)}
                   {selectedLog.level.toUpperCase()}
                 </span>
-                <h3 className="font-bold text-stone-800 dark:text-stone-100">日誌詳情</h3>
+                <h3 className="font-bold text-stone-800 dark:text-stone-100">{t('system_logs.log_details', '日誌詳情')}</h3>
               </div>
               <button 
                 onClick={() => setSelectedLog(null)}
@@ -224,36 +226,36 @@ export default function SystemLogsManager() {
             <div className="p-6 overflow-y-auto flex-1 space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
-                  <div className="text-stone-400 dark:text-stone-500 mb-1">時間</div>
+                  <div className="text-stone-400 dark:text-stone-500 mb-1">{t('system_logs.time', '時間')}</div>
                   <div className="font-medium text-stone-800 dark:text-stone-200">{new Date(selectedLog.created_at).toLocaleString()}</div>
                 </div>
                 <div>
-                  <div className="text-stone-400 dark:text-stone-500 mb-1">來源模組</div>
+                  <div className="text-stone-400 dark:text-stone-500 mb-1">{t('system_logs.source_module', '來源模組')}</div>
                   <div className="font-medium text-stone-800 dark:text-stone-200 font-mono text-xs bg-stone-100 dark:bg-stone-800 px-2 py-1 rounded inline-block">{selectedLog.source}</div>
                 </div>
                 <div>
-                  <div className="text-stone-400 dark:text-stone-500 mb-1">動作分類</div>
+                  <div className="text-stone-400 dark:text-stone-500 mb-1">{t('system_logs.action_category', '動作分類')}</div>
                   <div className="font-medium text-stone-800 dark:text-stone-200 font-mono text-xs bg-stone-100 dark:bg-stone-800 px-2 py-1 rounded inline-block">{selectedLog.action}</div>
                 </div>
                 <div>
-                  <div className="text-stone-400 dark:text-stone-500 mb-1">關聯 ID</div>
+                  <div className="text-stone-400 dark:text-stone-500 mb-1">{t('system_logs.related_id', '關聯 ID')}</div>
                   <div className="space-y-1">
                     {selectedLog.discord_id && <div className="text-stone-700 dark:text-stone-300">Discord: <span className="font-mono text-xs">{selectedLog.discord_id}</span></div>}
                     {selectedLog.user_id && <div className="text-stone-700 dark:text-stone-300">User: <span className="font-mono text-xs">{selectedLog.user_id}</span></div>}
-                    {!selectedLog.discord_id && !selectedLog.user_id && <span className="text-stone-400 italic">無</span>}
+                    {!selectedLog.discord_id && !selectedLog.user_id && <span className="text-stone-400 italic">{t('system_logs.none', '無')}</span>}
                   </div>
                 </div>
               </div>
 
               <div>
-                <div className="text-stone-400 dark:text-stone-500 mb-2 text-sm">訊息 (Message)</div>
+                <div className="text-stone-400 dark:text-stone-500 mb-2 text-sm">{t('system_logs.message', '訊息')}</div>
                 <div className="p-3 bg-stone-50 dark:bg-stone-800/50 rounded-lg text-stone-800 dark:text-stone-200 border border-stone-200 dark:border-stone-700">
                   {selectedLog.message}
                 </div>
               </div>
 
               <div>
-                <div className="text-stone-400 dark:text-stone-500 mb-2 text-sm">詳細資料 (Details JSON)</div>
+                <div className="text-stone-400 dark:text-stone-500 mb-2 text-sm">{t('system_logs.details_json', '詳細資料 (Details JSON)')}</div>
                 <div className="relative group">
                   <pre className="p-4 bg-stone-900 text-stone-300 rounded-lg overflow-x-auto text-xs font-mono leading-relaxed border border-stone-800">
                     <code>{JSON.stringify(selectedLog.details, null, 2)}</code>

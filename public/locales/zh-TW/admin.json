@@ -214,7 +214,11 @@
   },
   "binding": {
     "title": "身份手動匹配",
+    "single_match": "單一匹配",
+    "multi_match": "多重匹配",
     "unmatched_profiles": "未匹配的使用者",
+    "select_bound_profile": "選擇已綁定帳號",
+    "search_bound_members": "搜尋已綁定的成員...",
     "search_members": "搜尋成員",
     "search_placeholder": "輸入成員名稱搜尋...",
     "no_unmatched": "目前沒有未匹配的使用者",
@@ -224,10 +228,18 @@
     "bind_success": "身份綁定成功！",
     "bind_failed": "綁定失敗: {{error}}",
     "already_bound": "此成員已綁定其他 Discord 帳號",
+    "already_bound_to_this": "已綁定",
+    "already_bound_to_other": "已被其他帳號綁定",
     "guild": "公會",
-    "fetch_failed": "無法取得未匹配資料",
-    "select_profile_first": "請先從左側選擇一個未匹配的使用者",
-    "start_search_hint": "輸入成員名稱開始搜尋"
+    "fetch_failed": "無法取得資料",
+    "select_profile_first": "請先從左側選擇一個使用者",
+    "start_search_hint": "輸入成員名稱開始搜尋",
+    "bound_members": "已綁定成員",
+    "unbind": "解除",
+    "cannot_unbind_last": "必須至少保留一個綁定的成員",
+    "save_changes": "儲存變更",
+    "restore": "還原",
+    "unsaved_changes": "有未儲存的變更"
   },
   "guilds": {
     "add_guild": "新增公會",
@@ -258,6 +270,31 @@
     "access_control": "存取控制",
     "settings": "網頁設定",
     "identity_binding": "身份手動匹配",
-    "costume_db": "服裝資料庫"
+    "costume_db": "服裝資料庫",
+    "system_logs": "系統日誌"
+  },
+  "system_logs": {
+    "title": "系統日誌",
+    "refresh": "重新整理",
+    "search_placeholder": "搜尋訊息、Discord ID、動作...",
+    "time": "時間",
+    "level": "層級",
+    "source_action": "來源 / 動作",
+    "message": "訊息",
+    "related_id": "關聯 ID",
+    "actions": "操作",
+    "loading": "載入中...",
+    "no_results": "找不到符合的日誌",
+    "view_details": "查看詳情",
+    "log_details": "日誌詳情",
+    "source_module": "來源模組",
+    "action_category": "動作分類",
+    "details_json": "詳細資料 (Details JSON)",
+    "none": "無"
+  },
+  "common": {
+    "refresh": "重新整理",
+    "copy": "複製",
+    "back": "返回"
   }
 }
