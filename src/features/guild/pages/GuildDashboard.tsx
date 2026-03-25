@@ -23,40 +23,11 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
   const [sortConfig, setSortConfig] = useState<{ key: 'member' | string, order: 'asc' | 'desc' }>({ key: 'member', order: 'asc' });
-  const [archiveRemarks, setArchiveRemarks] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setSortConfig({ key: 'member', order: 'asc' });
     fetchMembers(guildId);
   }, [guildId]);
-
-  useEffect(() => {
-    const fetchArchiveRemarks = async () => {
-      const memberIds = Object.values(db.members)
-        .filter((m: any) => m.guildId === guildId)
-        .map((m: any) => m.id);
-
-      if (memberIds.length === 0) return;
-
-      const { data, error } = await supabase
-        .from('member_notes')
-        .select('member_id, archive_remark')
-        .in('member_id', memberIds)
-        .not('archive_remark', 'is', null);
-
-      if (!error && data) {
-        const remarksMap = data.reduce((acc, note) => {
-          if (note.archive_remark) {
-            acc[note.member_id] = note.archive_remark;
-          }
-          return acc;
-        }, {} as Record<string, string>);
-        setArchiveRemarks(remarksMap);
-      }
-    };
-
-    fetchArchiveRemarks();
-  }, [guildId, db.members]);
 
   const handleSort = (key: string) => {
     logEvent('GuildDashboard', 'Sort', key);
@@ -240,7 +211,6 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
                   hasBoundMemberInGuild={hasBoundMemberInGuild}
                   userProfileId={userProfileId}
                   userRole={userRole}
-                  archiveRemarks={archiveRemarks}
                   handleEditClick={handleEditClick}
                   isDragging={isDragging}
                   handleMouseDown={handleMouseDown}

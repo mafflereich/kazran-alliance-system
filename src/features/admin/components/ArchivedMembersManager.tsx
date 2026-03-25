@@ -36,7 +36,7 @@ export default function ArchivedMembersManager() {
           id,
           name,
           status,
-          archive_remark,
+          member_notes(archive_remark),
           members_archive_history (
             id,
             member_id,
@@ -54,12 +54,16 @@ export default function ArchivedMembersManager() {
       if (error) throw error;
 
       // Sort history arrays manually just in case Supabase order isn't perfect for nested arrays
-      const members = (data as any[]).map(member => ({
-        ...member,
-        membersArchiveHistory: (toCamel(member.members_archive_history) as ArchiveHistory[]).sort((a, b) =>
-          new Date(b.archivedAt).getTime() - new Date(a.archivedAt).getTime()
-        )
-      })).sort((a, b) => {
+      const members = (data as any[]).map(member => {
+        const memberNotes = Array.isArray(member.member_notes) ? member.member_notes[0] : member.member_notes;
+        return {
+          ...member,
+          archiveRemark: memberNotes?.archive_remark || '',
+          membersArchiveHistory: (toCamel(member.members_archive_history) as ArchiveHistory[]).sort((a, b) =>
+            new Date(b.archivedAt).getTime() - new Date(a.archivedAt).getTime()
+          )
+        };
+      }).sort((a, b) => {
         // Sort members by their latest archive date (descending)
         const dateA = a.membersArchiveHistory[0]?.archivedAt ? new Date(a.membersArchiveHistory[0].archivedAt).getTime() : 0;
         const dateB = b.membersArchiveHistory[0]?.archivedAt ? new Date(b.membersArchiveHistory[0].archivedAt).getTime() : 0;

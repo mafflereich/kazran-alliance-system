@@ -42,7 +42,6 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
     reason: ''
   });
   const [isArchiving, setIsArchiving] = useState(false);
-  const [archiveRemarks, setArchiveRemarks] = useState<Record<string, string>>({});
 
   const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
   const closeArchiveModal = () => setArchiveModal(prev => ({ ...prev, isOpen: false }));
@@ -57,34 +56,6 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
   useEffect(() => {
     fetchMembers(guildId);
   }, [guildId]);
-
-  useEffect(() => {
-    const fetchArchiveRemarks = async () => {
-      const memberIds = Object.values(db.members)
-        .filter((m: any) => m.guildId === guildId)
-        .map((m: any) => m.id);
-
-      if (memberIds.length === 0) return;
-
-      const { data, error } = await supabase
-        .from('member_notes')
-        .select('member_id, archive_remark')
-        .in('member_id', memberIds)
-        .not('archive_remark', 'is', null);
-
-      if (!error && data) {
-        const remarksMap = data.reduce((acc, note) => {
-          if (note.archive_remark) {
-            acc[note.member_id] = note.archive_remark;
-          }
-          return acc;
-        }, {} as Record<string, string>);
-        setArchiveRemarks(remarksMap);
-      }
-    };
-
-    fetchArchiveRemarks();
-  }, [guildId, db.members]);
 
   const sortedGuilds = (Object.entries(db.guilds) as [string, any][]).sort((a, b) => {
     const tierA = a[1].tier || 99;
@@ -407,7 +378,7 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
                       </div>
                     </td>
                     <td className="p-2 text-stone-400 dark:text-stone-500 text-xs">
-                      {archiveRemarks[id]}
+                      {member.archiveRemark}
                     </td>
                     <td className="p-2 text-right">
                       <div className="flex justify-end gap-1">
@@ -443,7 +414,7 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
                     </span>
                   </td>
                   <td className="p-3 text-stone-500 dark:text-stone-400 text-sm">{member.note}</td>
-                  <td className="p-3 text-stone-400 dark:text-stone-500 text-xs">{archiveRemarks[id]}</td>
+                  <td className="p-3 text-stone-400 dark:text-stone-500 text-xs">{member.archiveRemark}</td>
                   <td className="p-3 text-right">
                     <div className="flex justify-end gap-1">
                       <button

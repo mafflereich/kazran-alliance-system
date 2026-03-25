@@ -12,7 +12,6 @@ interface GuildCostumeTableProps {
   hasBoundMemberInGuild: boolean;
   userProfileId: string | null;
   userRole: string | null;
-  archiveRemarks: Record<string, string>;
   handleEditClick: (id: string, memberName: string) => void;
   isDragging: boolean;
   handleMouseDown: (e: React.MouseEvent) => void;
@@ -33,7 +32,6 @@ export default function GuildCostumeTable({
   hasBoundMemberInGuild,
   userProfileId,
   userRole,
-  archiveRemarks,
   handleEditClick,
   isDragging,
   handleMouseDown,
@@ -149,9 +147,9 @@ export default function GuildCostumeTable({
                         {formatDate(member.updatedAt)}
                       </span>
                     )}
-                    {((userRole === 'manager' || userRole === 'admin' || userRole === 'creator') && archiveRemarks[id]) && (
+                    {((userRole === 'manager' || userRole === 'admin' || userRole === 'creator') && member.archiveRemark) && (
                       <span className="text-[10px] text-amber-600 mt-0.5">
-                        {archiveRemarks[id]}
+                        {member.archiveRemark}
                       </span>
                     )}
                   </div>

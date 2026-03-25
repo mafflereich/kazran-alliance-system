@@ -432,7 +432,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   // Function to fetch members for a specific guild
-  const fetchMembers = async (guildId: string, columns: string = 'id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, archive_remark, member_notes(note, is_reserved), member_raid_records(id, season_id, score, season_note)') => {
+  const fetchMembers = async (guildId: string, columns: string = 'id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark), member_raid_records(id, season_id, score, season_note)') => {
     if (isOffline) return;
 
     // Check if we already have members for this guild
@@ -485,12 +485,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // member_notes keys are in snake_case since toCamel uses { deep: false }
       const note = memberNotes?.note || '';
       const isReserved = memberNotes?.is_reserved || false;
+      const archiveRemark = memberNotes?.archive_remark || '';
       const seasonNote = memberRaidRecords?.seasonNote || memberRaidRecords?.season_note || '';
       const score = memberRaidRecords?.score ?? 0;
       const mappedMember: Member = {
         ...camelMember,
         note,
         isReserved,
+        archiveRemark,
         seasonNote,
         score,
       };
@@ -534,7 +536,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Now fetch all members, then filter member_raid_records in JavaScript
     const { data, error } = await supabase
       .from('members')
-      .select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, archive_remark, member_notes(note, is_reserved), member_raid_records(id, season_id, score, season_note)');
+      .select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark), member_raid_records(id, season_id, score, season_note)');
 
     if (error) {
       console.error("Error fetching all members:", error);
@@ -553,12 +555,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // member_notes keys are in snake_case since toCamel uses { deep: false }
       const note = memberNotes?.note || '';
       const isReserved = memberNotes?.is_reserved || false;
+      const archiveRemark = memberNotes?.archive_remark || '';
       const seasonNote = memberRaidRecords?.seasonNote || memberRaidRecords?.season_note || '';
       const score = memberRaidRecords?.score ?? 0;
       const mappedMember: Member = {
         ...camelMember,
         note,
         isReserved,
+        archiveRemark,
         seasonNote,
         score,
       };
@@ -577,7 +581,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     let queryBuilder = supabase
       .from('members')
-      .select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, archive_remark, member_notes(note, is_reserved), member_raid_records(score, season_note)', { count: 'exact' })
+      .select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark), member_raid_records(score, season_note)', { count: 'exact' })
       .ilike('name', `%${query}%`)
       .order('status', { ascending: true }) // active comes before archived
       .order('name', { ascending: true })
@@ -602,12 +606,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // member_notes keys are in snake_case since toCamel uses { deep: false }
         const note = memberNotes?.note || '';
         const isReserved = memberNotes?.is_reserved || false;
+        const archiveRemark = memberNotes?.archive_remark || '';
         const seasonNote = memberRaidRecords?.seasonNote || memberRaidRecords?.season_note || '';
         const score = memberRaidRecords?.score ?? m.score ?? 0;
         const mappedMember: Member = {
           ...camelMember,
           note,
           isReserved,
+          archiveRemark,
           seasonNote,
           score,
         };
@@ -919,7 +925,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .select(`
           id,
           status,
-          archive_remark,
+          member_notes(archive_remark),
           members_archive_history (
             id,
             member_id,
