@@ -1,14 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/store';
-import { Menu, X, Shield, Swords, ArrowDownNarrowWide, ArrowDownWideNarrow, Search, User } from 'lucide-react';
+import { Shield } from 'lucide-react';
 import MemberEditModal from '../components/MemberEditModal';
 import MemberSearchModal from '../components/MemberSearchModal';
 import ConfirmModal from '@shared/ui/ConfirmModal';
-import { getTierTextColorDark, getTierHighlightClass, getTierHoverClass, truncateName, getImageUrl } from '@/shared/lib/utils';
+import { truncateName } from '@/shared/lib/utils';
 import { useTranslation } from 'react-i18next';
 import { logEvent } from '@/analytics';
 import { supabase } from '@/shared/api/supabase';
+import GuildSidebar from '../components/GuildSidebar';
+import GuildHeader from '../components/GuildHeader';
+import GuildCostumeTable from '../components/GuildCostumeTable';
+import { getSortedMembers, getSortedCostumes, getSortedGuilds } from '../utils/sort';
 
 export default function GuildDashboard({ guildId }: { guildId: string }) {
   const { t, i18n } = useTranslation();
@@ -156,83 +160,17 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
 
   const guild = db.guilds[guildId];
   const members = React.useMemo(() => {
-    const userMemberIds = userProfileId ? userProfileId.split(',').map(id => id.trim()).filter(Boolean) : [];
-
-    return Object.entries(db.members)
-      .filter(([_, m]: [string, any]) => m.guildId === guildId)
-      .sort((a: [string, any], b: [string, any]) => {
-        const isUserA = userMemberIds.includes(a[0]);
-        const isUserB = userMemberIds.includes(b[0]);
-
-        if (isUserA && !isUserB) return -1;
-        if (!isUserA && isUserB) return 1;
-
-        const roleOrder: Record<string, number> = {
-          'leader': 1,
-          'coleader': 2,
-          'member': 3
-        };
-
-        const getTieBreak = () => {
-          const orderA = roleOrder[a[1].role] || 99;
-          const orderB = roleOrder[b[1].role] || 99;
-          if (orderA !== orderB) return orderA - orderB;
-          return a[1].name.localeCompare(b[1].name);
-        };
-
-        if (sortConfig.key === 'member') {
-          if (sortConfig.order === 'asc') {
-            const orderA = roleOrder[a[1].role] || 99;
-            const orderB = roleOrder[b[1].role] || 99;
-            if (orderA !== orderB) return orderA - orderB;
-            return a[1].name.localeCompare(b[1].name);
-          } else {
-            const descRoleOrder: Record<string, number> = {
-              'member': 1,
-              'coleader': 2,
-              'leader': 3
-            };
-            const orderA = descRoleOrder[a[1].role] || 99;
-            const orderB = descRoleOrder[b[1].role] || 99;
-            if (orderA !== orderB) return orderA - orderB;
-            return b[1].name.localeCompare(a[1].name);
-          }
-        } else {
-          // Costume sorting
-          const costumeId = sortConfig.key;
-          const levelA = a[1].records[costumeId]?.level ?? -1;
-          const levelB = b[1].records[costumeId]?.level ?? -1;
-
-          if (levelA !== levelB) {
-            return sortConfig.order === 'asc' ? levelA - levelB : levelB - levelA;
-          }
-          return getTieBreak();
-        }
-      });
+    return getSortedMembers(db.members, guildId, sortConfig, userProfileId);
   }, [db.members, guildId, sortConfig, userProfileId]);
 
+  const hasBoundMemberInGuild = React.useMemo(() => {
+    if (!userProfileId) return false;
+    const userMemberIds = userProfileId.split(',').map(uid => uid.trim()).filter(Boolean);
+    return members.some(([id]) => userMemberIds.includes(id));
+  }, [members, userProfileId]);
+
   const costumes = React.useMemo(() => {
-    return Object.values(db.costumes).sort((a, b) => {
-      const charA = db.characters[a.characterId];
-      const charB = db.characters[b.characterId];
-
-      // Handle cases where a character might not exist for a costume
-      if (!charA && !charB) return 0; // Both are orphaned, treat as equal
-      if (!charA) return 1; // Orphaned 'a' goes to the end
-      if (!charB) return -1; // Orphaned 'b' goes to the end
-
-      // 1. Prioritize 'isNew' costumes
-      if (a.isNew && !b.isNew) return -1;
-      if (!a.isNew && b.isNew) return 1;
-
-      // 2. Sort by character order
-      if (charA.orderNum !== charB.orderNum) {
-        return charA.orderNum - charB.orderNum;
-      }
-
-      // 3. Sort by costume order
-      return (a.orderNum ?? 999) - (b.orderNum ?? 999);
-    });
+    return getSortedCostumes(db.costumes, db.characters);
   }, [db.costumes, db.characters]);
 
   if (!guild) {
@@ -267,262 +205,53 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
   };
 
   const sortedGuilds = React.useMemo(() => {
-    const guildsToDisplay = canSeeAllGuilds
-      ? Object.entries(db.guilds)
-      : Object.entries(db.guilds).filter(([_, g]) => userGuildRoles.includes(g.username || '') || userGuildRoles.includes(g.name || ''));
-
-    return (guildsToDisplay as [string, any][])
-      .sort((a, b) => {
-        const tierA = a[1].tier || 99;
-        const tierB = b[1].tier || 99;
-        if (tierA !== tierB) return tierA - tierB;
-        const orderA = a[1].orderNum || 99;
-        const orderB = b[1].orderNum || 99;
-        return orderA - orderB;
-      });
+    return getSortedGuilds(db.guilds, canSeeAllGuilds, userGuildRoles);
   }, [db.guilds, canSeeAllGuilds, userGuildRoles]);
 
   return (
     <div className="h-screen bg-stone-100 dark:bg-stone-900 flex flex-col overflow-hidden">
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar Overlay */}
-        {isSidebarOpen && (
-          <div
-            className="fixed inset-0 bg-stone-900/50 z-40"
-            onClick={() => setIsSidebarOpen(false)}
-          />
-        )}
-
-        {/* Sidebar */}
-        <aside className={`
-          fixed top-0 left-0 h-full w-64 bg-stone-900 text-stone-300 z-50
-          transform transition-transform duration-300 ease-in-out
-          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          flex flex-col
-        `}>
-          <div className="p-4 flex items-center justify-between border-b border-stone-800">
-            <h2 className="font-bold text-white flex items-center gap-2">
-              {t('dashboard.guild_list')}
-            </h2>
-            <button onClick={() => setIsSidebarOpen(false)} className="p-1 hover:bg-stone-800 rounded">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto py-4">
-            <div className="space-y-6 px-2">
-              {[1, 2, 3, 4].map(tier => {
-                const tierGuilds = sortedGuilds.filter(g => (g[1].tier || 1) === tier && g[1].isDisplay !== false);
-                if (tierGuilds.length === 0) return null;
-                return (
-                  <div key={tier}>
-                    <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 px-4 ${getTierTextColorDark(tier)}`}>{t('guilds.tier')} {tier}</h3>
-                    <ul className="space-y-1">
-                      {tierGuilds.map(([id, g]) => (
-                        <li key={id}>
-                          <button
-                            onClick={() => {
-                              navigate(`/guild/${id}`);
-                              setIsSidebarOpen(false);
-                            }}
-                            className={`w-full text-left px-4 py-2 rounded-lg transition-colors flex justify-between items-center ${id === guildId
-                              ? `${getTierHighlightClass(tier)} font-medium`
-                              : `${getTierHoverClass(tier)} text-stone-300`
-                              }`}
-                          >
-                            <span>{g.name}</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </aside>
+        <GuildSidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          sortedGuilds={sortedGuilds}
+          currentGuildId={guildId}
+        />
 
         {/* Main Content */}
         <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
-          <header className="bg-white dark:bg-stone-800 px-4 py-2 shadow-sm flex items-center gap-4 shrink-0">
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="p-2 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-lg transition-colors"
-            >
-              <Menu className="w-5 h-5 text-stone-600 dark:text-stone-400" />
-            </button>
-            <div className="flex items-center gap-3">
-              <div className="flex items-baseline gap-3">
-                <h1 className="font-bold text-lg text-stone-800 dark:text-stone-200">{guild.name}</h1>
-                <span className={`text-xs font-medium ${members.length > 30 ? 'text-red-500 bg-red-50 dark:bg-red-900/30 px-1.5 py-0.5 rounded' : 'text-stone-500 dark:text-stone-400'}`}>
-                  {t('dashboard.member_count')}: {members.length} / 30
-                </span>
-              </div>
-              {canSeeAllGuilds && (
-                <button
-                  onClick={() => setIsSearchModalOpen(true)}
-                  className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 dark:text-stone-500 dark:hover:text-stone-300 dark:hover:bg-stone-700 rounded-lg transition-colors"
-                  title={t('dashboard.global_search_member', '全域搜尋成員')}
-                >
-                  <Search className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          </header>
+          <GuildHeader
+            guildName={guild.name}
+            memberCount={members.length}
+            onOpenSidebar={() => setIsSidebarOpen(true)}
+            onOpenSearch={() => setIsSearchModalOpen(true)}
+            canSeeAllGuilds={canSeeAllGuilds}
+          />
 
           <main className="flex-1 overflow-hidden p-4 flex flex-col">
             <div className="max-w-full mx-auto w-full h-full flex flex-col min-h-0">
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="mb-2 shrink-0" />
-                <div className="bg-white dark:bg-stone-800 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-700 overflow-hidden flex-1 flex flex-col min-h-0 relative">
-                  {isMembersLoading && (
-                    <div className="absolute inset-0 z-50 bg-white/50 dark:bg-stone-800/50 backdrop-blur-sm flex items-center justify-center">
-                      <div className="flex flex-col items-center gap-3 bg-white dark:bg-stone-700 p-6 rounded-2xl shadow-xl border border-stone-100 dark:border-stone-600">
-                        <div className="w-8 h-8 border-4 border-stone-200 dark:border-stone-600 border-t-stone-800 dark:border-t-stone-200 rounded-full animate-spin"></div>
-                        <span className="text-stone-600 dark:text-stone-400 font-medium">{t('common.loading', '載入中...')}</span>
-                      </div>
-                    </div>
-                  )}
-                  <div
-                    ref={scrollRef}
-                    className={`overflow-auto flex-1 cursor-grab [&::-webkit-scrollbar:horizontal]:hidden ${isDragging ? 'cursor-grabbing select-none' : ''}`}
-                    onMouseDown={handleMouseDown}
-                    onMouseLeave={handleMouseLeave}
-                    onMouseUp={handleMouseUp}
-                    onMouseMove={handleMouseMove}
-                  >
-                    <table className="w-full text-left border-collapse min-w-max">
-                      <thead>
-                        <tr className="bg-stone-50 dark:bg-stone-700 text-stone-600 dark:text-stone-300">
-                          <th
-                            className="p-3 font-semibold sticky top-0 left-0 bg-stone-50 dark:bg-stone-700 z-30 border-r border-b-2 border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c] cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-600 transition-colors"
-                            onClick={() => handleSort('member')}
-                          >
-                            <div className="flex flex-col">
-                              <div className="flex items-center gap-2">
-                                {t('common.member')}
-                                {sortConfig.key === 'member' && (
-                                  sortConfig.order === 'asc' ? <ArrowDownNarrowWide className="w-4 h-4" /> : <ArrowDownWideNarrow className="w-4 h-4" />
-                                )}
-                              </div>
-                              <div className="text-[10px] font-normal text-amber-600 dark:text-amber-400 mt-0.5">
-                                {t('dashboard.click_to_edit')}
-                              </div>
-                            </div>
-                          </th>
-                          {costumes.map(c => (
-                            <th
-                              key={c.id}
-                              className="p-3 font-semibold text-center text-xs w-24 border-r border-b-2 border-stone-200 dark:border-stone-600 last:border-r-0 sticky top-0 bg-stone-50 dark:bg-stone-700 z-20 cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-600 transition-colors"
-                              onClick={() => handleSort(c.id)}
-                            >
-                              {c.imageName && (
-                                <div className="w-[50px] h-[50px] mx-auto mb-2 bg-stone-100 dark:bg-stone-700 rounded-lg overflow-hidden border border-stone-200 dark:border-stone-600">
-                                  <img
-                                    src={getImageUrl(c.imageName)}
-                                    alt={i18n.language === 'en' ? (c.nameE || c.name) : c.name}
-                                    className="w-full h-full object-cover"
-                                    referrerPolicy="no-referrer"
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).parentElement!.style.display = 'none';
-                                    }}
-                                  />
-                                </div>
-                              )}
-                              <div className="truncate w-20 mx-auto" title={i18n.language === 'en' ? (c.nameE || c.name) : c.name}>{i18n.language === 'en' ? (c.nameE || c.name) : c.name}</div>
-                              <div className="text-[10px] text-stone-400 dark:text-stone-500 mt-1 truncate w-20 mx-auto flex items-center justify-center gap-1">
-                                <span className="truncate" title={i18n.language === 'en' ? (db.characters[c.characterId]?.nameE || db.characters[c.characterId]?.name) : db.characters[c.characterId]?.name}>
-                                  {i18n.language === 'en' ? (db.characters[c.characterId]?.nameE || db.characters[c.characterId]?.name) : db.characters[c.characterId]?.name}
-                                </span>
-                                {sortConfig.key === c.id && (
-                                  sortConfig.order === 'asc' ? <ArrowDownNarrowWide className="w-3 h-3 shrink-0" /> : <ArrowDownWideNarrow className="w-3 h-3 shrink-0" />
-                                )}
-                              </div>
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {members.map(([id, member]: [string, any]) => {
-                          const isCurrentUser = userProfileId && userProfileId.split(',').map(uid => uid.trim()).filter(Boolean).includes(id);
-                          return (
-                          <tr key={id} className={`border-b border-stone-100 dark:border-stone-700 transition-colors group ${isCurrentUser ? 'hover:bg-stone-50 dark:hover:bg-stone-700' : ''}`}>
-                            <td
-                              className={`p-3 font-medium text-stone-800 dark:text-stone-200 sticky left-0 bg-white dark:bg-stone-800 border-r border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c] transition-colors ${isCurrentUser ? 'cursor-pointer group-hover:bg-stone-50 dark:group-hover:bg-stone-700' : ''}`}
-                              onClick={() => handleEditClick(id, member.name)}
-                            >
-                              <div className="flex flex-col">
-                                <div className="flex items-center gap-2">
-                                  {isCurrentUser && <User className="w-4 h-4 text-indigo-500 dark:text-indigo-400 shrink-0" />}
-                                  <span 
-                                    title={member.name}
-                                    className={
-                                      member.role === 'leader' 
-                                        ? 'px-1.5 py-0.5 rounded bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' 
-                                        : member.role === 'coleader'
-                                          ? 'px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
-                                          : ''
-                                    }
-                                  >
-                                    {getTruncatedName(member.name, member.role)}
-                                  </span>
-                                </div>
-                                {member.updatedAt && (
-                                  <span className="text-[10px] text-stone-400 mt-0.5">
-                                    {formatDate(member.updatedAt)}
-                                  </span>
-                                )}
-                                {((userRole === 'manager' || userRole === 'admin' || userRole === 'creator') && archiveRemarks[id]) && (
-                                  <span className="text-[10px] text-amber-600 mt-0.5">
-                                    {archiveRemarks[id]}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            {costumes.map(c => {
-                              const record = member.records[c.id];
-                              const hasCostume = record && record.level >= 0;
-                              const hasExclusiveWeapon = member.exclusiveWeapons?.[c.characterId] ?? false;
-
-                              let levelColorClass = "bg-orange-400 text-stone-900"; // default for +5
-                              if (hasCostume) {
-                                const level = Number(record.level);
-                                if (level <= 0) levelColorClass = "bg-stone-300 text-stone-900";
-                                else if (level === 1) levelColorClass = "bg-blue-300 text-stone-900";
-                                else if (level === 2) levelColorClass = "bg-blue-400 text-stone-900";
-                                else if (level === 3) levelColorClass = "bg-purple-300 text-stone-900";
-                                else if (level === 4) levelColorClass = "bg-purple-400 text-stone-900";
-                              }
-
-                              return (
-                                <td key={c.id} className={`p-0 text-center border-r border-stone-100 dark:border-stone-700 last:border-r-0 h-full ${hasCostume ? levelColorClass : ''}`}>
-                                  {hasCostume ? (
-                                    <div className="flex flex-col items-center justify-center h-full min-h-[60px] py-2 gap-1">
-                                      <span className="font-bold text-sm">+{record.level}</span>
-                                      {hasExclusiveWeapon && <Swords className="w-4 h-4" />}
-                                    </div>
-                                  ) : (
-                                    <div className="flex flex-col items-center justify-center h-full min-h-[60px] py-2 gap-1 text-stone-300 dark:text-stone-600">
-                                      <span className="text-sm">-</span>
-                                      {hasExclusiveWeapon && <Swords className="w-4 h-4 text-amber-500/50" />}
-                                    </div>
-                                  )}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                          );
-                        })}
-                        {members.length === 0 && (
-                          <tr>
-                            <td colSpan={costumes.length + 1} className="p-8 text-center text-stone-500 dark:text-stone-400">
-                              {t('dashboard.no_members')}
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <GuildCostumeTable
+                  members={members}
+                  costumes={costumes}
+                  sortConfig={sortConfig}
+                  handleSort={handleSort}
+                  hasBoundMemberInGuild={hasBoundMemberInGuild}
+                  userProfileId={userProfileId}
+                  userRole={userRole}
+                  archiveRemarks={archiveRemarks}
+                  handleEditClick={handleEditClick}
+                  isDragging={isDragging}
+                  handleMouseDown={handleMouseDown}
+                  handleMouseLeave={handleMouseLeave}
+                  handleMouseUp={handleMouseUp}
+                  handleMouseMove={handleMouseMove}
+                  scrollRef={scrollRef}
+                  isMembersLoading={isMembersLoading}
+                  getTruncatedName={getTruncatedName}
+                  formatDate={formatDate}
+                />
               </div>
             </div>
           </main>
