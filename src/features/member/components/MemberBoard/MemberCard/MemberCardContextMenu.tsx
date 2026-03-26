@@ -70,7 +70,7 @@ export default function MemberCardContextMenu(_: Props) {
         setShowRoleMenu(false);
 
         // ensure selected member is included when menu opens
-        if (member && !member.isReserved) {
+        if (member) {
             if (isMultiSelectMode) {
                 if (!selectedIds.has(member.id!)) {
                     setSelectedIds(new Set([...selectedIds, member.id!]));

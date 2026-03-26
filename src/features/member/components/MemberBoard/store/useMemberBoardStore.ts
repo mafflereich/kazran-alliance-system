@@ -608,15 +608,10 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
 
     batchToggleReserved: () => {
         set((state) => {
-            const anyReserved = [...state.localMembers, ...state.stagingMembers, ...state.deletedMembers]
-                .some(m => state.selectedIds.has(m.id!) && m.isReserved);
-
-            const newReservedValue = !anyReserved;
-
             return {
-                localMembers: updateMembersBySelection(state.localMembers, state.selectedIds, m => ({ ...m, isReserved: newReservedValue, updatedAt: Date.now() })),
-                stagingMembers: updateMembersBySelection(state.stagingMembers, state.selectedIds, m => ({ ...m, isReserved: newReservedValue, updatedAt: Date.now() })),
-                deletedMembers: updateMembersBySelection(state.deletedMembers, state.selectedIds, m => ({ ...m, isReserved: newReservedValue, updatedAt: Date.now() })),
+                localMembers: updateMembersBySelection(state.localMembers, state.selectedIds, m => ({ ...m, isReserved: !m.isReserved, updatedAt: Date.now() })),
+                stagingMembers: updateMembersBySelection(state.stagingMembers, state.selectedIds, m => ({ ...m, isReserved: !m.isReserved, updatedAt: Date.now() })),
+                deletedMembers: updateMembersBySelection(state.deletedMembers, state.selectedIds, m => ({ ...m, isReserved: !m.isReserved, updatedAt: Date.now() })),
                 ...saveHistory(state),
             };
         });
@@ -727,7 +722,7 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
         });
     },
 
-        saveToDatabase: async () => {
+    saveToDatabase: async () => {
         const state = get();
         const { localMembers, localGuilds, stagingMembers, deletedMembers, initialMemberStates } = state;
 
