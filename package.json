@@ -24,7 +24,6 @@
     "camelcase-keys": "^10.0.2",
     "clsx": "^2.1.1",
     "html-to-image": "^1.11.13",
-    "html2canvas": "^1.4.1",
     "i18next": "^25.8.13",
     "i18next-browser-languagedetector": "^8.2.1",
     "i18next-http-backend": "^3.0.2",
