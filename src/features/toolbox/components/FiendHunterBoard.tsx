@@ -288,10 +288,20 @@ export const FiendHunterBoard: React.FC = () => {
 
                   const { baseStr, bracketStr } = formatDamageParts(stats.requiredDamage);
                   const rowBorderClass = boss.difficulty % 5 === 0 ? 'border-b-2 border-b-stone-400 dark:border-b-stone-500' : '';
+                  const rowBgClass = boss.difficulty === 10 
+                    ? 'bg-blue-100 dark:bg-blue-900/30' 
+                    : boss.difficulty === 15 
+                      ? 'bg-red-100 dark:bg-red-900/30' 
+                      : 'hover:bg-stone-50 dark:hover:bg-stone-700/50';
+                  const difficultyLabel = boss.difficulty === 10 
+                    ? 'Lv.10 (低保)' 
+                    : boss.difficulty === 15 
+                      ? 'Lv.15 (絕望)' 
+                      : `Lv.${boss.difficulty}`;
 
                   return (
-                    <tr key={`${boss.season}-${boss.difficulty}`} className="hover:bg-stone-50 dark:hover:bg-stone-700/50 transition-colors">
-                      <td className={`px-3 py-0.5 whitespace-nowrap font-medium text-stone-800 dark:text-stone-100 border border-stone-200 dark:border-stone-700 ${rowBorderClass}`}>Lv.{boss.difficulty}</td>
+                    <tr key={`${boss.season}-${boss.difficulty}`} className={`${rowBgClass} transition-colors`}>
+                      <td className={`px-3 py-0.5 whitespace-nowrap font-medium text-stone-800 dark:text-stone-100 border border-stone-200 dark:border-stone-700 ${rowBorderClass}`}>{difficultyLabel}</td>
                       <td className={`px-3 py-0.5 whitespace-nowrap text-right border border-stone-200 dark:border-stone-700 ${rowBorderClass}`}>{(boss.hp * 1000).toLocaleString()}</td>
                       <td className={`px-3 py-0.5 whitespace-nowrap tabular-nums text-blue-600 dark:text-blue-400 border border-stone-200 dark:border-stone-700 border-r-2 border-r-stone-400 dark:border-r-stone-500 ${rowBorderClass}`}>
                         <div className="text-right">

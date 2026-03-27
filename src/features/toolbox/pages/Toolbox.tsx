@@ -27,7 +27,7 @@ const Toolbox: React.FC = () => {
         <div className="space-y-6">
           {/* Fiend Hunter Board */}
           <section className="w-full">
-            <h2 className="text-xl font-bold text-stone-800 dark:text-stone-100 mb-3">魔獸戰傷害計算機</h2>
+            <h2 className="text-xl font-bold text-stone-800 dark:text-stone-100 mb-3">魔獸討伐戰傷害計算機</h2>
             <div className="flex justify-center">
               <FiendHunterBoard />
             </div>
