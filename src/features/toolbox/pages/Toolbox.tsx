@@ -24,15 +24,17 @@ const Toolbox: React.FC = () => {
           </div>
         </div>
 
-        <div className="space-y-6 flex flex-col items-center">
+        <div className="space-y-6">
           {/* Fiend Hunter Board */}
-          <section className="w-fit">
+          <section className="w-full">
             <h2 className="text-xl font-bold text-stone-800 dark:text-stone-100 mb-3">魔獸戰傷害計算機</h2>
-            <FiendHunterBoard />
+            <div className="flex justify-center">
+              <FiendHunterBoard />
+            </div>
           </section>
 
           {/* Score Calculators */}
-          <section className="w-full flex flex-col items-center">
+          <section className="w-full">
             <h2 className="text-xl font-bold text-stone-800 dark:text-stone-100 mb-3">分數計算機</h2>
             <div className="flex flex-col md:flex-row gap-3 items-start justify-center">
               <div className="w-full max-w-md">
