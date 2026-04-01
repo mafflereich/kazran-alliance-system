@@ -213,7 +213,8 @@
     "notice": "Selected roles will be able to see the link in the header and access the page."
   },
   "binding": {
-    "title": "Manual Identity Binding",
+    "title": "Profiles Manager",
+    "tab_identity_binding": "Identity Binding",
     "single_match": "Single Match",
     "multi_match": "Multi Match",
     "unmatched_profiles": "Unmatched Users",
@@ -240,6 +241,21 @@
     "save_changes": "Save Changes",
     "restore": "Restore",
     "unsaved_changes": "Unsaved changes"
+  },
+  "role_setting": {
+    "tab_title": "Role Setting",
+    "title": "Role Setting",
+    "search_members": "Search Bound Members",
+    "search_bound_members": "Search bound members...",
+    "select_member_first": "Please select a member from the left first",
+    "current_role": "Current Role",
+    "new_role": "New Role",
+    "role_manager": "Manager",
+    "role_member": "Member",
+    "save_changes": "Save Changes",
+    "save_success": "Role updated successfully",
+    "save_failed": "Failed to update role",
+    "no_results": "No matching members found"
   },
   "guilds": {
     "add_guild": "Add Guild",
@@ -269,7 +285,7 @@
     "tools": "Tools",
     "access_control": "Access Control",
     "settings": "Settings",
-    "identity_binding": "Identity Binding",
+    "identity_binding": "Profiles Manager",
     "costume_db": "Costume Database",
     "system_logs": "System Logs"
   },

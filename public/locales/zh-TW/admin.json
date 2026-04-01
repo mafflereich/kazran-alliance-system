@@ -213,7 +213,8 @@
     "notice": "勾選後該職位的使用者將能在 Header 看到連結並進入該頁面。"
   },
   "binding": {
-    "title": "身份手動匹配",
+    "title": "身份管理",
+    "tab_identity_binding": "身份手動匹配",
     "single_match": "單一匹配",
     "multi_match": "多重匹配",
     "unmatched_profiles": "未匹配的使用者",
@@ -240,6 +241,21 @@
     "save_changes": "儲存變更",
     "restore": "還原",
     "unsaved_changes": "有未儲存的變更"
+  },
+  "role_setting": {
+    "tab_title": "權限更改",
+    "title": "權限更改",
+    "search_members": "搜尋已綁定的成員",
+    "search_bound_members": "搜尋已綁定的成員...",
+    "select_member_first": "請先從左側選擇一個使用者",
+    "current_role": "目前權限",
+    "new_role": "新權限",
+    "role_manager": "管理員 (manager)",
+    "role_member": "一般成員 (member)",
+    "save_changes": "儲存變更",
+    "save_success": "權限更新成功",
+    "save_failed": "權限更新失敗",
+    "no_results": "找不到符合的成員"
   },
   "guilds": {
     "add_guild": "新增公會",
@@ -269,7 +285,7 @@
     "tools": "便利小功能",
     "access_control": "存取控制",
     "settings": "網頁設定",
-    "identity_binding": "身份手動匹配",
+    "identity_binding": "身份管理",
     "costume_db": "服裝資料庫",
     "system_logs": "系統日誌"
   },
