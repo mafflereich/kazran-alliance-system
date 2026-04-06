@@ -63,6 +63,7 @@ export interface Setting {
   bgmDefaultVolume?: number;
   indexMessage?: string;
   indexPercentType?: 'empty' | 'new_costumes_owned';
+  isDebugMode?: boolean;
 }
 
 export interface ApplyMail {

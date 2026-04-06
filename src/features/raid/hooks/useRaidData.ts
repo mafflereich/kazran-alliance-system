@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/shared/api/supabase';
+import { isDebugMode } from '@/shared/api/debugMode';
 import type { RaidSeason, MemberRaidRecord, GuildRaidRecord } from '../types';
-
-const ENABLE_DEBUG_LOGS = true; // Toggle this to true/false to enable/disable detailed fetch error logs
 
 export function useRaidData(
   fetchAllMembers: () => void,
@@ -77,7 +76,8 @@ export function useRaidData(
     } catch (err: any) {
       if (token !== fetchTokenRef.current) return;
       console.error('Error fetching records:', err);
-      if (ENABLE_DEBUG_LOGS) {
+      isDebugMode().then(enabled => {
+        if (!enabled) return;
         supabase.auth.getSession().then(({ data: { session } }) => {
           console.error("=== DETAILED ERROR LOG FOR RECORDS FETCH (useRaidData) ===", JSON.stringify({
             errorDetails: err,
@@ -95,7 +95,7 @@ export function useRaidData(
             seasonId: selectedSeasonId
           }, null, 2));
         });
-      }
+      });
       if (err.code !== '42P01') setError(err.message);
     } finally {
       // Foreground fetches always clear loading regardless of token —

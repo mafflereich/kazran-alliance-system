@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/shared/api/supabase';
-
-const ENABLE_DEBUG_LOGS = true; // Toggle this to true/false to enable/disable detailed fetch error logs
+import { isDebugMode } from '@/shared/api/debugMode';
 
 export function useGhostRecords() {
   const [ghostRecords, setGhostRecords] = useState<Record<string, any[]>>({});
@@ -45,7 +44,8 @@ export function useGhostRecords() {
     } catch (err: any) {
       fetchedMemberIds.current.delete(memberId); // allow retry on error
       console.error('Error fetching ghost records for member:', err);
-      if (ENABLE_DEBUG_LOGS) {
+      isDebugMode().then(enabled => {
+        if (!enabled) return;
         supabase.auth.getSession().then(({ data: { session } }) => {
           console.error("=== DETAILED ERROR LOG FOR GHOST RECORDS FETCH ===", JSON.stringify({
             errorDetails: err,
@@ -59,7 +59,7 @@ export function useGhostRecords() {
             memberId: memberId
           }, null, 2));
         });
-      }
+      });
     }
   }, []);
 
@@ -107,7 +107,8 @@ export function useGhostRecords() {
     } catch (err: any) {
       unfetched.forEach(id => fetchedMemberIds.current.delete(id));
       console.error('Error fetching ghost records for members:', err);
-      if (ENABLE_DEBUG_LOGS) {
+      isDebugMode().then(enabled => {
+        if (!enabled) return;
         supabase.auth.getSession().then(({ data: { session } }) => {
           console.error("=== DETAILED ERROR LOG FOR GHOST RECORDS FETCH (MULTIPLE) ===", JSON.stringify({
             errorDetails: err,
@@ -121,7 +122,7 @@ export function useGhostRecords() {
             memberIds: unfetched
           }, null, 2));
         });
-      }
+      });
     }
   }, []);
 
