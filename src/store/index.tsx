@@ -5,6 +5,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { useTranslation } from 'react-i18next';
 import { formatDate } from '@/shared/lib/utils';
 
+const ENABLE_DEBUG_LOGS = true; // Toggle this to true/false to enable/disable detailed fetch error logs
+
 const defaultData: Database = {
   guilds: {},
   guildOrder: [],
@@ -465,6 +467,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (error) {
       console.error("Error fetching members:", error);
+      if (ENABLE_DEBUG_LOGS) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          console.error("=== DETAILED ERROR LOG FOR MEMBERS FETCH (fetchMembers) ===", JSON.stringify({
+            errorDetails: error,
+            errorMessage: error.message,
+            errorCode: (error as any).code,
+            errorDetails2: (error as any).details,
+            errorHint: (error as any).hint,
+            userSession: session?.user ? {
+              id: session.user.id,
+              email: session.user.email,
+              role: session.user.role,
+              app_metadata: session.user.app_metadata,
+              user_metadata: session.user.user_metadata
+            } : null,
+            query: selectQuery,
+            guildId: guildId
+          }, null, 2));
+        });
+      }
       setIsOffline(true);
       showToast(t('common.fetch_members_failed'), 'error');
       setIsMembersLoading(false);
@@ -540,6 +562,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (error) {
       console.error("Error fetching all members:", error);
+      if (ENABLE_DEBUG_LOGS) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          console.error("=== DETAILED ERROR LOG FOR MEMBERS FETCH (fetchAllMembers) ===", JSON.stringify({
+            errorDetails: error,
+            errorMessage: error.message,
+            errorCode: (error as any).code,
+            errorDetails2: (error as any).details,
+            errorHint: (error as any).hint,
+            userSession: session?.user ? {
+              id: session.user.id,
+              email: session.user.email,
+              role: session.user.role,
+              app_metadata: session.user.app_metadata,
+              user_metadata: session.user.user_metadata
+            } : null,
+            query: "select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark), member_raid_records(id, season_id, score, season_note)')"
+          }, null, 2));
+        });
+      }
       return;
     }
 
@@ -595,6 +636,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (error) {
       console.error("Error searching members:", error);
+      if (ENABLE_DEBUG_LOGS) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          console.error("=== DETAILED ERROR LOG FOR MEMBERS FETCH (searchMembers) ===", JSON.stringify({
+            errorDetails: error,
+            errorMessage: error.message,
+            errorCode: (error as any).code,
+            errorDetails2: (error as any).details,
+            errorHint: (error as any).hint,
+            userSession: session?.user ? {
+              id: session.user.id,
+              email: session.user.email,
+              role: session.user.role,
+              app_metadata: session.user.app_metadata,
+              user_metadata: session.user.user_metadata
+            } : null,
+            query: "select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark), member_raid_records(score, season_note)')",
+            searchQuery: query
+          }, null, 2));
+        });
+      }
       return { data: [], total: 0 };
     }
 

@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/shared/api/supabase';
 
+const ENABLE_DEBUG_LOGS = true; // Toggle this to true/false to enable/disable detailed fetch error logs
+
 export function useGhostRecords() {
   const [ghostRecords, setGhostRecords] = useState<Record<string, any[]>>({});
   const fetchedMemberIds = useRef<Set<string>>(new Set());
@@ -40,9 +42,24 @@ export function useGhostRecords() {
       if (error && error.code !== '42P01') throw error;
 
       setGhostRecords(prev => ({ ...prev, [memberId]: data || [] }));
-    } catch (err) {
+    } catch (err: any) {
       fetchedMemberIds.current.delete(memberId); // allow retry on error
       console.error('Error fetching ghost records for member:', err);
+      if (ENABLE_DEBUG_LOGS) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          console.error("=== DETAILED ERROR LOG FOR GHOST RECORDS FETCH ===", JSON.stringify({
+            errorDetails: err,
+            errorMessage: err.message,
+            errorCode: err.code,
+            userSession: session?.user ? {
+              id: session.user.id,
+              email: session.user.email,
+              role: session.user.role
+            } : null,
+            memberId: memberId
+          }, null, 2));
+        });
+      }
     }
   }, []);
 
@@ -87,9 +104,24 @@ export function useGhostRecords() {
         });
         return next;
       });
-    } catch (err) {
+    } catch (err: any) {
       unfetched.forEach(id => fetchedMemberIds.current.delete(id));
       console.error('Error fetching ghost records for members:', err);
+      if (ENABLE_DEBUG_LOGS) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          console.error("=== DETAILED ERROR LOG FOR GHOST RECORDS FETCH (MULTIPLE) ===", JSON.stringify({
+            errorDetails: err,
+            errorMessage: err.message,
+            errorCode: err.code,
+            userSession: session?.user ? {
+              id: session.user.id,
+              email: session.user.email,
+              role: session.user.role
+            } : null,
+            memberIds: unfetched
+          }, null, 2));
+        });
+      }
     }
   }, []);
 
