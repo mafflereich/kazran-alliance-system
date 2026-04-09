@@ -4,9 +4,7 @@
   "score_calculator": {
     "title": "Score Calculator",
     "target_score": "Target Score",
-    "defense_score": "Defense Score",
-    "formula_hint": "Formula: Difficulty + Turn + Borrow + Lancelot",
-    "formula_hint_old": "Formula: Defense + Difficulty + Turn + Borrow + Lancelot",
+    "formula_hint": "Formula: Difficulty + Turn + Borrow",
     "difficulty": "Difficulty Lv {{level}}",
     "borrow": "Borrow {{count}}",
     "no_results": "No combinations found. Please check your input."

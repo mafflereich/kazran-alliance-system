@@ -10,8 +10,6 @@ interface CalculationResult {
 }
 
 interface ScoreCalculatorProps {
-  label?: string;
-  enableDefenseScore?: boolean;
   noBorder?: boolean;
 }
 
@@ -45,39 +43,30 @@ const ResultItem = ({ item, t }: { item: CalculationResult, t: any }) => {
   );
 };
 
-const ScoreCalculator: React.FC<ScoreCalculatorProps> = ({ label, enableDefenseScore = false, noBorder = false }) => {
+const ScoreCalculator: React.FC<ScoreCalculatorProps> = ({ noBorder = false }) => {
   const { t } = useTranslation(['toolbox', 'translation']);
   const [targetScore, setTargetScore] = useState<number | ''>('');
-  const [defenseScore, setDefenseScore] = useState<number | ''>(450);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (targetScore && typeof targetScore === 'number') {
-        const calculatorType = label ? `Score Calculator ${label}` : 'Score Calculator';
-        logEvent('Toolbox', 'Calculate', calculatorType, targetScore);
+        logEvent('Toolbox', 'Calculate', 'Score Calculator', targetScore);
       }
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [targetScore, label]);
+  }, [targetScore]);
 
   const results = useMemo(() => {
     if (!targetScore || typeof targetScore !== 'number') return [];
 
-    let currentTarget = targetScore;
-    if (enableDefenseScore && typeof defenseScore === 'number') {
-      currentTarget -= defenseScore;
-    }
-
-    const LANCELOT_SCORE = 49;
-    const remainingScore = currentTarget - LANCELOT_SCORE;
     const foundResults: CalculationResult[] = [];
 
     // Difficulty: Lv 1 to 10
     // Score = Lv * 500
     for (let diff = 1; diff <= 10; diff++) {
       const diffScore = diff * 500;
-      if (diffScore > remainingScore) continue;
+      if (diffScore > targetScore) continue;
 
       // Turns: 1 to 28 (Score > 0)
       // Score = 80 - (T - 1) * 3
@@ -91,7 +80,7 @@ const ScoreCalculator: React.FC<ScoreCalculatorProps> = ({ label, enableDefenseS
         for (let borrow = 0; borrow < borrowScores.length; borrow++) {
           const borrowScore = borrowScores[borrow];
 
-          if (diffScore + turnScore + borrowScore === remainingScore) {
+          if (diffScore + turnScore + borrowScore === targetScore) {
             foundResults.push({
               difficulty: diff,
               turn: turn,
@@ -122,7 +111,7 @@ const ScoreCalculator: React.FC<ScoreCalculatorProps> = ({ label, enableDefenseS
         <div className="p-4 border-b border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900/50 flex items-center gap-2">
           <Calculator className="w-5 h-5 text-amber-600" />
           <h2 className="font-bold text-stone-800 dark:text-stone-200">
-            {t('toolbox:score_calculator.title', '戰鬥分數反推計算機')} {label}
+            {t('toolbox:score_calculator.title', '戰鬥分數反推計算機')}
           </h2>
         </div>
       )}
@@ -130,7 +119,7 @@ const ScoreCalculator: React.FC<ScoreCalculatorProps> = ({ label, enableDefenseS
       <div className="p-6 space-y-6">
         {/* Input Section */}
         <div className="space-y-4">
-          <div className={`grid ${enableDefenseScore ? 'grid-cols-2 gap-4' : 'grid-cols-1'}`}>
+          <div className="grid grid-cols-1">
             <div>
               <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-2">
                 {t('toolbox:score_calculator.target_score', '目標總分')}
@@ -143,25 +132,9 @@ const ScoreCalculator: React.FC<ScoreCalculatorProps> = ({ label, enableDefenseS
                 className="w-full p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-stone-700 dark:text-stone-100 text-lg font-mono"
               />
             </div>
-            {enableDefenseScore && (
-              <div>
-                <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-2">
-                  {t('toolbox:score_calculator.defense_score', '防禦戰分數')}
-                </label>
-                <input
-                  type="number"
-                  value={defenseScore}
-                  onChange={(e) => setDefenseScore(e.target.value ? parseInt(e.target.value) : '')}
-                  placeholder="450"
-                  className="w-full p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white dark:bg-stone-700 dark:text-stone-100 text-lg font-mono"
-                />
-              </div>
-            )}
           </div>
           <p className="text-xs text-stone-500 dark:text-stone-400">
-            {enableDefenseScore
-              ? t('toolbox:score_calculator.formula_hint_old', '公式：防禦戰 + 難度 + 回合 + 借人 + 蘭斯洛特')
-              : t('toolbox:score_calculator.formula_hint', '公式：難度 + 回合 + 借人 + 蘭斯洛特')}
+            {t('toolbox:score_calculator.formula_hint', '公式：難度 + 回合 + 借人')}
           </p>
         </div>
 

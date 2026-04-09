@@ -8,23 +8,20 @@ export interface DeductionResult {
 export function deduceScore(targetScore: number, t: any, evenRounds: boolean = true): string {
   if (targetScore === 0) return '';
 
-  const LANCELOT_SCORE = 49;
-
   /* 
   賽季7限定，先扣450分。賽季7完結後刪此段
   const SEASON_7_DEDUCTION = 450;
+  const LANCELOT_SCORE = 49;
   const adjustedTargetScore = targetScore - SEASON_7_DEDUCTION;
   const remainingScore = adjustedTargetScore - LANCELOT_SCORE;
   */
   
-  // 賽季8開始用此段：
-  const remainingScore = targetScore - LANCELOT_SCORE;
   const foundResults: DeductionResult[] = [];
 
   // Difficulty: Lv 1 to 10
   for (let level = 1; level <= 10; level++) {
     const diffScore = level * 500;
-    if (diffScore > remainingScore) continue;
+    if (diffScore > targetScore) continue;
 
     // Turns: 1 to 28
     for (let turn = 1; turn <= 28; turn++) {
@@ -37,7 +34,7 @@ export function deduceScore(targetScore: number, t: any, evenRounds: boolean = t
       for (let borrow = 0; borrow < borrowScores.length; borrow++) {
         const borrowScore = borrowScores[borrow];
 
-        if (diffScore + turnScore + borrowScore === remainingScore) {
+        if (diffScore + turnScore + borrowScore === targetScore) {
           foundResults.push({
             level,
             turn,

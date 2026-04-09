@@ -36,12 +36,9 @@ const Toolbox: React.FC = () => {
           {/* Score Calculators */}
           <section className="w-full">
             <h2 className="text-xl font-bold text-stone-800 dark:text-stone-100 mb-3">{t('toolbox:score_calculator.title')}</h2>
-            <div className="flex flex-col md:flex-row gap-3 items-start justify-center">
+            <div className="flex justify-center">
               <div className="w-full max-w-md">
-                <ScoreCalculator label="(舊)" enableDefenseScore={true} />
-              </div>
-              <div className="w-full max-w-md">
-                <ScoreCalculator label="(新)" />
+                <ScoreCalculator />
               </div>
             </div>
           </section>

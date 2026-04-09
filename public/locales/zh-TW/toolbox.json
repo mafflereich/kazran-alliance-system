@@ -4,9 +4,7 @@
   "score_calculator": {
     "title": "戰鬥分數反推計算機",
     "target_score": "目標總分",
-    "defense_score": "防禦戰分數",
-    "formula_hint": "公式：難度 + 回合 + 借人 + 蘭斯洛特",
-    "formula_hint_old": "公式：防禦戰 + 難度 + 回合 + 借人 + 蘭斯洛特",
+    "formula_hint": "公式：難度 + 回合 + 借人",
     "difficulty": "難度 Lv {{level}}",
     "borrow": "借{{count}}",
     "no_results": "找不到符合此分數的組合，請檢查輸入是否正確"
