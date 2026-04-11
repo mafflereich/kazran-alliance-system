@@ -212,8 +212,22 @@ function GuildRaidTable({
         {loading ? (
           <div className="p-8 text-center text-stone-500">{t('common.loading', '載入中...')}</div>
         ) : (
-          <table className="w-full text-left border-collapse max-md:min-w-[800px]">
-            <thead 
+          <table className="w-full text-left border-collapse table-fixed max-md:min-w-[560px]">
+            {isComparisonMode ? (
+              <colgroup>
+                <col />
+                <col style={{ width: '80px' }} />
+              </colgroup>
+            ) : (
+              <colgroup>
+                <col />
+                <col style={{ width: '80px' }} />
+                <col style={{ width: '150px' }} />
+                <col />
+                <col />
+              </colgroup>
+            )}
+            <thead
               ref={theadRef}
               style={isComparisonMode && theadHeight ? { height: `${theadHeight}px` } : {}}
               className="sticky top-0 bg-stone-50 dark:bg-stone-700 z-10 shadow-sm"
@@ -233,7 +247,7 @@ function GuildRaidTable({
                   </div>
                 </th>
                 <th 
-                  className="p-3 text-xs font-semibold text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-600 cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-600 w-[72px]"
+                  className="p-3 text-xs font-semibold text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-600 cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-600"
                   onClick={() => onSort('score')}
                 >
                   <div className="flex items-center gap-1">
@@ -246,7 +260,7 @@ function GuildRaidTable({
                   </div>
                 </th>
                 {!isComparisonMode && (
-                  <th className="p-3 text-xs font-semibold text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-600 w-[173px]">
+                  <th className="p-3 text-xs font-semibold text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-600">
                     {t('raid.column_deduction', '推算')}
                   </th>
                 )}

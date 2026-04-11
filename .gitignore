@@ -11,3 +11,4 @@ tests/
 test-results/
 *playwright*
 public/meta.json
+.superpowers/
