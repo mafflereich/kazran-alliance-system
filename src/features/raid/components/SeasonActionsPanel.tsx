@@ -26,7 +26,8 @@ interface ManagerActionsModalProps {
   isSelectedSeasonArchived: boolean;
   members?: Member[];
   guilds?: Guild[];
-  records?: Record<string, MemberRaidRecord>;
+  archivedSeasonRecords?: Record<string, MemberRaidRecord>;
+  nextSeasonRecords?: Record<string, MemberRaidRecord>;
 }
 
 const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
@@ -49,14 +50,16 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
   isSelectedSeasonArchived,
   members = [],
   guilds = [],
-  records = {},
+  archivedSeasonRecords = {},
+  nextSeasonRecords = {},
 }) => {
   const { t } = useTranslation(['raid', 'translation']);
   const [confirmType, setConfirmType] = React.useState<'archive' | 'delete_score' | 'delete_note' | null>(null);
 
   const { moveSummaries, loading: movesLoading } = useMemberMoveAnnounce(
-    activeTab === 'memberMove' ? 'archived' : null,
-    records,
+    activeTab === 'memberMove' ? 'current' : null,
+    archivedSeasonRecords,
+    nextSeasonRecords,
     members,
     guilds,
     isSelectedSeasonArchived

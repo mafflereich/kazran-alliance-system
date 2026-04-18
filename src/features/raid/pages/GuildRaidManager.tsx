@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/store';
+import { supabase } from '@/shared/api/supabase';
 import { AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import GuildRaidTable from '../components/GuildRaidTable';
@@ -35,6 +36,7 @@ export default function GuildRaidManager() {
   const [sortConfig, setSortConfig] = useState<{ key: 'default' | 'score'; order: 'asc' | 'desc' }>({ key: 'default', order: 'asc' });
   const [selectedMemberStats, setSelectedMemberStats] = useState<any>(null);
   const [isFindMemberOpen, setIsFindMemberOpen] = useState(false);
+  const [nextSeasonRecords, setNextSeasonRecords] = useState<Record<string, any>>({});
 
   const { ghostRecords, fetchGhostRecordsForMember, fetchGhostRecordsForMembers, handleAddGhostRecord: addGhostRecord, handleDeleteGhostRecord } = useGhostRecords();
   const { availableGuilds, guildsByTier, guildMemberCounts } = useGuildStats(canManage, targetTier);
@@ -83,6 +85,46 @@ export default function GuildRaidManager() {
   });
 
   const layout = useTableLayout(raidData.selectedSeasonId, isComparisonMode, sortConfig);
+
+  // Fetch next season records when current season is archived
+  useEffect(() => {
+    if (!raidData.isSelectedSeasonArchived || !raidData.selectedSeason) {
+      setNextSeasonRecords({});
+      return;
+    }
+
+    const fetchNextSeasonRecords = async () => {
+      // Find next season based on season_number
+      const currentSeasonNum = raidData.selectedSeason?.season_number || 0;
+      const nextSeason = raidData.seasons.find(s => s.season_number === currentSeasonNum + 1);
+
+      if (!nextSeason) {
+        setNextSeasonRecords({});
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('member_raid_records')
+          .select('*')
+          .eq('season_id', nextSeason.id);
+
+        if (error) throw error;
+
+        const recordsMap: Record<string, any> = {};
+        (data || []).forEach(r => {
+          recordsMap[r.member_id] = r;
+        });
+
+        setNextSeasonRecords(recordsMap);
+      } catch (err) {
+        console.error('Failed to fetch next season records:', err);
+        setNextSeasonRecords({});
+      }
+    };
+
+    fetchNextSeasonRecords();
+  }, [raidData.isSelectedSeasonArchived, raidData.selectedSeason, raidData.seasons]);
 
   // Initialise guild selection
   useEffect(() => {
@@ -239,7 +281,8 @@ export default function GuildRaidManager() {
           isSelectedSeasonArchived={raidData.isSelectedSeasonArchived}
           members={Object.values(db.members)}
           guilds={Object.values(db.guilds)}
-          records={raidData.records}
+          archivedSeasonRecords={raidData.records}
+          nextSeasonRecords={nextSeasonRecords}
         />
 
         {error && (

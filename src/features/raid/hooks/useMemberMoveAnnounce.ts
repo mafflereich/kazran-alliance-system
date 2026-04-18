@@ -18,7 +18,8 @@ export interface GuildMoveSummary {
 
 export function useMemberMoveAnnounce(
   selectedSeasonId: string | null,
-  records: Record<string, MemberRaidRecord>,
+  archivedSeasonRecords: Record<string, MemberRaidRecord>,
+  nextSeasonRecords: Record<string, MemberRaidRecord>,
   members: Member[],
   guilds: Guild[],
   isSelectedSeasonArchived: boolean
@@ -34,76 +35,81 @@ export function useMemberMoveAnnounce(
 
     // Create maps for faster lookup
     const guildMap = new Map<string, Guild>(guilds.map(g => [g.id!, g]));
-    const memberMap = new Map<string, Member>(members.map(m => [m.id!, m]));
 
     // Track member movements and removals
     const memberMoves: Map<string, MemberMoveItem> = new Map();
 
-    // Step 1: For each current member, check if their guild changed from season_guild
-    members.forEach(member => {
-      if (!member.id) return;
+    // Get all member IDs from both seasons
+    const allMemberIds = new Set([
+      ...Object.keys(archivedSeasonRecords),
+      ...Object.keys(nextSeasonRecords)
+    ]);
 
-      const record = records[member.id];
-      if (!record) return; // Skip members without raid records
+    // Compare archived season with next season
+    allMemberIds.forEach(memberId => {
+      const archivedRecord = archivedSeasonRecords[memberId];
+      const nextRecord = nextSeasonRecords[memberId];
+      const member = members.find(m => m.id === memberId);
 
-      const archivedGuildId = record.season_guild;
-      const currentGuildId = member.guildId;
+      if (!archivedRecord && nextRecord) {
+        // New member in next season (recruit)
+        if (!member) return;
+        const toGuild = guildMap.get(nextRecord.season_guild);
+        if (!toGuild) return;
 
-      // Skip if archived guild is same as current
-      if (archivedGuildId === currentGuildId) return;
+        memberMoves.set(memberId, {
+          memberId,
+          name: member.name,
+          fromGuild: '',
+          toGuild: toGuild.name || '未知公會',
+          action: 'move'
+        });
+      } else if (archivedRecord && !nextRecord) {
+        // Member removed in next season (kicked)
+        const fromGuild = guildMap.get(archivedRecord.season_guild);
+        if (!fromGuild) return;
 
-      const fromGuild = guildMap.get(archivedGuildId);
-      const toGuild = guildMap.get(currentGuildId);
+        memberMoves.set(memberId, {
+          memberId,
+          name: member?.name || archivedRecord.member_id || '未知成員',
+          fromGuild: fromGuild.name || '未知公會',
+          toGuild: '',
+          action: 'kick'
+        });
+      } else if (archivedRecord && nextRecord) {
+        // Member exists in both seasons - check if guild changed
+        if (archivedRecord.season_guild !== nextRecord.season_guild) {
+          if (!member) return;
+          const fromGuild = guildMap.get(archivedRecord.season_guild);
+          const toGuild = guildMap.get(nextRecord.season_guild);
 
-      if (!fromGuild || !toGuild) return;
+          if (!fromGuild || !toGuild) return;
 
-      memberMoves.set(member.id, {
-        memberId: member.id,
-        name: member.name,
-        fromGuild: fromGuild.name || '未知公會',
-        toGuild: toGuild.name || '未知公會',
-        action: 'move'
-      });
-    });
-
-    // Step 2: Check for members in archived records who are no longer active (kicked)
-    Object.entries(records).forEach(([memberId, record]) => {
-      // Skip if we already tracked this as a move
-      if (memberMoves.has(memberId)) return;
-
-      const currentMember = memberMap.get(memberId);
-      const fromGuildId = record.season_guild;
-
-      // Only mark as kicked if:
-      // 1. Member no longer exists in current members, OR
-      // 2. Member's current guild is different AND we haven't already marked them
-      if (!currentMember) {
-        // This member was in the archived season but is no longer a member
-        const fromGuild = guildMap.get(fromGuildId);
-        if (fromGuild) {
           memberMoves.set(memberId, {
             memberId,
-            name: record.member_id || '未知成員',
+            name: member.name,
             fromGuild: fromGuild.name || '未知公會',
-            toGuild: '',
-            action: 'kick'
+            toGuild: toGuild.name || '未知公會',
+            action: 'move'
           });
         }
       }
     });
 
-    // Step 3: Group by guild and action type
+    // Group by guild and action type
     const guildGroups = new Map<string, { toKick: MemberMoveItem[], toRecruit: MemberMoveItem[] }>();
 
     memberMoves.forEach(move => {
       // Add to source guild's "kick" list
-      if (!guildGroups.has(move.fromGuild)) {
-        guildGroups.set(move.fromGuild, { toKick: [], toRecruit: [] });
+      if (move.fromGuild) {
+        if (!guildGroups.has(move.fromGuild)) {
+          guildGroups.set(move.fromGuild, { toKick: [], toRecruit: [] });
+        }
+        guildGroups.get(move.fromGuild)!.toKick.push(move);
       }
-      guildGroups.get(move.fromGuild)!.toKick.push(move);
 
       // For move actions, also add to target guild's "recruit" list
-      if (move.action === 'move') {
+      if (move.action === 'move' && move.toGuild) {
         if (!guildGroups.has(move.toGuild)) {
           guildGroups.set(move.toGuild, { toKick: [], toRecruit: [] });
         }
@@ -111,7 +117,7 @@ export function useMemberMoveAnnounce(
       }
     });
 
-    // Step 4: Build summaries
+    // Build summaries
     const summaries: GuildMoveSummary[] = [];
 
     guildGroups.forEach((groups, guildName) => {
@@ -141,7 +147,7 @@ export function useMemberMoveAnnounce(
       // Sort kick before recruit within same guild
       return a.action === 'kick' ? -1 : 1;
     }));
-  }, [selectedSeasonId, records, members, guilds, isSelectedSeasonArchived]);
+  }, [selectedSeasonId, archivedSeasonRecords, nextSeasonRecords, members, guilds, isSelectedSeasonArchived]);
 
   return {
     moveSummaries,
