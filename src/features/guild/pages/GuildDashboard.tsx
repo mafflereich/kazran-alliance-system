@@ -180,8 +180,8 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
   }, [db.guilds, canSeeAllGuilds, userGuildRoles]);
 
   return (
-    <div className="h-screen bg-stone-100 dark:bg-stone-900 flex flex-col overflow-hidden">
-      <div className="flex-1 flex overflow-hidden">
+    <div className="min-h-screen bg-stone-100 dark:bg-stone-900">
+      <div className="flex">
         <GuildSidebar
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
@@ -190,7 +190,7 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
         />
 
         {/* Main Content */}
-        <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
+        <div className="flex-1 min-w-0 flex flex-col">
           <GuildHeader
             guildName={guild.name}
             memberCount={members.length}
@@ -199,10 +199,9 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
             canSeeAllGuilds={canSeeAllGuilds}
           />
 
-          <main className="flex-1 overflow-hidden p-4 flex flex-col">
-            <div className="max-w-full mx-auto w-full h-full flex flex-col min-h-0">
-              <div className="flex-1 flex flex-col min-h-0">
-                <div className="mb-2 shrink-0" />
+          <main className="p-4">
+            <div className="max-w-full mx-auto w-full">
+              <div className="mb-2" />
                 <GuildCostumeTable
                   members={members}
                   costumes={costumes}
@@ -222,7 +221,6 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
                   getTruncatedName={getTruncatedName}
                   formatDate={formatDate}
                 />
-              </div>
             </div>
           </main>
         </div>

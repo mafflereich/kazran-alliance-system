@@ -14,7 +14,7 @@ export default function GuildHeader({ guildName, memberCount, onOpenSidebar, onO
   const { t } = useTranslation();
 
   return (
-    <header className="bg-white dark:bg-stone-800 px-4 py-2 shadow-sm flex items-center gap-4 shrink-0">
+    <header className="sticky top-0 z-40 bg-white dark:bg-stone-800 px-4 py-2 shadow-sm flex items-center gap-4 shrink-0">
       <button
         onClick={onOpenSidebar}
         className="p-2 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-lg transition-colors"

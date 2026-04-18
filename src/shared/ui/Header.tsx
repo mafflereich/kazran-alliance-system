@@ -21,7 +21,7 @@ export default function Header() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { db, currentUser, currentAvatar, setCurrentUser, userVolume, setUserVolume, userRole, userGuildRoles, isRoleLoading, handleLogout } = useAppContext();
+  const { db, currentUser, currentAvatar, setCurrentUser, userVolume, setUserVolume, userRole, userGuildRoles, isRoleLoading, handleLogout, fetchSettings } = useAppContext();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -45,9 +45,13 @@ export default function Header() {
     };
   }, []);
 
-  // Close menu on route change
+  const isPrivilegedRole = userRole === 'creator' || userRole === 'admin' || userRole === 'manager';
+
+  // Close menu and refresh settings on route change
   useEffect(() => {
     setIsMenuOpen(false);
+    if (isPrivilegedRole) fetchSettings();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
   const sortedGuilds = (Object.entries(db.guilds) as [string, any][]).sort((a, b) => {
@@ -89,6 +93,7 @@ export default function Header() {
   ];
 
   const firstSettingId = db.settings && Object.keys(db.settings).length > 0 ? Object.keys(db.settings)[0] : 'default';
+  const hasPendingApplications = isPrivilegedRole && (db.settings?.[firstSettingId]?.applicationPendingCount ?? 0) > 0;
   const hasBgm = !!db.settings?.[firstSettingId]?.bgmUrl;
   const bgmDefaultVolume = db.settings?.[firstSettingId]?.bgmDefaultVolume ?? 50;
   const currentVolume = userVolume !== null ? userVolume : bgmDefaultVolume;
@@ -201,7 +206,12 @@ export default function Header() {
                             : 'text-stone-400 hover:bg-stone-900 hover:text-white'
                             }`}
                         >
-                          <item.icon className={`w-5 h-5 ${item.active ? 'text-amber-500' : 'text-stone-500 group-hover:text-amber-400'}`} />
+                          <div className="relative shrink-0">
+                            <item.icon className={`w-5 h-5 ${item.active ? 'text-amber-500' : 'text-stone-500 group-hover:text-amber-400'}`} />
+                            {item.id === 'application_mailbox' && hasPendingApplications && (
+                              <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
+                            )}
+                          </div>
                           <span className="text-sm font-medium">{item.label}</span>
                         </button>
                       );

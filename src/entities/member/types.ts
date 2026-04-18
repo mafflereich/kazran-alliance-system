@@ -64,6 +64,7 @@ export interface Setting {
   indexMessage?: string;
   indexPercentType?: 'empty' | 'new_costumes_owned';
   isDebugMode?: boolean;
+  applicationPendingCount?: number;
 }
 
 export interface ApplyMail {
