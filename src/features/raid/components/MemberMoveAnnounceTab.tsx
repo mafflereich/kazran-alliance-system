@@ -9,7 +9,7 @@ interface MemberMoveAnnounceTabProps {
   isLoading?: boolean;
 }
 
-const buildGroupText = (guildName: string, members: GuildMoveSummary['members'], action: 'kick' | 'recruit') => {
+const buildGroupText = (listName: string, members: GuildMoveSummary['members']) => {
   const membersText = members.map(member => {
     if (member.action === 'kick') {
       return `${member.name} (踢出)`;
@@ -17,12 +17,7 @@ const buildGroupText = (guildName: string, members: GuildMoveSummary['members'],
     return `${member.name} (${member.toGuild || member.fromGuild})`;
   }).join(' ');
 
-  if (action === 'kick') {
-    return `# ${guildName}\n${membersText}\n請 {會長} {副會長} 今天送出他們`;
-  } else {
-    // Recruit message
-    return `# ${guildName}\n${membersText}`;
-  }
+  return `# ${listName}\n${membersText}\n請 {會長} {副會長} 今天送出他們`;
 };
 
 const MemberMoveAnnounceTab: React.FC<MemberMoveAnnounceTabProps> = ({ moveSummaries, isLoading = false }) => {
@@ -34,16 +29,20 @@ const MemberMoveAnnounceTab: React.FC<MemberMoveAnnounceTabProps> = ({ moveSumma
 
   // Build API payload
   const buildApiPayload = (): MemberMovePayload[] => {
-    return moveSummaries.map(summary => ({
-      guildName: summary.guildName,
-      members: summary.members.map(m => ({
-        id: m.memberId,
-        name: m.name,
-        sourceGuild: m.fromGuild,
-        targetGuild: m.toGuild,
-        action: m.action
-      }))
-    }));
+    return moveSummaries.map(summary => {
+      const actionLabel = summary.action === 'kick' ? '送出名單' : '招收名單';
+      const listName = `${summary.guildName} - ${actionLabel}`;
+      return {
+        guildName: listName,
+        members: summary.members.map(m => ({
+          id: m.memberId,
+          name: m.name,
+          sourceGuild: m.fromGuild,
+          targetGuild: m.toGuild,
+          action: m.action
+        }))
+      };
+    });
   };
 
   // Build Discord message preview
@@ -52,7 +51,9 @@ const MemberMoveAnnounceTab: React.FC<MemberMoveAnnounceTabProps> = ({ moveSumma
 
     const parts: string[] = [];
     moveSummaries.forEach(summary => {
-      parts.push(buildGroupText(summary.guildName, summary.members, summary.action));
+      const actionLabel = summary.action === 'kick' ? '送出名單' : '招收名單';
+      const listName = `${summary.guildName} - ${actionLabel}`;
+      parts.push(buildGroupText(listName, summary.members));
     });
     return parts.join('\n\n');
   };

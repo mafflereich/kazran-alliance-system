@@ -123,71 +123,8 @@ const sendApiAndNotify = (
     memberCount: number,
     onSuccess?: () => void
 ) => {
-    if (apiPayload.length === 0) {
-        onSuccess?.();
-        set({ notification: { isOpen: true, title: '儲存成功', message: `已儲存 ${memberCount} 位成員到資料庫！`, type: 'success' } });
-        return;
-    }
-
-    const buildGroupText = (group: { guildName: string; members: MemberMovePayloadItem[] }) => {
-        const membersText = group.members.map(member => {
-            if (member.action === 'kick') {
-                return `${member.name} (踢出)`;
-            }
-            const targetName = member.targetGuild || member.sourceGuild || '未知公會';
-            return `${member.name} (${targetName})`;
-        }).join(' ');
-
-        const isApplicantList = group.guildName === '申請者清單';
-        if (isApplicantList) {
-            return `# ${group.guildName}\n${membersText}`;
-        }
-        return `# ${group.guildName}\n${membersText}\n請 {會長} {副會長} 今天送出他們`;
-    };
-
-    const applicantGroup = apiPayload.find((group) => group.guildName === '申請者清單');
-    const otherGroups = apiPayload.filter((group) => group.guildName !== '申請者清單');
-
-    const localMessage = [
-        ...otherGroups.map(buildGroupText),
-        ...(applicantGroup ? [buildGroupText(applicantGroup)] : []),
-    ].join('\n\n');
-
-    fetch('https://chaosop.duckdns.org/api/memberMoveMessage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(apiPayload),
-    }).then(async (response) => {
-        const isSuccess = response.ok;
-        const message = isSuccess ? await response.text() : null;
-
-        if (message) navigator.clipboard.writeText(message).catch(console.error);
-
-        onSuccess?.();
-        set({
-            notification: {
-                isOpen: true,
-                title: isSuccess ? '儲存成功' : '儲存成功 (API 錯誤)',
-                message: isSuccess
-                    ? (message ? `已儲存 ${memberCount} 位成員！\n\nDiscord 通知訊息:\n${message}` : `已儲存 ${memberCount} 位成員！`)
-                    : `已儲存成員，但 API 回傳錯誤\n\n(本地預覽訊息):\n${localMessage}`,
-                type: isSuccess ? 'success' : 'error',
-                copyContent: message || localMessage
-            }
-        });
-    }).catch(() => {
-        navigator.clipboard.writeText(localMessage).catch(console.error);
-        onSuccess?.();
-        set({
-            notification: {
-                isOpen: true,
-                title: '儲存成功 (API 連線失敗)',
-                message: `已儲存成員，但 API 連線失敗\n\n(本地預覽訊息):\n${localMessage}`,
-                type: 'error',
-                copyContent: localMessage
-            }
-        });
-    });
+    onSuccess?.();
+    set({ notification: { isOpen: true, title: '儲存成功', message: `已儲存 ${memberCount} 位成員到資料庫！`, type: 'success' } });
 };
 
 const initialState = {
