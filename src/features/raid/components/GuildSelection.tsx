@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface GuildSelectionProps {
@@ -10,6 +10,7 @@ interface GuildSelectionProps {
   getTierColorActive: (tier: number) => string;
   guildMemberCounts?: Record<string, number>;
   disabled?: boolean;
+  onFindMember?: () => void;
 }
 
 const MAX_MEMBERS = 30;
@@ -22,6 +23,7 @@ const GuildSelection: React.FC<GuildSelectionProps> = ({
   getTierColorActive,
   guildMemberCounts = {},
   disabled = false,
+  onFindMember,
 }) => {
   const [copied, setCopied] = useState(false);
   const { t } = useTranslation(['raid', 'translation']);
@@ -81,6 +83,19 @@ const GuildSelection: React.FC<GuildSelectionProps> = ({
                 <span>{t('raid.guild_selection_copy', '複製缺少人數')}</span>
               </>
             )}
+          </button>
+          <button
+            onClick={onFindMember}
+            disabled={disabled || !onFindMember}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors
+              ${disabled || !onFindMember
+                ? 'opacity-50 cursor-not-allowed border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400'
+                : 'border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:bg-stone-100/60 dark:hover:bg-stone-800/60'
+              }`}
+            title={t('raid.find_member', '尋找成員')}
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span>{t('raid.find_member', '尋找成員')}</span>
           </button>
         </div>
         {Object.entries(guildsByTier)

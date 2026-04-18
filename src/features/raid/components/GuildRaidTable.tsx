@@ -297,7 +297,13 @@ function GuildRaidTable({
                           className="flex items-center gap-2 text-xs font-medium text-stone-800 dark:text-stone-200 hover:text-indigo-600 dark:hover:text-indigo-400 text-left"
                         >
                           <Search className="w-3.5 h-3.5 text-stone-400" />
-                          <span className="truncate max-w-[160px]">{member.name}</span>
+                          <span className={`truncate max-w-[160px] ${
+                            member.role === 'leader'
+                              ? 'px-1.5 py-0.5 rounded bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                              : member.role === 'coleader'
+                                ? 'px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                                : ''
+                          }`}>{member.name}</span>
                         </button>
                         <button
                           onClick={(e) => handleCopyName(e, member.name, member.id!)}

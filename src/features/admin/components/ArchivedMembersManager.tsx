@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase, toCamel } from '@/shared/api/supabase';
 import { useAppContext } from '@/store';
-import { Archive, History, RotateCcw, ChevronDown, ChevronUp, X, AlertCircle } from 'lucide-react';
+import { Archive, History, RotateCcw, ChevronDown, ChevronUp, X, AlertCircle, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { formatDate } from '@/shared/lib/utils';
 import { ArchivedMember, ArchiveHistory } from '@/entities/member/types';
@@ -13,6 +13,7 @@ export default function ArchivedMembersManager() {
   const [archivedMembers, setArchivedMembers] = useState<ArchivedMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedMemberId, setExpandedMemberId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
@@ -136,9 +137,15 @@ export default function ArchivedMembersManager() {
     }
   };
 
+  const filteredMembers = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return archivedMembers;
+    return archivedMembers.filter(m => m.name.toLowerCase().includes(q));
+  }, [archivedMembers, searchQuery]);
+
   // Pagination logic
-  const totalPages = Math.ceil(archivedMembers.length / itemsPerPage);
-  const paginatedMembers = archivedMembers.slice(
+  const totalPages = Math.ceil(filteredMembers.length / itemsPerPage);
+  const paginatedMembers = filteredMembers.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -149,9 +156,23 @@ export default function ArchivedMembersManager() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Archive className="w-6 h-6 text-stone-600 dark:text-stone-400" />
-        <h2 className="text-2xl font-bold text-stone-800 dark:text-stone-200">{t('nav.archived_members')}</h2>
+      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Archive className="w-6 h-6 text-stone-600 dark:text-stone-400" />
+          <h2 className="text-2xl font-bold text-stone-800 dark:text-stone-200">{t('nav.archived_members')}</h2>
+        </div>
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="w-4 h-4 text-stone-400 dark:text-stone-500" />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+            placeholder={t('dashboard.enter_member_name', '請輸入成員名稱...')}
+            className="pl-9 pr-4 py-2 border border-stone-300 dark:border-stone-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all bg-stone-50 dark:bg-stone-700 focus:bg-white dark:focus:bg-stone-600 dark:text-stone-100 w-56"
+          />
+        </div>
       </div>
 
       <div className="bg-white dark:bg-stone-800 rounded-xl shadow-sm border border-stone-200 dark:border-stone-700 overflow-hidden">

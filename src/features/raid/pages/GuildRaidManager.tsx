@@ -8,6 +8,7 @@ import MemberStatsModal from '../components/MemberStatsModal';
 import TopControlBar from '../components/TopControlBar';
 import GuildSelection from '../components/GuildSelection';
 import SeasonActionsPanel from '../components/SeasonActionsPanel';
+import RaidMemberSearchModal from '../components/RaidMemberSearchModal';
 import { useGhostRecords } from '../hooks/useGhostRecords';
 import { useRaidData } from '../hooks/useRaidData';
 import { useRaidRecordEditor } from '../hooks/useRaidRecordEditor';
@@ -33,6 +34,7 @@ export default function GuildRaidManager() {
   const [selectedGuildIds, setSelectedGuildIds] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: 'default' | 'score'; order: 'asc' | 'desc' }>({ key: 'default', order: 'asc' });
   const [selectedMemberStats, setSelectedMemberStats] = useState<any>(null);
+  const [isFindMemberOpen, setIsFindMemberOpen] = useState(false);
 
   const { ghostRecords, fetchGhostRecordsForMember, fetchGhostRecordsForMembers, handleAddGhostRecord: addGhostRecord, handleDeleteGhostRecord } = useGhostRecords();
   const { availableGuilds, guildsByTier, guildMemberCounts } = useGuildStats(canManage, targetTier);
@@ -252,6 +254,16 @@ export default function GuildRaidManager() {
           getTierColorActive={getTierColorActive}
           guildMemberCounts={guildMemberCounts}
           disabled={raidData.loading}
+          onFindMember={() => setIsFindMemberOpen(true)}
+        />
+
+        <RaidMemberSearchModal
+          isOpen={isFindMemberOpen}
+          onClose={() => setIsFindMemberOpen(false)}
+          season={raidData.selectedSeason}
+          isSeasonArchived={raidData.isSelectedSeasonArchived}
+          records={raidData.records}
+          onSelectGuild={(guildId) => setSelectedGuildIds([guildId])}
         />
 
         <div className={`flex-1 grid gap-4 ${isComparisonMode ? `grid-cols-1 md:grid-cols-${Math.min(selectedGuildIds.length, 4)}` : 'grid-cols-1'}`}>
