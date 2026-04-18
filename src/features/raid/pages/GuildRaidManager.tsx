@@ -94,16 +94,37 @@ export default function GuildRaidManager() {
     }
 
     const fetchNextSeasonRecords = async () => {
-      // Find next season based on season_number
-      const currentSeasonNum = raidData.selectedSeason?.season_number || 0;
-      const nextSeason = raidData.seasons.find(s => s.season_number === currentSeasonNum + 1);
-
-      if (!nextSeason) {
+      // Get next season number
+      const currentSeasonNum = raidData.selectedSeason?.season_number;
+      if (!currentSeasonNum) {
         setNextSeasonRecords({});
         return;
       }
 
+      const nextSeasonNum = currentSeasonNum + 1;
+
       try {
+        // First, find the next season in the list
+        let nextSeason = raidData.seasons.find(s => s.season_number === nextSeasonNum);
+
+        // If not found in seasons list, fetch it directly from database
+        if (!nextSeason) {
+          const { data: seasonData, error: seasonError } = await supabase
+            .from('raid_seasons')
+            .select('*')
+            .eq('season_number', nextSeasonNum)
+            .single();
+
+          if (seasonError || !seasonData) {
+            console.warn(`Next season S${nextSeasonNum} not found`);
+            setNextSeasonRecords({});
+            return;
+          }
+
+          nextSeason = seasonData;
+        }
+
+        // Now fetch the records for next season
         const { data, error } = await supabase
           .from('member_raid_records')
           .select('*')
@@ -124,7 +145,7 @@ export default function GuildRaidManager() {
     };
 
     fetchNextSeasonRecords();
-  }, [raidData.isSelectedSeasonArchived, raidData.selectedSeason, raidData.seasons]);
+  }, [raidData.isSelectedSeasonArchived, raidData.selectedSeason?.season_number, raidData.selectedSeason?.id]);
 
   // Initialise guild selection
   useEffect(() => {
