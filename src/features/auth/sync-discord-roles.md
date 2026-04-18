@@ -195,11 +195,20 @@ serve(async (req) => {
 
     // 3. 準備資料列 (這段已經移出 if 外面，保證一定會執行)
     const cleanedUsername = username?.endsWith('#0') ? username.slice(0, -2) : username;
+
+    // 查詢現有 profile 的 id，若已與 matchedId 相同則不重複寫入
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('discord_id', discord_id)
+      .single();
+
+    const shouldUpdateId = !existingProfile?.id?.includes(matchedId);
     
     const dataRow = {
       discord_id: discord_id,
       discord_username: cleanedUsername, // 新增：儲存 Discord 的 username (已移除 #0)
-      id: matchedId, // 比對成功會有值，失敗或沒比對就是 null
+      ...(shouldUpdateId ? { id: matchedId } : {}),
       auth_id: user_id || null,
       user_role: role || null,
       user_guilds: guildRoles.join(',') || null,
