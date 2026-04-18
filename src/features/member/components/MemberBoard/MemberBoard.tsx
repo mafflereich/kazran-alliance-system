@@ -280,7 +280,7 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
                 limitToBounds={false}
                 centerOnInit={false}
             >
-                <TransformComponent wrapperStyle={{ width: '300%', height: '100%' }}>
+                <TransformComponent wrapperStyle={{ width: '1000%', height: '100%' }}>
                     <div className="min-h-[180vh] pb-[1200px] p-4 relative">
                         <ConnectionLines />
                         <div className="w-full grid grid-cols-2 gap-4 relative z-10">
