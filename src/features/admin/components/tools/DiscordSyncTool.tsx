@@ -17,7 +17,7 @@ export default function DiscordSyncTool({
     setIsProcessing(true);
     try {
       const payload: Record<string, string[]> = {};
-      
+
       Object.values(db.guilds)
         .filter(guild => guild.isDisplay !== false)
         .forEach(guild => {
@@ -39,7 +39,7 @@ export default function DiscordSyncTool({
 
       const result = await response.json();
       showToast(t('settings.sync_discord_success', '同步成功'), 'success');
-      console.log('Discord role sync result:', result);
+      console.log('Discord role sync result:', result.results);
     } catch (error: any) {
       console.error('Error syncing Discord roles:', error);
       showToast(`${t('settings.sync_discord_failed', '同步失敗')}: ${error.message}`, 'error');
