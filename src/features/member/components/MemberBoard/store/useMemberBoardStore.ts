@@ -156,6 +156,9 @@ const initialState = {
         isOpen: false,
         members: [] as { id: string; name: string; guildName: string; reason: string }[],
     },
+    isArchivedSearchOpen: false,
+    archivedMembers: [] as { id: string; name: string; guildName: string; reason: string }[],
+    archivedMembersLoading: false,
 };
 
 const MAX_HISTORY_STEPS = 30;
@@ -800,6 +803,43 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
     discardDraft: () => {
         clearPersistedDraft();
         window.location.reload();
+    },
+
+    openArchivedSearch: () => set({ isArchivedSearchOpen: true }),
+    closeArchivedSearch: () => set({ isArchivedSearchOpen: false }),
+
+    fetchArchivedMembers: async () => {
+        set({ archivedMembersLoading: true });
+        try {
+            const { data, error } = await supabase
+                .from('members_archive_history')
+                .select(`
+                    id,
+                    members (name),
+                    guilds (name),
+                    archive_reason,
+                    archived_at
+                `)
+                .order('archived_at', { ascending: false });
+
+            if (error) {
+                console.error('載入封存成員失敗', error);
+                set({ archivedMembers: [], archivedMembersLoading: false });
+            } else {
+                set({
+                    archivedMembers: (data || []).map((m) => ({
+                        id: m.id,
+                        name: m.members?.name || '未知成員',
+                        guildName: m.guilds?.name || '未知公會',
+                        reason: m.archive_reason || '',
+                    })),
+                    archivedMembersLoading: false,
+                });
+            }
+        } catch (err) {
+            console.error('載入封存成員失敗', err);
+            set({ archivedMembers: [], archivedMembersLoading: false });
+        }
     },
 }));
 

@@ -9,10 +9,10 @@ import NotificationModal from './NotificationModal';
 import ArchiveModal from './ArchiveModal';
 import type { Member, Guild, TieredData } from '@entities/member/types';
 import MemberCardContextMenu from './MemberCard/MemberCardContextMenu';
-import StagingArea from './StagingArea';
 import DeletionArea from './DeletionArea';
 import ConnectionLines from './ConnectionLines';
-import { RotateCcw, CheckSquare, Square } from 'lucide-react';
+import ArchivedSearchArea from './ArchivedSearchArea';
+import { RotateCcw, CheckSquare, Square, Archive } from 'lucide-react';
 
 type Props = {
     initialMembers: Member[];
@@ -39,11 +39,13 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
         redoStack,
         showNotification,
         discardDraft,
+        fetchArchivedMembers,
     } = useMemberBoardStore();
 
     useEffect(() => {
         init(initialMembers, initialGuilds);
-    }, [initialMembers, initialGuilds, init]);
+        fetchArchivedMembers();
+    }, [initialMembers, initialGuilds, init, fetchArchivedMembers]);
 
     const handleSave = async () => {
         await saveToDatabase();
@@ -226,6 +228,16 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
                 >
                     捨棄草稿
                 </button>
+                <button
+                    onClick={() => {
+                        const { openArchivedSearch } = useMemberBoardStore.getState();
+                        openArchivedSearch();
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white rounded-lg text-sm font-medium shadow transition border border-amber-500"
+                >
+                    <Archive size={14} />
+                    <span>封存搜尋</span>
+                </button>
             </div>
             <TransformWrapper
                 initialScale={0.6}
@@ -251,7 +263,7 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
                 <ZoomControls />
             </TransformWrapper>
 
-            <StagingArea />
+            <ArchivedSearchArea />
             <DeletionArea />
 
             <MemberCardContextMenu />

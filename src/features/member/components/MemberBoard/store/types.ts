@@ -59,6 +59,9 @@ export type MemberBoardState = {
         isOpen: boolean;
         members: ArchiveMember[];
     };
+    isArchivedSearchOpen: boolean;
+    archivedMembers: ArchiveMember[];
+    archivedMembersLoading: boolean;
 };
 
 export type MemberBoardActions = {
@@ -92,6 +95,9 @@ export type MemberBoardActions = {
     confirmArchiveAndSave: () => Promise<void>;
     saveToDatabase: () => Promise<void>;
     discardDraft: () => void;
+    openArchivedSearch: () => void;
+    closeArchivedSearch: () => void;
+    fetchArchivedMembers: () => Promise<void>;
 };
 
 export type MemberBoardStore = MemberBoardState & MemberBoardActions;
