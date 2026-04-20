@@ -48,7 +48,7 @@ export default function AllianceRaidRecord() {
   const [showScoreInTable, setShowScoreInTable] = useState(true);
   const [hideLatestSeason, setHideLatestSeason] = useState(false);
 
-  const [, setIsGeneratingImage] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
 
   const [editingCell, setEditingCell] = useState<{ guild_id: string, season_id: string } | null>(null);
@@ -257,13 +257,17 @@ export default function AllianceRaidRecord() {
     setExportConfig(config);
     setIsDownloadModalOpen(false);
     setIsGeneratingImage(true);
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 500));
     if (!exportRef.current) {
       setIsGeneratingImage(false);
       return;
     }
     try {
-      const dataUrl = await toPng(exportRef.current, { pixelRatio: 2, skipFonts: true });
+      const dataUrl = await toPng(exportRef.current, {
+        backgroundColor: '#1c1917',
+        pixelRatio: 2,
+        skipFonts: true,
+      });
       const link = document.createElement('a');
       link.download = `raid-record-${Date.now()}.png`;
       link.href = dataUrl;
@@ -335,9 +339,14 @@ export default function AllianceRaidRecord() {
 
             <button
               onClick={() => setIsDownloadModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+              disabled={isGeneratingImage}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
             >
-              <Download className="w-4 h-4" />
+              {isGeneratingImage ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
               <span>{t('alliance_raid.download_record')}</span>
             </button>
 
