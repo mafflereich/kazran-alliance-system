@@ -119,7 +119,8 @@ export default function AllianceRaidDownloadModal({
   };
 
   const toggleAll = () => {
-    if (effectiveSelectedIds.size === totalCount) {
+    const allSelected = selectedGuildIds.size === allGuildIds.size && tierNumbers.every(t => tierEnabled[t] !== false);
+    if (allSelected) {
       const disabled: Record<number, boolean> = {};
       tierNumbers.forEach(t => { disabled[t] = false; });
       setTierEnabled(disabled);
@@ -299,7 +300,7 @@ export default function AllianceRaidDownloadModal({
           </button>
           <button
             onClick={() => onDownload({ seasonFrom, seasonTo, includeScore, selectedGuildIds: effectiveSelectedIds })}
-            disabled={selectedCount === 0}
+            disabled={selectedCount === 0 || !seasonFrom || !seasonTo}
             className="flex items-center gap-2 px-5 py-2 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 transition-colors disabled:opacity-50"
           >
             <Download className="w-4 h-4" />
