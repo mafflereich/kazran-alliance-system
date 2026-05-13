@@ -33,6 +33,7 @@ export function useMemberMoveAnnounce(
     }
 
     const guildMap = new Map<string, Guild>(guilds.map(g => [g.id!, g]));
+    const guildNameMap = new Map<string, Guild>(guilds.map(g => [g.name, g]));
     const memberMap = new Map<string, Member>(members.map(m => [m.id!, m]));
     const memberMoves: Map<string, MemberMoveItem> = new Map();
 
@@ -181,12 +182,23 @@ export function useMemberMoveAnnounce(
       }
     });
 
-    setMoveSummaries(summaries.sort((a, b) => {
-      if (a.guildName !== b.guildName) {
-        return a.guildName.localeCompare(b.guildName);
-      }
+    const sortedSummaries = summaries.sort((a, b) => {
+      const guildA = guildNameMap.get(a.guildName);
+      const guildB = guildNameMap.get(b.guildName);
+      
+      const tierA = guildA?.tier || 99;
+      const tierB = guildB?.tier || 99;
+      
+      if (tierA !== tierB) return tierA - tierB;
+      
+      const orderA = guildA?.orderNum || 99;
+      const orderB = guildB?.orderNum || 99;
+      if (orderA !== orderB) return orderA - orderB;
+      
       return a.action === 'kick' ? -1 : 1;
-    }));
+    });
+
+    setMoveSummaries(sortedSummaries);
   }, [currentSeasonRecords, prevSeasonRecords, members, guilds, isCurrentSeasonArchived]);
 
   return {
