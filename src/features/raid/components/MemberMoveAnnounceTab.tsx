@@ -12,12 +12,12 @@ interface MemberMoveAnnounceTabProps {
 const buildGroupText = (listName: string, members: GuildMoveSummary['members'], action: 'kick' | 'recruit') => {
   const membersText = members.map(member => {
     if (action === 'kick') {
-      return `${member.name} (${member.fromGuild || '?'} → ${member.toGuild || '?'})`;
+      return `${member.name} (到 ${member.toGuild || '?'})`;
     }
     return `${member.name}`;
   }).join('\n');
 
-  return `# ${listName}\n${membersText}\n請 {會長} {副會長} 今天送出他們`;
+  return `# ${listName}\n${membersText}\n請 {會長} {副會長} ${action === 'kick' ? '今天送出他們' : '注意收人'}`;
 };
 
 const MemberMoveAnnounceTab: React.FC<MemberMoveAnnounceTabProps> = ({ moveSummaries, isLoading = false }) => {
