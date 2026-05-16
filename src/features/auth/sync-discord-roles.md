@@ -184,7 +184,7 @@ serve(async (req) => {
       const matchedMember = memberRows.find((m: any) => {
         if (!m?.name) return false;
         const memberName = m.name.toString();
-        return displayName.includes(memberName) || memberName.includes(displayName);
+        return displayName.replace(/(\[[^]*\])|(\([^]*\))/g,"") == memberName;
       });
 
       // 如果有找到人，就把預設的 null 替換成真實的 id

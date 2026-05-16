@@ -27,16 +27,16 @@ export default function BackupRestoreTool({
     cancelRestore,
   } = useRestoreDiff();
 
-  const fetchAllRows = async (tableName: string) => {
+  const fetchAllRows = async (tableName: string, filter?: { column: string; value: any }) => {
     const allData: any[] = [];
     let from = 0;
     const limit = 1000;
 
     while (true) {
-      const { data, error } = await supabase
-        .from(tableName)
-        .select('*')
-        .range(from, from + limit - 1);
+      let query = supabase.from(tableName).select('*').range(from, from + limit - 1);
+      if (filter) query = query.eq(filter.column, filter.value);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       if (!data || data.length === 0) break;
@@ -87,16 +87,12 @@ export default function BackupRestoreTool({
         fetchAllRows('guild_raid_records'),
       ]);
 
-      // member_raid_records is too large for a full-table scan — fetch per season instead
-      const seasonResults = await Promise.all(
-        raidSeasons.map((season: any) =>
-          supabase.from('member_raid_records').select('*').eq('season_id', season.id)
-        )
-      );
+      // Fetch member_raid_records sequentially per season with pagination to avoid
+      // concurrent full-table scans causing statement timeout (PG error 57014)
       const memberRaidRecords: any[] = [];
-      for (const { data, error } of seasonResults) {
-        if (error) throw error;
-        if (data) memberRaidRecords.push(...data);
+      for (const season of raidSeasons) {
+        const records = await fetchAllRows('member_raid_records', { column: 'season_id', value: season.id });
+        memberRaidRecords.push(...records);
       }
 
       triggerJsonDownload(
