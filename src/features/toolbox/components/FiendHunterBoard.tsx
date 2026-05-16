@@ -330,7 +330,7 @@ export const FiendHunterBoard: React.FC = () => {
                         }
                         const strikes = stats.strikesPerLevel[i];
                         const isBottleneck = actualRequiredPerLevel[i] >= maxReq - 0.01;
-                        const displayStrikes = (i < 9 && strikes === 1 && !isBottleneck) ? '' : strikes;
+                        const displayStrikes = (strikes === 1 && !isBottleneck) ? '' : strikes;
                         
                         return (
                           <td 

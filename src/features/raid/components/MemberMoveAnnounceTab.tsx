@@ -9,15 +9,15 @@ interface MemberMoveAnnounceTabProps {
   isLoading?: boolean;
 }
 
-const buildGroupText = (listName: string, members: GuildMoveSummary['members']) => {
+const buildGroupText = (listName: string, members: GuildMoveSummary['members'], action: 'kick' | 'recruit') => {
   const membersText = members.map(member => {
-    if (member.action === 'kick') {
-      return `${member.name} (踢出)`;
+    if (action === 'kick') {
+      return `${member.name} (到 ${member.toGuild || '?'})`;
     }
-    return `${member.name} (從 ${member.fromGuild || '申請者清單'} 到 ${member.toGuild})`;
+    return `${member.name}`;
   }).join('\n');
 
-  return `# ${listName}\n${membersText}\n請 {會長} {副會長} 今天送出他們`;
+  return `# ${listName}\n${membersText}\n請 {會長} {副會長} ${action === 'kick' ? '今天送出他們' : '注意收人'}`;
 };
 
 const MemberMoveAnnounceTab: React.FC<MemberMoveAnnounceTabProps> = ({ moveSummaries, isLoading = false }) => {
@@ -53,7 +53,7 @@ const MemberMoveAnnounceTab: React.FC<MemberMoveAnnounceTabProps> = ({ moveSumma
     moveSummaries.forEach(summary => {
       const actionLabel = summary.action === 'kick' ? '送出名單' : '招收名單';
       const listName = `${summary.guildName} - ${actionLabel}`;
-      parts.push(buildGroupText(listName, summary.members));
+      parts.push(buildGroupText(listName, summary.members, summary.action));
     });
     return parts.join('\n\n');
   };
@@ -213,7 +213,7 @@ const MemberMoveAnnounceTab: React.FC<MemberMoveAnnounceTabProps> = ({ moveSumma
                 {summary.members.map((m, i) => (
                   <div key={i}>
                     {m.name}
-                    {m.action === 'kick' ? ' (踢出)' : ` (來自 ${m.fromGuild})`}
+                    {m.action === 'kick' ? ` (${m.fromGuild} → ${m.toGuild})` : ` (到 ${m.toGuild})`}
                   </div>
                 ))}
               </div>

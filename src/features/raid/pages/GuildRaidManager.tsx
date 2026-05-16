@@ -37,6 +37,7 @@ export default function GuildRaidManager() {
   const [selectedMemberStats, setSelectedMemberStats] = useState<any>(null);
   const [isFindMemberOpen, setIsFindMemberOpen] = useState(false);
   const [nextSeasonRecords, setNextSeasonRecords] = useState<Record<string, any>>({});
+  const [prevSeasonRecords, setPrevSeasonRecords] = useState<Record<string, any>>({});
 
   const { ghostRecords, fetchGhostRecordsForMember, fetchGhostRecordsForMembers, handleAddGhostRecord: addGhostRecord, handleDeleteGhostRecord } = useGhostRecords();
   const { availableGuilds, guildsByTier, guildMemberCounts } = useGuildStats(canManage, targetTier);
@@ -124,6 +125,8 @@ export default function GuildRaidManager() {
           nextSeason = seasonData;
         }
 
+        console.log(nextSeason?.season_number, nextSeason?.id);
+
         // Now fetch the records for next season (archived or not)
         const { data, error } = await supabase
           .from('member_raid_records')
@@ -146,6 +149,65 @@ export default function GuildRaidManager() {
 
     fetchNextSeasonRecords();
   }, [raidData.isSelectedSeasonArchived, raidData.selectedSeason?.season_number, raidData.selectedSeason?.id]);
+
+  useEffect(() => {
+    const fetchPrevSeasonRecords = async () => {
+      const currentSeasonNum = raidData.selectedSeason?.season_number;
+      console.log('fetchPrevSeasonRecords called, currentSeasonNum:', currentSeasonNum);
+      if (!currentSeasonNum || currentSeasonNum <= 1) {
+        console.log('No prev season needed, currentSeasonNum:', currentSeasonNum);
+        setPrevSeasonRecords({});
+        return;
+      }
+
+      const prevSeasonNum = currentSeasonNum - 1;
+      console.log('Fetching prev season:', prevSeasonNum);
+
+      try {
+        let prevSeason = raidData.seasons.find(s => s.season_number === prevSeasonNum);
+        console.log('Found prevSeason from seasons list:', prevSeason);
+
+        if (!prevSeason) {
+          console.log('Prev season not in list, fetching from DB...');
+          const { data: seasonData, error: seasonError } = await supabase
+            .from('raid_seasons')
+            .select('*')
+            .eq('season_number', prevSeasonNum)
+            .single();
+
+          if (seasonError || !seasonData) {
+            console.warn(`Previous season S${prevSeasonNum} not found`);
+            setPrevSeasonRecords({});
+            return;
+          }
+
+          prevSeason = seasonData;
+        }
+
+        console.log('Using prevSeason:', prevSeason?.season_number, prevSeason?.id);
+
+        const { data, error } = await supabase
+          .from('member_raid_records')
+          .select('*')
+          .eq('season_id', prevSeason!.id);
+
+        if (error) throw error;
+
+        const recordsMap: Record<string, any> = {};
+        (data || []).forEach((r: any) => {
+          recordsMap[r.member_id] = r;
+        });
+
+        setPrevSeasonRecords(recordsMap);
+        console.log('Prev season records fetched:', Object.keys(recordsMap).length);
+      } catch (err) {
+        console.error('Failed to fetch previous season records:', err);
+        setPrevSeasonRecords({});
+      }
+    };
+
+    fetchPrevSeasonRecords();
+  }, [raidData.selectedSeason?.season_number, raidData.selectedSeason?.id, raidData.seasons]);
 
   // Initialise guild selection
   useEffect(() => {
@@ -302,8 +364,8 @@ export default function GuildRaidManager() {
           isSelectedSeasonArchived={raidData.isSelectedSeasonArchived}
           members={Object.values(db.members)}
           guilds={Object.values(db.guilds)}
-          archivedSeasonRecords={raidData.records}
-          nextSeasonRecords={nextSeasonRecords}
+          currentSeasonRecords={raidData.records}
+          prevSeasonRecords={prevSeasonRecords}
         />
 
         {error && (
