@@ -51,7 +51,7 @@ export function useRaidRecordEditor({
     return () => { Object.values(saveTimersRef.current).forEach(clearTimeout); };
   }, []);
 
-  const handleRecordChange = useCallback((memberId: string, field: 'score' | 'note' | 'season_note', value: string | number) => {
+  const handleRecordChange = useCallback((memberId: string, field: 'score' | 'note' | 'season_note' | 'overkill', value: string | number | null) => {
     setDraftRecords(prev => {
       const existingRecord = prev[memberId] || recordsRef.current[memberId] || {
         season_id: selectedSeasonId,
@@ -119,8 +119,9 @@ export function useRaidRecordEditor({
     const scoreChanged = draft.score !== (originalRecord?.score ?? 0);
     const seasonNoteChanged = (draft.season_note || '') !== (originalRecord?.season_note || '');
     const noteChanged = (draft.note || '') !== originalNote;
+    const overkillChanged = (draft.overkill ?? null) !== (originalRecord?.overkill ?? null);
 
-    if (!scoreChanged && !seasonNoteChanged && !noteChanged) {
+    if (!scoreChanged && !seasonNoteChanged && !noteChanged && !overkillChanged) {
       setDraftRecords(prev => { const next = { ...prev }; delete next[memberId]; return next; });
       return;
     }
@@ -129,15 +130,20 @@ export function useRaidRecordEditor({
     try {
       const { note, ...raidRecord } = draft;
 
+      const payload = {
+        ...raidRecord,
+        overkill: raidRecord.overkill != null ? Number(raidRecord.overkill) : null,
+      };
+
       const { error } = await supabase
         .from('member_raid_records')
-        .upsert(raidRecord, { onConflict: 'season_id, member_id' });
+        .upsert(payload, { onConflict: 'season_id, member_id' });
 
       if (error) throw error;
 
       if (noteChanged) await updateMember(memberId, { note });
 
-      const nextRecords = { ...recordsRef.current, [memberId]: raidRecord as MemberRaidRecord };
+      const nextRecords = { ...recordsRef.current, [memberId]: payload as MemberRaidRecord };
       setRecords(nextRecords);
 
       setDraftRecords(prev => { const next = { ...prev }; delete next[memberId]; return next; });
