@@ -433,7 +433,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
 
   // Function to fetch members for a specific guild
-  const fetchMembers = async (guildId: string, columns: string = 'id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark), member_raid_records(id, season_id, score, season_note)') => {
+  const fetchMembers = async (guildId: string, columns: string = 'id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark), member_raid_records(id, season_id, score, season_note, overkill)') => {
     if (isOffline) return;
 
     // Check if we already have members for this guild
@@ -509,6 +509,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const isReserved = memberNotes?.is_reserved || false;
       const archiveRemark = memberNotes?.archive_remark || '';
       const seasonNote = memberRaidRecords?.seasonNote || memberRaidRecords?.season_note || '';
+      const overkill = memberRaidRecords?.overkill ?? null;
       const score = memberRaidRecords?.score ?? 0;
       const mappedMember: Member = {
         ...camelMember,
@@ -516,6 +517,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isReserved,
         archiveRemark,
         seasonNote,
+        overkill,
         score,
       };
       delete (mappedMember as any).memberNotes;
@@ -565,7 +567,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const raidRecordsQuery = maxSeasonId
       ? supabase
         .from('member_raid_records')
-        .select('member_id, score, season_note')
+        .select('member_id, score, season_note, overkill')
         .eq('season_id', maxSeasonId)
       : Promise.resolve({ data: [] as any[], error: null });
 
@@ -612,6 +614,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const isReserved = memberNotes?.is_reserved || false;
       const archiveRemark = memberNotes?.archive_remark || '';
       const seasonNote = memberRaidRecord?.season_note || '';
+      const overkill = memberRaidRecord?.overkill ?? null;
       const score = memberRaidRecord?.score ?? 0;
       const mappedMember: Member = {
         ...camelMember,
@@ -619,6 +622,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isReserved,
         archiveRemark,
         seasonNote,
+        overkill,
         score,
       };
       delete (mappedMember as any).memberNotes;
@@ -636,7 +640,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     let queryBuilder = supabase
       .from('members')
-      .select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark), member_raid_records(score, season_note)', { count: 'exact' })
+      .select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark), member_raid_records(score, season_note, overkill)', { count: 'exact' })
       .ilike('name', `%${query}%`)
       .order('status', { ascending: true }) // active comes before archived
       .order('name', { ascending: true })
@@ -684,6 +688,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const isReserved = memberNotes?.is_reserved || false;
         const archiveRemark = memberNotes?.archive_remark || '';
         const seasonNote = memberRaidRecords?.seasonNote || memberRaidRecords?.season_note || '';
+        const overkill = memberRaidRecords?.overkill ?? null;
         const score = memberRaidRecords?.score ?? m.score ?? 0;
         const mappedMember: Member = {
           ...camelMember,
@@ -691,6 +696,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           isReserved,
           archiveRemark,
           seasonNote,
+          overkill,
           score,
         };
         delete (mappedMember as any).memberNotes;

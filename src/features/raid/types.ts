@@ -2,6 +2,7 @@ export interface RaidSeason {
   id: string;
   season_number: number;
   period_text: string;
+  score_threshold?: number | null;
   description: string;
   even_rounds: boolean;
   is_archived?: boolean;

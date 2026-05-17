@@ -32,15 +32,15 @@ export function useMemberMoveAnnounce(
       return;
     }
 
-    const guildMap = new Map<string, Guild>(guilds.map(g => [g.id!, g]));
+    const guildMap = new Map<string, Guild>(guilds.map(g => [String(g.id!), g]));
     const guildNameMap = new Map<string, Guild>(guilds.map(g => [g.name, g]));
-    const memberMap = new Map<string, Member>(members.map(m => [m.id!, m]));
+    const memberMap = new Map<string, Member>(members.map(m => [String(m.id!), m]));
     const memberMoves: Map<string, MemberMoveItem> = new Map();
 
     const memberCurrentGuildMap = new Map<string, string>();
     members.forEach(m => {
       if (m.id && m.guildId) {
-        memberCurrentGuildMap.set(m.id, m.guildId);
+        memberCurrentGuildMap.set(String(m.id), String(m.guildId));
       }
     });
 
@@ -65,7 +65,7 @@ export function useMemberMoveAnnounce(
 
       if (!isCurrentSeasonArchived) {
         if (!prevRecord && currentGuildId) {
-          const toGuild = guildMap.get(currentGuildId);
+          const toGuild = guildMap.get(String(currentGuildId));
           if (!toGuild) return;
 
           memberMoves.set(memberId, {
@@ -76,7 +76,7 @@ export function useMemberMoveAnnounce(
             action: 'move'
           });
         } else if (prevRecord && !currentGuildId) {
-          const fromGuild = guildMap.get(prevRecord.season_guild!);
+          const fromGuild = guildMap.get(String(prevRecord.season_guild!));
           if (!fromGuild) return;
 
           memberMoves.set(memberId, {
@@ -87,9 +87,9 @@ export function useMemberMoveAnnounce(
             action: 'kick'
           });
         } else if (prevRecord && currentGuildId) {
-          if (prevRecord.season_guild !== currentGuildId) {
-            const fromGuild = guildMap.get(prevRecord.season_guild!);
-            const toGuild = guildMap.get(currentGuildId);
+          if (String(prevRecord.season_guild) !== String(currentGuildId)) {
+            const fromGuild = guildMap.get(String(prevRecord.season_guild!));
+            const toGuild = guildMap.get(String(currentGuildId));
 
             if (!fromGuild || !toGuild) return;
 
@@ -104,7 +104,7 @@ export function useMemberMoveAnnounce(
         }
       } else {
         if (!prevRecord && currentRecord) {
-          const toGuild = guildMap.get(currentRecord.season_guild!);
+          const toGuild = guildMap.get(String(currentRecord.season_guild!));
           if (!toGuild) return;
 
           memberMoves.set(memberId, {
@@ -115,7 +115,7 @@ export function useMemberMoveAnnounce(
             action: 'move'
           });
         } else if (prevRecord && !currentRecord) {
-          const fromGuild = guildMap.get(prevRecord.season_guild!);
+          const fromGuild = guildMap.get(String(prevRecord.season_guild!));
           if (!fromGuild) return;
 
           memberMoves.set(memberId, {
@@ -126,9 +126,9 @@ export function useMemberMoveAnnounce(
             action: 'kick'
           });
         } else if (prevRecord && currentRecord) {
-          if (prevRecord.season_guild !== currentRecord.season_guild) {
-            const fromGuild = guildMap.get(prevRecord.season_guild!);
-            const toGuild = guildMap.get(currentRecord.season_guild!);
+          if (String(prevRecord.season_guild) !== String(currentRecord.season_guild)) {
+            const fromGuild = guildMap.get(String(prevRecord.season_guild!));
+            const toGuild = guildMap.get(String(currentRecord.season_guild!));
 
             if (!fromGuild || !toGuild) return;
 

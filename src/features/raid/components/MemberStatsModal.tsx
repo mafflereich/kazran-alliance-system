@@ -16,9 +16,37 @@ export default function MemberStatsModal({ member, onClose }: MemberStatsModalPr
 
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
   const [historyLimit, setHistoryLimit] = useState(4);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
+
+  const [memberRecords, setMemberRecords] = useState<Record<string, any> | null>(null);
+  const [memberExclusiveWeapons, setMemberExclusiveWeapons] = useState<Record<string, boolean> | null>(null);
+  const [loadingMemberData, setLoadingMemberData] = useState(false);
+
+  useEffect(() => {
+    const fetchMemberData = async () => {
+      if (!member?.id) return;
+      setLoadingMemberData(true);
+      try {
+        const { data, error } = await supabase
+          .from('members')
+          .select('records, exclusive_weapons')
+          .eq('id', member.id)
+          .single();
+        if (error) throw error;
+        setMemberRecords(data?.records ?? {});
+        setMemberExclusiveWeapons(data?.exclusive_weapons ?? {});
+      } catch (err) {
+        console.error('Error fetching member costume data:', err);
+        setMemberRecords({});
+        setMemberExclusiveWeapons({});
+      } finally {
+        setLoadingMemberData(false);
+      }
+    };
+    fetchMemberData();
+  }, [member?.id]);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -100,7 +128,7 @@ export default function MemberStatsModal({ member, onClose }: MemberStatsModalPr
   };
 
   const costumesByCharacter = useMemo(() => {
-    if (!member?.records) return [];
+    if (!memberRecords) return [];
 
     const grouped: Record<string, any[]> = {};
     Object.values(db.costumes).forEach(costume => {
@@ -125,7 +153,7 @@ export default function MemberStatsModal({ member, onClose }: MemberStatsModalPr
         costumes
       };
     });
-  }, [member, db.costumes, db.characters]);
+  }, [memberRecords, db.costumes, db.characters]);
 
   if (!member) return null;
 
@@ -261,67 +289,76 @@ export default function MemberStatsModal({ member, onClose }: MemberStatsModalPr
             )}
           </div>
 
-          <div className="flex flex-wrap items-start gap-x-6 gap-y-6">
-            {costumesByCharacter.map(({ character, costumes }) => (
-              <div key={character?.id || 'unknown'} className="flex flex-col gap-3">
-                <div className="text-sm font-bold text-stone-700 dark:text-stone-300 border-b border-stone-200 dark:border-stone-700 pb-1">
-                  {character ? (i18n.language === 'en' ? (character.nameE || character.name) : character.name) : 'Unknown'}
-                </div>
-                <div className="flex flex-wrap gap-4">
-                  {costumes.map(costume => {
-                    const record = member.records[costume.id];
-                    const rawLevel = record?.level;
-                    const isOwned = record && rawLevel !== undefined && rawLevel !== null && Number(rawLevel) >= 0;
-                    const level = isOwned ? Number(rawLevel) : -1;
-                    const hasWeapon = member.exclusiveWeapons?.[costume.characterId];
-                    
-                    let levelColorClass = "bg-orange-400 text-stone-900";
-                    if (level < 0) levelColorClass = "bg-stone-100 dark:bg-stone-800 text-stone-400";
-                    else if (level === 0) levelColorClass = "bg-stone-300 text-stone-900";
-                    else if (level === 1) levelColorClass = "bg-blue-300 text-stone-900";
-                    else if (level === 2) levelColorClass = "bg-blue-400 text-stone-900";
-                    else if (level === 3) levelColorClass = "bg-purple-300 text-stone-900";
-                    else if (level === 4) levelColorClass = "bg-purple-400 text-stone-900";
-                    else if (level >= 5) levelColorClass = "bg-orange-400 text-stone-900 font-black";
+          {loadingMemberData ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3 text-stone-400">
+              <Loader2 className="w-8 h-8 animate-spin" />
+              <span className="text-sm">{t('common.loading', '載入中...')}</span>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-start gap-x-6 gap-y-6">
+                {costumesByCharacter.map(({ character, costumes }) => (
+                  <div key={character?.id || 'unknown'} className="flex flex-col gap-3">
+                    <div className="text-sm font-bold text-stone-700 dark:text-stone-300 border-b border-stone-200 dark:border-stone-700 pb-1">
+                      {character ? (i18n.language === 'en' ? (character.nameE || character.name) : character.name) : 'Unknown'}
+                    </div>
+                    <div className="flex flex-wrap gap-4">
+                      {costumes.map(costume => {
+                        const record = memberRecords?.[costume.id];
+                        const rawLevel = record?.level;
+                        const isOwned = record && rawLevel !== undefined && rawLevel !== null && Number(rawLevel) >= 0;
+                        const level = isOwned ? Number(rawLevel) : -1;
+                        const hasWeapon = memberExclusiveWeapons?.[costume.characterId];
 
-                    return (
-                      <div key={costume.id} className={`w-24 bg-stone-50 dark:bg-stone-700/50 rounded-xl p-3 border border-stone-200 dark:border-stone-700 flex flex-col items-center gap-2 relative ${!isOwned ? 'opacity-60 grayscale' : ''}`}>
-                        {costume.imageName && (
-                          <div className="w-16 h-16 rounded-lg overflow-hidden border border-stone-200 dark:border-stone-600">
-                            <img
-                              src={getImageUrl(costume.imageName)}
-                              alt={i18n.language === 'en' ? (costume.nameE || costume.name) : costume.name}
-                              className="w-full h-full object-cover"
-                              referrerPolicy="no-referrer"
-                            />
-                          </div>
-                        )}
-                        <div className="text-xs font-medium text-center truncate w-full text-stone-700 dark:text-stone-300" title={i18n.language === 'en' ? (costume.nameE || costume.name) : costume.name}>
-                          {i18n.language === 'en' ? (costume.nameE || costume.name) : costume.name}
-                        </div>
-                        {isOwned && (
-                          <div className="absolute -top-2 -right-2 flex flex-col items-center gap-1 z-10">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${levelColorClass}`}>
-                              +{level}
+                        let levelColorClass = "bg-orange-400 text-stone-900";
+                        if (level < 0) levelColorClass = "bg-stone-100 dark:bg-stone-800 text-stone-400";
+                        else if (level === 0) levelColorClass = "bg-stone-300 text-stone-900";
+                        else if (level === 1) levelColorClass = "bg-blue-300 text-stone-900";
+                        else if (level === 2) levelColorClass = "bg-blue-400 text-stone-900";
+                        else if (level === 3) levelColorClass = "bg-purple-300 text-stone-900";
+                        else if (level === 4) levelColorClass = "bg-purple-400 text-stone-900";
+                        else if (level >= 5) levelColorClass = "bg-orange-400 text-stone-900 font-black";
+
+                        return (
+                          <div key={costume.id} className={`w-24 bg-stone-50 dark:bg-stone-700/50 rounded-xl p-3 border border-stone-200 dark:border-stone-700 flex flex-col items-center gap-2 relative ${!isOwned ? 'opacity-60 grayscale' : ''}`}>
+                            {costume.imageName && (
+                              <div className="w-16 h-16 rounded-lg overflow-hidden border border-stone-200 dark:border-stone-600">
+                                <img
+                                  src={getImageUrl(costume.imageName)}
+                                  alt={i18n.language === 'en' ? (costume.nameE || costume.name) : costume.name}
+                                  className="w-full h-full object-cover"
+                                  referrerPolicy="no-referrer"
+                                />
+                              </div>
+                            )}
+                            <div className="text-xs font-medium text-center truncate w-full text-stone-700 dark:text-stone-300" title={i18n.language === 'en' ? (costume.nameE || costume.name) : costume.name}>
+                              {i18n.language === 'en' ? (costume.nameE || costume.name) : costume.name}
                             </div>
-                            {hasWeapon && (
-                              <div className="w-6 h-6 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center shadow-sm">
-                                <Swords className="w-3.5 h-3.5 text-amber-600" />
+                            {isOwned && (
+                              <div className="absolute -top-2 -right-2 flex flex-col items-center gap-1 z-10">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-sm ${levelColorClass}`}>
+                                  +{level}
+                                </div>
+                                {hasWeapon && (
+                                  <div className="w-6 h-6 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center shadow-sm">
+                                    <Swords className="w-3.5 h-3.5 text-amber-600" />
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          {(!member.records || Object.keys(member.records).length === 0) && (
-            <div className="text-center text-stone-500 py-8">
-              {t('raid.no_stats', '尚無練度資料')}
-            </div>
+              {memberRecords && Object.keys(memberRecords).length === 0 && (
+                <div className="text-center text-stone-500 py-8">
+                  {t('raid.no_stats', '尚無練度資料')}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

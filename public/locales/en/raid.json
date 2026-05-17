@@ -34,7 +34,8 @@
     "download_png": "Download PNG",
     "display_options": "Display Options",
     "display_options_modal_title": "Display Options",
-    "display_options_apply": "Apply"
+    "display_options_apply": "Apply",
+    "hide_overkill": "Hide Overkill"
   },
   "raid": {
     "title_guild_manager": "Guild Raid Manager",
@@ -68,6 +69,7 @@
     "ghost_log_delete_desc": "Are you sure you want to delete this Awaken record? This action cannot be undone.",
     "season_actions_title": "Season Actions",
     "tab_add_season": "Add Season",
+    "tab_edit_season": "Edit Season",
     "tab_archive_season": "Archive Season",
     "tab_delete_records": "Delete Records",
     "tab_member_moves": "Member Movement Roster",
@@ -78,6 +80,9 @@
     "delete_scores_title": "Delete current season scores",
     "delete_scores_desc": "Reset all members' scores to 0",
     "delete_scores_button": "Delete Scores",
+    "delete_overkill_title": "Delete current season overkill",
+    "delete_overkill_desc": "Clear all members' overkill",
+    "delete_overkill_button": "Delete Overkill",
     "delete_notes_title": "Delete current season notes",
     "delete_notes_desc": "Clear all members' season notes",
     "delete_notes_button": "Delete Notes",
@@ -85,6 +90,9 @@
     "button_team_assign": "Team Assignment",
     "keep_scores_label": "Keep scores",
     "keep_season_notes_label": "Keep season notes",
+    "keep_overkill_label": "Keep overkill",
+    "score_threshold": "Score Threshold",
+    "score_threshold_hint": "Members whose score meets or exceeds this value can fill in their overkill. If left empty, no members can fill in overkill.",
     "guild_selection_title": "Select Guild",
     "guild_selection_copy_title": "Copy missing members by guild",
     "guild_selection_copy": "Copy missing members",

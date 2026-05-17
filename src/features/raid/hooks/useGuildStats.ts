@@ -1,8 +1,25 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { supabase } from '@/shared/api/supabase';
 import { useAppContext } from '@/store';
 
 export function useGuildStats(canManage: boolean, targetTier: number) {
   const { db } = useAppContext();
+  const [guildMemberCounts, setGuildMemberCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    supabase
+      .from('members')
+      .select('guild_id')
+      .eq('status', 'active')
+      .then(({ data }: { data: { guild_id: string }[] | null }) => {
+        if (!data) return;
+        const counts: Record<string, number> = {};
+        data.forEach((row: { guild_id: string }) => {
+          if (row.guild_id) counts[row.guild_id] = (counts[row.guild_id] || 0) + 1;
+        });
+        setGuildMemberCounts(counts);
+      });
+  }, []);
 
   const availableGuilds = useMemo(() => {
     return Object.values(db.guilds)
@@ -22,16 +39,6 @@ export function useGuildStats(canManage: boolean, targetTier: number) {
     });
     return grouped;
   }, [availableGuilds]);
-
-  const guildMemberCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    Object.values(db.members).forEach(m => {
-      if (m.guildId && m.status !== 'archived') {
-        counts[m.guildId] = (counts[m.guildId] || 0) + 1;
-      }
-    });
-    return counts;
-  }, [db.members]);
 
   return { availableGuilds, guildsByTier, guildMemberCounts };
 }

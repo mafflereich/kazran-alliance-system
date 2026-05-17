@@ -25,6 +25,7 @@ export interface Member {
   exclusiveWeapons?: Record<string, boolean>; // characterId: boolean
   note?: string;
   seasonNote?: string;
+  overkill?: number | null;
   color?: string;
   score?: number;
   updatedAt?: number;

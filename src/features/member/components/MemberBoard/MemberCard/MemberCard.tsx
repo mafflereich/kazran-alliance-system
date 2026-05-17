@@ -215,10 +215,11 @@ export default function MemberCard({
                         )}
 
                         {/* 備註（名字下方） */}
-                        {(member.note || member.seasonNote) && (
+                        {(member.note || member.seasonNote || member.overkill != null) && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <div ref={noteRef} className="mt-1 text-xs text-gray-400 line-clamp-2 cursor-default select-none">
+                                        {member.overkill != null && <span className="text-violet-400 mr-1">[{member.overkill.toLocaleString()}E]</span>}
                                         {member.seasonNote && <span className="text-blue-400 mr-1">[{member.seasonNote}]</span>}
                                         {member.note}
                                     </div>
@@ -231,7 +232,7 @@ export default function MemberCard({
                                     collisionBoundary={document.body}  // 可選：限制碰撞邊界
                                 >
                                     <p className="whitespace-pre-wrap">
-                                        {member.seasonNote && <span className="text-blue-400">[{member.seasonNote}]</span>} {member.note}
+                                        {member.overkill != null && <span className="text-violet-400">[{member.overkill.toLocaleString()}E]</span>}{member.seasonNote && <span className="text-blue-400"> [{member.seasonNote}]</span>} {member.note}
                                     </p>
                                 </TooltipContent>}
                             </Tooltip>

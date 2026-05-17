@@ -9,18 +9,24 @@ import type { MemberRaidRecord } from '../types';
 interface ManagerActionsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  activeTab: 'add' | 'archive' | 'delete' | 'memberMove';
-  onTabChange: (tab: 'add' | 'archive' | 'delete' | 'memberMove') => void;
-  newSeason: { season_number: number; period_text: string; description: string; even_rounds: boolean };
-  setNewSeason: React.Dispatch<React.SetStateAction<{ season_number: number; period_text: string; description: string; even_rounds: boolean }>>;
+  activeTab: 'add' | 'edit' | 'archive' | 'delete' | 'memberMove';
+  onTabChange: (tab: 'add' | 'edit' | 'archive' | 'delete' | 'memberMove') => void;
+  newSeason: { season_number: number; period_text: string; score_threshold: number | null; description: string; even_rounds: boolean };
+  setNewSeason: React.Dispatch<React.SetStateAction<{ season_number: number; period_text: string; score_threshold: number | null; description: string; even_rounds: boolean }>>;
   keepScores: boolean;
   setKeepScores: (val: boolean) => void;
   keepSeasonNotes: boolean;
   setKeepSeasonNotes: (val: boolean) => void;
+  keepOverkill: boolean;
+  setKeepOverkill: (val: boolean) => void;
+  editSeason: { season_number: number; period_text: string; score_threshold: number | null; description: string; even_rounds: boolean };
+  setEditSeason: React.Dispatch<React.SetStateAction<{ season_number: number; period_text: string; score_threshold: number | null; description: string; even_rounds: boolean }>>;
   handleSaveSeason: (e: React.FormEvent) => void;
+  handleEditSeason: (e: React.FormEvent) => void;
   handleArchiveSeason: () => void;
-  handleDeleteRecords: (type: 'score' | 'season_note') => void;
+  handleDeleteRecords: (type: 'score' | 'season_note' | 'overkill') => void;
   saving: boolean;
+  editSaving: boolean;
   archiving: boolean;
   isDeleting: boolean;
   isSelectedSeasonArchived: boolean;
@@ -28,6 +34,8 @@ interface ManagerActionsModalProps {
   guilds?: Guild[];
   currentSeasonRecords?: Record<string, MemberRaidRecord>;
   prevSeasonRecords?: Record<string, MemberRaidRecord> | null;
+  prevSeasonRecordsLoading?: boolean;
+  memberMoveAllMembers?: Member[];
 }
 
 const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
@@ -41,10 +49,16 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
   setKeepScores,
   keepSeasonNotes,
   setKeepSeasonNotes,
+  keepOverkill,
+  setKeepOverkill,
+  editSeason,
+  setEditSeason,
   handleSaveSeason,
+  handleEditSeason,
   handleArchiveSeason,
   handleDeleteRecords,
   saving,
+  editSaving,
   archiving,
   isDeleting,
   isSelectedSeasonArchived,
@@ -52,14 +66,16 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
   guilds = [],
   currentSeasonRecords = {},
   prevSeasonRecords = null,
+  prevSeasonRecordsLoading = false,
+  memberMoveAllMembers,
 }) => {
   const { t } = useTranslation(['raid', 'translation']);
-  const [confirmType, setConfirmType] = React.useState<'archive' | 'delete_score' | 'delete_note' | null>(null);
+  const [confirmType, setConfirmType] = React.useState<'archive' | 'delete_score' | 'delete_note' | 'delete_overkill' | null>(null);
 
   const { moveSummaries, loading: movesLoading } = useMemberMoveAnnounce(
     currentSeasonRecords,
     prevSeasonRecords,
-    members,
+    memberMoveAllMembers?.length ? memberMoveAllMembers : members,
     guilds,
     isSelectedSeasonArchived
   );
@@ -71,6 +87,8 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
       handleArchiveSeason();
     } else if (confirmType === 'delete_score') {
       handleDeleteRecords('score');
+    } else if (confirmType === 'delete_overkill') {
+      handleDeleteRecords('overkill');
     } else if (confirmType === 'delete_note') {
       handleDeleteRecords('season_note');
     }
@@ -111,6 +129,18 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
         <button
           onClick={() => {
             setConfirmType(null);
+            onTabChange('edit');
+          }}
+          className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'edit'
+              ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+              : 'border-transparent text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
+            }`}
+        >
+          {t('raid.tab_edit_season', '編輯賽季')}
+        </button>
+        <button
+          onClick={() => {
+            setConfirmType(null);
             onTabChange('archive');
           }}
           className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'archive'
@@ -132,20 +162,18 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
         >
           {t('raid.tab_delete_records', '刪除記錄')}
         </button>
-        {prevSeasonRecords && (
-          <button
-            onClick={() => {
-              setConfirmType(null);
-              onTabChange('memberMove');
-            }}
-            className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'memberMove'
-                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                : 'border-transparent text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
-              }`}
-          >
-            {t('raid.tab_member_moves', '成員變動名冊')}
-          </button>
-        )}
+        <button
+          onClick={() => {
+            setConfirmType(null);
+            onTabChange('memberMove');
+          }}
+          className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'memberMove'
+              ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+              : 'border-transparent text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
+            }`}
+        >
+          {t('raid.tab_member_moves', '成員變動名冊')}
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
@@ -213,6 +241,28 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                    {t('raid.score_threshold', '分數閾值')}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newSeason.score_threshold ?? ''}
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (v === '') { setNewSeason(prev => ({ ...prev, score_threshold: null })); return; }
+                      if (!/^\d{1,4}$/.test(v)) return;
+                      setNewSeason(prev => ({ ...prev, score_threshold: Number(v) }));
+                    }}
+                    placeholder="—"
+                    className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <p className="mt-1 text-xs text-stone-400 dark:text-stone-500">
+                    {t('raid.score_threshold_hint', '成員分數為此數字以上時，方可以填寫其超殺。不填寫此數字時，所有成員都不能填寫超殺。')}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
                     {t('alliance_raid.description')}
                   </label>
                   <input
@@ -249,6 +299,17 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
+                      checked={keepOverkill}
+                      onChange={(e) => setKeepOverkill(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 rounded border-stone-300 focus:ring-indigo-500 dark:border-stone-600 dark:bg-stone-700"
+                    />
+                    <span className="text-sm text-stone-700 dark:text-stone-300">
+                      {t('raid.keep_overkill_label', '保留超殺')}
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
                       checked={keepSeasonNotes}
                       onChange={(e) => setKeepSeasonNotes(e.target.checked)}
                       className="w-4 h-4 text-indigo-600 rounded border-stone-300 focus:ring-indigo-500 dark:border-stone-600 dark:bg-stone-700"
@@ -274,6 +335,103 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
                   >
                     {saving && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                     {t('common.add')}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {activeTab === 'edit' && (
+              <form onSubmit={handleEditSeason} className="space-y-4 max-w-md mx-auto">
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                    {t('alliance_raid.season_number')}
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={editSeason.season_number}
+                    onChange={e => setEditSeason(prev => ({ ...prev, season_number: Number(e.target.value) }))}
+                    className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                    {t('alliance_raid.period')}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editSeason.period_text}
+                    onChange={e => setEditSeason(prev => ({ ...prev, period_text: e.target.value }))}
+                    className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                    {t('raid.score_threshold', '分數閾值')}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editSeason.score_threshold ?? ''}
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (v === '') { setEditSeason(prev => ({ ...prev, score_threshold: null })); return; }
+                      if (!/^\d{1,4}$/.test(v)) return;
+                      setEditSeason(prev => ({ ...prev, score_threshold: Number(v) }));
+                    }}
+                    placeholder="—"
+                    className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <p className="mt-1 text-xs text-stone-400 dark:text-stone-500">
+                    {t('raid.score_threshold_hint', '成員分數為此數字以上時，方可以填寫其超殺。不填寫此數字時，所有成員都不能填寫超殺。')}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
+                    {t('alliance_raid.description')}
+                  </label>
+                  <input
+                    type="text"
+                    value={editSeason.description}
+                    onChange={e => setEditSeason(prev => ({ ...prev, description: e.target.value }))}
+                    className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2 pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editSeason.even_rounds}
+                      onChange={e => setEditSeason(prev => ({ ...prev, even_rounds: e.target.checked }))}
+                      className="w-4 h-4 text-indigo-600 rounded border-stone-300 focus:ring-indigo-500 dark:border-stone-600 dark:bg-stone-700"
+                    />
+                    <span className="text-sm text-stone-700 dark:text-stone-300">
+                      {t('common.even_rounds')}
+                    </span>
+                  </label>
+                </div>
+
+                <div className="pt-4 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-lg transition-colors"
+                  >
+                    {t('common.cancel')}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editSaving}
+                    className="px-4 py-2 bg-stone-800 dark:bg-stone-600 text-white rounded-lg hover:bg-stone-700 dark:hover:bg-stone-500 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {editSaving && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                    {t('common.save', '儲存')}
                   </button>
                 </div>
               </form>
@@ -358,6 +516,24 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
                   <div className="flex items-center justify-between p-3 bg-stone-50 dark:bg-stone-900/50 rounded-lg border border-stone-200 dark:border-stone-700">
                     <div>
                       <div className="text-sm font-bold text-stone-800 dark:text-stone-200">
+                        {t('raid.delete_overkill_title', '刪除當前賽季超殺')}
+                      </div>
+                      <div className="text-xs text-stone-500">
+                        {t('raid.delete_overkill_desc', '將所有成員的超殺清空')}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setConfirmType('delete_overkill')}
+                      disabled={isDeleting || isSelectedSeasonArchived}
+                      className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-bold disabled:opacity-50"
+                    >
+                      {t('raid.delete_overkill_button', '刪除超殺')}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-stone-50 dark:bg-stone-900/50 rounded-lg border border-stone-200 dark:border-stone-700">
+                    <div>
+                      <div className="text-sm font-bold text-stone-800 dark:text-stone-200">
                         {t('raid.delete_notes_title', '刪除當前賽季備註')}
                       </div>
                       <div className="text-xs text-stone-500">
@@ -376,11 +552,23 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
               </div>
             )}
 
-            {activeTab === 'memberMove' && prevSeasonRecords && (
-              <MemberMoveAnnounceTab
-                moveSummaries={moveSummaries}
-                isLoading={movesLoading}
-              />
+            {activeTab === 'memberMove' && (
+              prevSeasonRecordsLoading || prevSeasonRecords === null
+                ? (
+                  <div className="flex items-center justify-center py-12 text-stone-400 dark:text-stone-500">
+                    <svg className="animate-spin w-5 h-5 mr-2" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    <span className="text-sm">載入中...</span>
+                  </div>
+                )
+                : (
+                  <MemberMoveAnnounceTab
+                    moveSummaries={moveSummaries}
+                    isLoading={movesLoading}
+                  />
+                )
             )}
           </>
         )}

@@ -32,10 +32,13 @@ export function useSeasonManager({
   const [error, setError] = useState('');
 
   const [isSeasonPanelOpen, setIsSeasonPanelOpen] = useState(false);
-  const [activeSeasonTab, setActiveSeasonTab] = useState<'add' | 'archive' | 'delete' | 'memberMove'>('add');
-  const [newSeason, setNewSeason] = useState({ season_number: 1, period_text: '', description: '', even_rounds: false });
+  const [activeSeasonTab, setActiveSeasonTab] = useState<'add' | 'edit' | 'archive' | 'delete' | 'memberMove'>('add');
+  const [newSeason, setNewSeason] = useState({ season_number: 1, period_text: '', score_threshold: null as number | null, description: '', even_rounds: false });
   const [keepScores, setKeepScores] = useState(true);
-  const [keepSeasonNotes, setKeepSeasonNotes] = useState(false);
+  const [keepSeasonNotes, setKeepSeasonNotes] = useState(true);
+  const [keepOverkill, setKeepOverkill] = useState(true);
+  const [editSeason, setEditSeason] = useState({ season_number: 1, period_text: '', score_threshold: null as number | null, description: '', even_rounds: false });
+  const [editSaving, setEditSaving] = useState(false);
 
   // Keep newSeason.season_number in sync with latest season
   useEffect(() => {
@@ -44,6 +47,20 @@ export function useSeasonManager({
       setNewSeason(prev => ({ ...prev, season_number: maxSeason + 1 }));
     }
   }, [seasons]);
+
+  // Sync editSeason with selected season
+  useEffect(() => {
+    const selected = seasons.find(s => String(s.id) === String(selectedSeasonId));
+    if (selected) {
+      setEditSeason({
+        season_number: selected.season_number,
+        period_text: selected.period_text || '',
+        score_threshold: selected.score_threshold ?? null,
+        description: selected.description || '',
+        even_rounds: selected.even_rounds ?? false,
+      });
+    }
+  }, [selectedSeasonId, seasons]);
 
   const handleSaveSeason = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,8 +88,8 @@ export function useSeasonManager({
 
           if (!prevRecordsError && prevGuildRecords && prevGuildRecords.length > 0) {
             const newGuildRecords = prevGuildRecords
-              .filter(r => r.note !== null && r.note !== '')
-              .map(r => ({ season_id: createdSeason.id, guild_id: r.guild_id, note: r.note }));
+              .filter((r: { guild_id: string; note: string | null }) => r.note !== null && r.note !== '')
+              .map((r: { guild_id: string; note: string | null }) => ({ season_id: createdSeason.id, guild_id: r.guild_id, note: r.note }));
 
             if (newGuildRecords.length > 0) {
               const { error: upsertError } = await supabase
@@ -83,20 +100,21 @@ export function useSeasonManager({
           }
 
           // Copy previous season's member records if requested
-          if (keepScores || keepSeasonNotes) {
+          if (keepScores || keepSeasonNotes || keepOverkill) {
             const { data: prevMemberRecords, error: prevMemberRecordsError } = await supabase
               .from('member_raid_records')
-              .select('member_id, score, season_note')
+              .select('member_id, score, season_note, overkill')
               .eq('season_id', previousSeason.id);
 
             if (!prevMemberRecordsError && prevMemberRecords && prevMemberRecords.length > 0) {
               const newMemberRecords = prevMemberRecords
-                .filter(r => (keepScores && r.score) || (keepSeasonNotes && r.season_note))
-                .map(r => ({
+                .filter((r: { member_id: string; score: number; season_note: string; overkill: number | null }) => (keepScores && r.score) || (keepSeasonNotes && r.season_note) || (keepOverkill && r.overkill != null))
+                .map((r: { member_id: string; score: number; season_note: string; overkill: number | null }) => ({
                   season_id: createdSeason.id,
                   member_id: r.member_id,
                   score: keepScores ? r.score : 0,
                   season_note: keepSeasonNotes ? r.season_note : '',
+                  overkill: keepOverkill ? r.overkill : null,
                 }));
 
               if (newMemberRecords.length > 0) {
@@ -110,9 +128,10 @@ export function useSeasonManager({
         }
 
         setIsSeasonPanelOpen(false);
-        setNewSeason({ season_number: createdSeason.season_number + 1, period_text: '', description: '', even_rounds: false });
+        setNewSeason({ season_number: createdSeason.season_number + 1, period_text: '', score_threshold: null, description: '', even_rounds: false });
         setKeepScores(true);
-        setKeepSeasonNotes(false);
+        setKeepSeasonNotes(true);
+        setKeepOverkill(true);
       }
     } catch (err: any) {
       console.error('Error saving season:', err);
@@ -179,11 +198,45 @@ export function useSeasonManager({
     }
   };
 
-  const handleDeleteRecords = async (type: 'score' | 'season_note') => {
+  const handleEditSeason = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSeasonId) return;
+    setEditSaving(true);
+    try {
+      const { error } = await supabase
+        .from('raid_seasons')
+        .update({
+          season_number: editSeason.season_number,
+          period_text: editSeason.period_text,
+          score_threshold: editSeason.score_threshold,
+          description: editSeason.description,
+          even_rounds: editSeason.even_rounds,
+        })
+        .eq('id', selectedSeasonId);
+
+      if (error) throw error;
+
+      setSeasons(prev =>
+        prev.map(s =>
+          String(s.id) === String(selectedSeasonId)
+            ? { ...s, ...editSeason }
+            : s
+        ).sort((a, b) => b.season_number - a.season_number)
+      );
+      setIsSeasonPanelOpen(false);
+    } catch (err: any) {
+      console.error('Error editing season:', err);
+      setError(`Error editing season: ${err.message}`);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleDeleteRecords = async (type: 'score' | 'season_note' | 'overkill') => {
     if (!selectedSeasonId) return;
     setIsDeleting(true);
     try {
-      const updateData = type === 'score' ? { score: 0 } : { season_note: '' };
+      const updateData = type === 'score' ? { score: 0 } : type === 'season_note' ? { season_note: '' } : { overkill: null };
       const { error } = await supabase
         .from('member_raid_records')
         .update(updateData)
@@ -204,6 +257,7 @@ export function useSeasonManager({
     saving,
     archiving,
     isDeleting,
+    editSaving,
     error,
     isSeasonPanelOpen,
     setIsSeasonPanelOpen,
@@ -215,7 +269,12 @@ export function useSeasonManager({
     setKeepScores,
     keepSeasonNotes,
     setKeepSeasonNotes,
+    keepOverkill,
+    setKeepOverkill,
+    editSeason,
+    setEditSeason,
     handleSaveSeason,
+    handleEditSeason,
     handleArchiveSeason,
     handleDeleteRecords,
   };

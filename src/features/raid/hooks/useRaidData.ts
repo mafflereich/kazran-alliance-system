@@ -4,7 +4,6 @@ import { isDebugMode } from '@/shared/api/debugMode';
 import type { RaidSeason, MemberRaidRecord, GuildRaidRecord } from '../types';
 
 export function useRaidData(
-  fetchAllMembers: () => void,
   updateMemberNote: (memberId: string, payload: Record<string, any>) => void,
 ) {
   const [seasons, setSeasons] = useState<RaidSeason[]>([]);
@@ -21,7 +20,6 @@ export function useRaidData(
   const fetchTokenRef = useRef(0);
 
   // Stable ref for updateMemberNote — avoids adding the prop to subscription effect deps
-  // (same pattern as fetchAllMembers; callers must ensure the function is stable)
   const updateMemberNoteRef = useRef(updateMemberNote);
   updateMemberNoteRef.current = updateMemberNote;
 
@@ -107,7 +105,6 @@ export function useRaidData(
   // Initial load
   useEffect(() => {
     fetchSeasons();
-    fetchAllMembers();
   }, []);
 
   // Reload on season change

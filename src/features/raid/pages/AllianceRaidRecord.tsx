@@ -7,7 +7,6 @@ import { useTranslation } from 'react-i18next';
 import { getTierColor } from '@/shared/lib/utils';
 import { toPng } from 'html-to-image';
 
-import AllianceRaidSeasonModal from '../components/AllianceRaidSeasonModal';
 import AllianceRaidDownloadModal, { DownloadConfig } from '../components/AllianceRaidDownloadModal';
 import AllianceRaidDisplayOptionsModal from '../components/AllianceRaidDisplayOptionsModal';
 import AllianceRaidExportView from '../components/AllianceRaidExportView';
@@ -27,6 +26,7 @@ interface GuildRaidRecord {
   score: number;
   rank: string;
   member_score_median?: number;
+  overkill?: number | null;
 }
 
 export default function AllianceRaidRecord() {
@@ -40,22 +40,18 @@ export default function AllianceRaidRecord() {
   const [error, setError] = useState('');
 
   // Modals state
-  const [isSeasonModalOpen, setIsSeasonModalOpen] = useState(false);
-  const [editingSeasonId, setEditingSeasonId] = useState<string | null>(null);
-  const [newSeason, setNewSeason] = useState({ season_number: 1, period_text: '', description: '', even_rounds: false });
-
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [exportConfig, setExportConfig] = useState<DownloadConfig | null>(null);
   const [hideScoreInTable, setHideScoreInTable] = useState(false);
+  const [hideOverkillInTable, setHideOverkillInTable] = useState(false);
   const [hideLatestSeason, setHideLatestSeason] = useState(false);
   const [isDisplayOptionsModalOpen, setIsDisplayOptionsModalOpen] = useState(false);
   const [visibleGuildIds, setVisibleGuildIds] = useState<Set<string> | null>(null);
 
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
 
   const [editingCell, setEditingCell] = useState<{ guild_id: string, season_id: string } | null>(null);
-  const [editRecordData, setEditRecordData] = useState<{ score: number | '', rank: string }>({ score: '', rank: '' });
+  const [editRecordData, setEditRecordData] = useState<{ score: number | '', rank: string, overkill: number | null }>({ score: '', rank: '', overkill: null });
 
   const canManage = userRole === 'manager' || userRole === 'admin' || userRole === 'creator';
 
@@ -85,88 +81,27 @@ export default function AllianceRaidRecord() {
   }, []);
 
 
-  const handleSaveSeason = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingSeasonId) {
-        const { error } = await supabase
-          .from('raid_seasons')
-          .update(newSeason)
-          .eq('id', editingSeasonId);
-
-        if (error) throw error;
-
-        setSeasons(prev => prev.map(s => s.id === editingSeasonId ? { ...s, ...newSeason } : s).sort((a, b) => b.season_number - a.season_number));
-      } else {
-        const { data, error } = await supabase
-          .from('raid_seasons')
-          .insert([newSeason])
-          .select();
-
-        if (error) throw error;
-
-        if (data && data.length > 0) {
-          const createdSeason = data[0];
-          setSeasons(prev => [createdSeason, ...prev].sort((a, b) => b.season_number - a.season_number));
-
-          // Copy previous season's guild notes
-          const previousSeason = seasons.length > 0 ? seasons[0] : null;
-          if (previousSeason) {
-            const { data: prevGuildRecords, error: prevRecordsError } = await supabase
-              .from('guild_raid_records')
-              .select('guild_id, note')
-              .eq('season_id', previousSeason.id);
-
-            if (!prevRecordsError && prevGuildRecords && prevGuildRecords.length > 0) {
-              const newGuildRecords = prevGuildRecords
-                .filter(record => record.note !== null && record.note !== '')
-                .map(record => ({
-                  season_id: createdSeason.id,
-                  guild_id: record.guild_id,
-                  note: record.note
-                }));
-
-              if (newGuildRecords.length > 0) {
-                const { error: upsertError } = await supabase
-                  .from('guild_raid_records')
-                  .upsert(newGuildRecords, { onConflict: 'season_id,guild_id' });
-
-                if (upsertError) {
-                  console.error('Error copying previous season guild notes:', upsertError);
-                }
-              }
-            }
-          }
-        }
-      }
-      setIsSeasonModalOpen(false);
-      setEditingSeasonId(null);
-      setNewSeason({ season_number: (seasons[0]?.season_number || 0) + 1, period_text: '', description: '', even_rounds: false });
-    } catch (err: any) {
-      setError(`Error saving season: ${err.message}`);
-    }
-  };
-
   const handleSaveRecord = async (guild_id: string, season_id: string) => {
     try {
       const existingRecord = records.find(r => r.guild_id === guild_id && r.season_id === season_id);
 
       const scoreToSave = editRecordData.score === '' ? 0 : Number(editRecordData.score);
       const rankToSave = editRecordData.rank;
+      const overkillToSave = (editRecordData.rank && /[a-zA-Z]/.test(editRecordData.rank)) ? editRecordData.overkill : null;
 
       if (existingRecord) {
         const { error } = await supabase
           .from('guild_raid_records')
-          .update({ score: scoreToSave, rank: rankToSave })
+          .update({ score: scoreToSave, rank: rankToSave, overkill: overkillToSave })
           .eq('id', existingRecord.id);
 
         if (error) throw error;
 
-        setRecords(prev => prev.map(r => r.id === existingRecord.id ? { ...r, score: scoreToSave, rank: rankToSave } : r));
+        setRecords(prev => prev.map(r => r.id === existingRecord.id ? { ...r, score: scoreToSave, rank: rankToSave, overkill: overkillToSave } : r));
       } else {
         const { data, error } = await supabase
           .from('guild_raid_records')
-          .insert([{ guild_id, season_id, score: scoreToSave, rank: rankToSave }])
+          .insert([{ guild_id, season_id, score: scoreToSave, rank: rankToSave, overkill: overkillToSave }])
           .select();
 
         if (error) throw error;
@@ -185,7 +120,8 @@ export default function AllianceRaidRecord() {
     const existingRecord = records.find(r => r.guild_id === guild_id && r.season_id === season_id);
     setEditRecordData({
       score: existingRecord ? existingRecord.score : '',
-      rank: existingRecord ? existingRecord.rank : ''
+      rank: existingRecord?.rank ?? '',
+      overkill: existingRecord?.overkill ?? null,
     });
     setEditingCell({ guild_id, season_id });
   };
@@ -263,12 +199,8 @@ export default function AllianceRaidRecord() {
   const handleDownloadFromModal = async (config: DownloadConfig) => {
     setExportConfig(config);
     setIsDownloadModalOpen(false);
-    setIsGeneratingImage(true);
     await new Promise(resolve => setTimeout(resolve, 500));
-    if (!exportRef.current) {
-      setIsGeneratingImage(false);
-      return;
-    }
+    if (!exportRef.current) return;
     try {
       const dataUrl = await toPng(exportRef.current, {
         backgroundColor: '#1c1917',
@@ -283,7 +215,6 @@ export default function AllianceRaidRecord() {
       console.error('Error generating image:', err);
       setError(t('alliance_raid.export_failed'));
     } finally {
-      setIsGeneratingImage(false);
       setExportConfig(null);
     }
   };
@@ -344,6 +275,26 @@ export default function AllianceRaidRecord() {
 
             <div className="h-6 w-px bg-stone-300 dark:bg-stone-700 mx-1"></div>
 
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-stone-700 dark:text-stone-300 whitespace-nowrap">
+                {t('alliance_raid.hide_overkill')}
+              </span>
+              <button
+                onClick={() => setHideOverkillInTable(!hideOverkillInTable)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                  hideOverkillInTable ? 'bg-amber-600' : 'bg-stone-300 dark:bg-stone-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                    hideOverkillInTable ? 'translate-x-[18px]' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="h-6 w-px bg-stone-300 dark:bg-stone-700 mx-1"></div>
+
             <button
               onClick={() => setIsDisplayOptionsModalOpen(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-200 dark:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-lg hover:bg-stone-300 dark:hover:bg-stone-600 transition-colors text-sm font-medium"
@@ -355,15 +306,10 @@ export default function AllianceRaidRecord() {
             <div className="h-6 w-px bg-stone-300 dark:bg-stone-700 mx-1"></div>
 
             <button
-              onClick={() => setIsDownloadModalOpen(true)}
-              disabled={isGeneratingImage}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50"
+              disabled
+              className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg transition-colors opacity-50 cursor-not-allowed"
             >
-              {isGeneratingImage ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <Download className="w-4 h-4" />
-              )}
+              <Download className="w-4 h-4" />
               <span>{t('alliance_raid.download_record')}</span>
             </button>
 
@@ -424,23 +370,6 @@ export default function AllianceRaidRecord() {
                             {season.description}
                           </div>
                         </div>
-                        {canManage && (
-                          <button
-                            onClick={() => {
-                              setEditingSeasonId(season.id);
-                              setNewSeason({
-                                season_number: season.season_number,
-                                period_text: season.period_text,
-                                description: season.description,
-                                even_rounds: season.even_rounds || false
-                              });
-                              setIsSeasonModalOpen(true);
-                            }}
-                            className="absolute top-1 right-1 p-1 text-stone-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded opacity-0 group-hover:opacity-100 transition-all"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
                       </th>
                     ))}
                   </tr>
@@ -490,9 +419,19 @@ export default function AllianceRaidRecord() {
                                       placeholder="Score"
                                     />
                                   </div>
+                                  {editRecordData.rank && /[a-zA-Z]/.test(editRecordData.rank) && (
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={editRecordData.overkill ?? ''}
+                                      onChange={e => setEditRecordData(prev => ({ ...prev, overkill: e.target.value ? Number(e.target.value) : null }))}
+                                      className="w-full px-1 py-0.5 text-xs border border-violet-300 dark:border-violet-700 rounded bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      placeholder="Overkill"
+                                    />
+                                  )}
                                   <div className="flex gap-1">
                                     <button
-                                      onClick={() => handleSaveRecord(guild.id, season.id)}
+                                      onClick={() => handleSaveRecord(guild.id!, season.id)}
                                       className="flex-1 py-0.5 bg-green-100 text-green-700 hover:bg-green-200 rounded flex items-center justify-center transition-colors"
                                     >
                                       <Save className="w-3.5 h-3.5" />
@@ -506,31 +445,37 @@ export default function AllianceRaidRecord() {
                                   </div>
                                 </div>
                               ) : (
-                                <div className="flex items-center gap-1.5 min-h-[20px] relative pr-6">
-                                  {record && record.rank ? (
-                                    <>
-                                      <div className={`text-sm font-bold leading-tight ${record.rank && !record.rank.includes('%')
-                                        ? 'bg-gradient-to-r from-amber-400 to-orange-600 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(245,158,11,0.5)] scale-110 transform origin-left'
-                                        : 'text-amber-600 dark:text-amber-400'
-                                        }`}>
-                                        {record.rank}
-                                      </div>
-                                      {record.score > 0 && !hideScoreInTable && (
-                                        <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
-                                          ({record.score.toLocaleString()})
+                                <div className="flex flex-col gap-0.5 min-h-[20px] relative pr-6">
+                                  <div className="flex items-center gap-1.5">
+                                    {record && record.rank ? (
+                                      <>
+                                        <div className={`text-sm font-bold leading-tight ${record.rank && !record.rank.includes('%')
+                                          ? 'bg-gradient-to-r from-amber-400 to-orange-600 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(245,158,11,0.5)] scale-110 transform origin-left'
+                                          : 'text-amber-600 dark:text-amber-400'
+                                          }`}>
+                                          {record.rank}
                                         </div>
-                                      )}
-                                    </>
-                                  ) : (
-                                    <div className="text-sm text-stone-400 dark:text-stone-600 italic">
-                                      -
+                                        {record.score > 0 && !hideScoreInTable && (
+                                          <div className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight">
+                                            ({record.score.toLocaleString()})
+                                          </div>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <div className="text-sm text-stone-400 dark:text-stone-600 italic">
+                                        -
+                                      </div>
+                                    )}
+                                  </div>
+                                  {!hideOverkillInTable && record && record.rank && !record.rank.includes('%') && record.overkill != null && (
+                                    <div className="text-[10px] text-violet-500 dark:text-violet-400 font-medium leading-tight">
+                                      {record.overkill.toLocaleString()}
                                     </div>
                                   )}
-
                                   {canManage && (
                                     <button
-                                      onClick={() => startEditing(guild.id, season.id)}
-                                      className="absolute top-1/2 -translate-y-1/2 right-0 p-1 text-stone-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded opacity-0 group-hover:opacity-100 transition-all"
+                                      onClick={() => startEditing(guild.id!, season.id)}
+                                      className="absolute top-0.5 right-0 p-1 text-stone-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded opacity-0 group-hover:opacity-100 transition-all"
                                     >
                                       <Edit2 className="w-3.5 h-3.5" />
                                     </button>
@@ -549,15 +494,6 @@ export default function AllianceRaidRecord() {
           )}
         </div>
       </main>
-
-      <AllianceRaidSeasonModal
-        isOpen={isSeasonModalOpen}
-        onClose={() => setIsSeasonModalOpen(false)}
-        onSave={handleSaveSeason}
-        editingSeasonId={editingSeasonId}
-        newSeason={newSeason}
-        setNewSeason={setNewSeason}
-      />
 
       <AllianceRaidDownloadModal
         isOpen={isDownloadModalOpen}
