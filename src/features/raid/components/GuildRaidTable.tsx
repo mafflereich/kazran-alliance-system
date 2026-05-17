@@ -38,6 +38,7 @@ interface GuildRaidTableProps {
   onDeleteGhostRecord?: (memberId: string, record: any) => void;
   showOverkill?: boolean;
   scoreThreshold?: number | null;
+  forceHideOverkill?: boolean;
 }
 
 function GuildRaidTable({
@@ -72,6 +73,7 @@ function GuildRaidTable({
   onDeleteGhostRecord,
   showOverkill = false,
   scoreThreshold = null,
+  forceHideOverkill = true,
 }: GuildRaidTableProps) {
   const { t } = useTranslation(['raid', 'translation']);
   const guildName = guild?.name || '';
@@ -227,7 +229,7 @@ function GuildRaidTable({
                 <col />
                 <col style={{ width: '80px' }} />
                 <col style={{ width: '150px' }} />
-                {showOverkill && scoreThreshold != null && <col style={{ width: '92px' }} />}
+                {showOverkill && scoreThreshold != null && !forceHideOverkill && <col style={{ width: '92px' }} />}
                 <col />
                 <col />
               </colgroup>
@@ -269,7 +271,7 @@ function GuildRaidTable({
                     {t('raid.column_deduction', '推算')}
                   </th>
                 )}
-                {!isComparisonMode && showOverkill && scoreThreshold != null && (
+                {!isComparisonMode && showOverkill && scoreThreshold != null && !forceHideOverkill && (
                   <th
                     className="p-3 text-xs font-semibold text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-600 cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-600"
                     onClick={() => onSort('score')}
@@ -382,7 +384,7 @@ function GuildRaidTable({
                         </div>
                       </td>
                     )}
-                    {!isComparisonMode && showOverkill && scoreThreshold != null && (
+                    {!isComparisonMode && showOverkill && scoreThreshold != null && !forceHideOverkill && (
                       <td className="py-0.5 px-2">
                         {!isArchived ? (
                           (record.score || 0) >= scoreThreshold ? (
@@ -458,7 +460,7 @@ function GuildRaidTable({
                 <td className="py-1 px-3 text-xs text-stone-500 dark:text-stone-400">
                   {medianScore}
                 </td>
-                {!isComparisonMode && <td colSpan={showOverkill && scoreThreshold != null ? 4 : 3}></td>}
+                {!isComparisonMode && <td colSpan={showOverkill && scoreThreshold != null && !forceHideOverkill ? 4 : 3}></td>}
               </tr>
             </tbody>
           </table>

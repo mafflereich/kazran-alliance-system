@@ -17,6 +17,7 @@ interface RaidSeason {
   period_text: string;
   description: string;
   even_rounds: boolean;
+  score_threshold: number | null;
 }
 
 interface GuildRaidRecord {
@@ -419,7 +420,7 @@ export default function AllianceRaidRecord() {
                                       placeholder="Score"
                                     />
                                   </div>
-                                  {editRecordData.rank && /[a-zA-Z]/.test(editRecordData.rank) && (
+                                  {season.score_threshold != null && typeof editRecordData.score === 'number' && editRecordData.score >= season.score_threshold * 30 && (
                                     <input
                                       type="number"
                                       min="0"
@@ -467,7 +468,7 @@ export default function AllianceRaidRecord() {
                                       </div>
                                     )}
                                   </div>
-                                  {!hideOverkillInTable && record && record.rank && !record.rank.includes('%') && record.overkill != null && (
+                                  {!hideOverkillInTable && record?.overkill != null && season.score_threshold != null && record.score >= season.score_threshold * 30 && (
                                     <div className="text-[10px] text-violet-500 dark:text-violet-400 font-medium leading-tight">
                                       {record.overkill.toLocaleString()}
                                     </div>
