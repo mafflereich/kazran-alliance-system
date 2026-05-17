@@ -15,6 +15,7 @@ export interface MemberRaidRecord {
   note: string;
   season_note?: string;
   season_guild?: string;
+  overkill?: number | null;
 }
 
 export interface GuildRaidRecord {
