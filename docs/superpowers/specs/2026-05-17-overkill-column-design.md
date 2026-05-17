@@ -22,14 +22,14 @@ Add an "Overkill" column to the raid member table, visible only for Tier 1 guild
 
 ## Sorting
 
-- Sort key: `'overkill'` added to `sortConfig.key` union
-- First click on header → descending order (matches `score` column behavior)
-- Subsequent clicks toggle asc/desc
-- Tie-breaking order:
-  1. overkill value (primary, direction follows `sortConfig.order`)
-  2. score (descending)
-  3. member name (ascending alphabetical)
-- Overkill header shows sort arrow icon when active (same style as score column)
+- 個人總分 and 超殺 columns **share the same sort state** — clicking either calls `onSort('score')`
+- `sortConfig.key` union stays `'default' | 'score'` (no new key needed)
+- First click on either header → `key: 'score', order: 'desc'`; subsequent clicks toggle asc/desc
+- Sort order (direction follows `sortConfig.order`):
+  1. score (primary)
+  2. overkill (always follows score, same direction)
+  3. member name (always ascending alphabetical)
+- Both score and overkill headers show sort arrow icon when `sortConfig.key === 'score'`
 
 ## Data Layer
 
@@ -59,9 +59,9 @@ export interface MemberRaidRecord {
 
 ### `GuildRaidManager` (`src/features/raid/pages/GuildRaidManager.tsx`)
 
-- `sortConfig.key` type extended: `'default' | 'score' | 'overkill'`
-- `handleSort`: when key is `'overkill'`, defaults to `order: 'desc'` on first press (same as `'score'`)
-- `sortedMembersMap`: add overkill branch with tie-breaking (overkill → score desc → name asc)
+- `sortConfig.key` type stays `'default' | 'score'` — no change needed
+- `handleSort`: no change needed
+- `sortedMembersMap`: update `key === 'score'` branch tie-breaking to: score → overkill (same direction) → name asc
 - Pass `showOverkill={db.guilds[guildId]?.tier === 1}` to each `GuildRaidTable`
 
 ## Component Layer
@@ -71,17 +71,17 @@ export interface MemberRaidRecord {
 **Props:**
 ```ts
 showOverkill?: boolean;
-onSort: (key: 'default' | 'score' | 'overkill') => void;
+// onSort type unchanged: (key: 'default' | 'score') => void
 ```
 
 **colgroup** (non-comparison mode): insert `<col style={{ width: '92px' }} />` after the deduction column. Because 成員備註 and 賽季備註 are flexible (`<col />` with no fixed width), the browser automatically absorbs the 92px into those columns — total table width stays the same with no other colgroup changes needed.
 
 **thead** (non-comparison, `showOverkill`):
 ```tsx
-<th onClick={() => onSort('overkill')} ...>
+<th onClick={() => onSort('score')} ...>
   <div className="flex items-center gap-1">
     {t('raid.column_overkill', '超殺')}
-    {sortConfig.key === 'overkill' && <SortIcon />}
+    {sortConfig.key === 'score' && <SortIcon />}
   </div>
 </th>
 ```
