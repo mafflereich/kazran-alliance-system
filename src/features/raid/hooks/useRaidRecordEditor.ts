@@ -132,7 +132,7 @@ export function useRaidRecordEditor({
 
       const payload = {
         ...raidRecord,
-        overkill: raidRecord.overkill != null ? Number(raidRecord.overkill) : null,
+        overkill: raidRecord.overkill != null && !isNaN(Number(raidRecord.overkill)) ? Number(raidRecord.overkill) : null,
       };
 
       const { error } = await supabase
