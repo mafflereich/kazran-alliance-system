@@ -21,7 +21,7 @@ interface GuildRaidTableProps {
   saving: boolean;
   sortConfig: { key: 'default' | 'score', order: 'asc' | 'desc' };
   onSort: (key: 'default' | 'score') => void;
-  onRecordChange: (memberId: string, field: 'score' | 'note' | 'season_note', value: string | number) => void;
+  onRecordChange: (memberId: string, field: 'score' | 'note' | 'season_note' | 'overkill', value: string | number | null) => void;
   onGuildNoteChange?: (guildId: string, note: string) => void;
   onBlur: (memberId: string, guildId: string) => void;
   onMemberClick: (member: Member) => void;
@@ -36,6 +36,7 @@ interface GuildRaidTableProps {
   onFetchGhostRecords?: (memberId: string) => void;
   onAddGhostRecord?: (memberId: string) => void;
   onDeleteGhostRecord?: (memberId: string, record: any) => void;
+  showOverkill?: boolean;
 }
 
 function GuildRaidTable({
@@ -67,7 +68,8 @@ function GuildRaidTable({
   ghostRecords = {},
   onFetchGhostRecords,
   onAddGhostRecord,
-  onDeleteGhostRecord
+  onDeleteGhostRecord,
+  showOverkill = false,
 }: GuildRaidTableProps) {
   const { t } = useTranslation(['raid', 'translation']);
   const guildName = guild?.name || '';
@@ -223,6 +225,7 @@ function GuildRaidTable({
                 <col />
                 <col style={{ width: '80px' }} />
                 <col style={{ width: '150px' }} />
+                {showOverkill && <col style={{ width: '92px' }} />}
                 <col />
                 <col />
               </colgroup>
@@ -264,6 +267,21 @@ function GuildRaidTable({
                     {t('raid.column_deduction', '推算')}
                   </th>
                 )}
+                {!isComparisonMode && showOverkill && (
+                  <th
+                    className="p-3 text-xs font-semibold text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-600 cursor-pointer hover:bg-stone-100 dark:hover:bg-stone-600"
+                    onClick={() => onSort('score')}
+                  >
+                    <div className="flex items-center gap-1">
+                      {t('raid.column_overkill', '超殺')}
+                      {sortConfig.key === 'score' && (
+                        sortConfig.order === 'asc'
+                          ? <ArrowDownWideNarrow className="w-3.5 h-3.5 text-indigo-500" />
+                          : <ArrowDownNarrowWide className="w-3.5 h-3.5 text-indigo-500" />
+                      )}
+                    </div>
+                  </th>
+                )}
                 {!isComparisonMode && (
                   <th className="p-3 text-xs font-semibold text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-600">
                     {t('raid.column_note', '成員備註')}
@@ -278,7 +296,7 @@ function GuildRaidTable({
             </thead>
             <tbody>
               {sortedMembers.map((member, index) => {
-                const record = draftRecords[member.id!] || records[member.id!] || { score: 0, season_note: '' };
+                const record = draftRecords[member.id!] || records[member.id!] || { score: 0, season_note: '', overkill: null };
                 const noteValue = draftRecords[member.id!]?.note ?? member.note ?? '';
                 const isDirty = !!draftRecords[member.id!];
                 const isHighlighted = highlightedMemberIds?.has(member.id!);
@@ -362,6 +380,33 @@ function GuildRaidTable({
                         </div>
                       </td>
                     )}
+                    {!isComparisonMode && showOverkill && (
+                      <td className="py-0.5 px-2">
+                        {!isArchived ? (
+                          <div className="flex items-center gap-0.5">
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={record.overkill != null ? String(record.overkill) : ''}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                if (!/^[0-9.]*$/.test(v)) return;
+                                if ((v.match(/\./g) || []).length > 1) return;
+                                if (v.length > 5) return;
+                                onRecordChange(member.id!, 'overkill', v === '' ? null : v);
+                              }}
+                              onBlur={() => onBlur(member.id!, guildId)}
+                              className={`w-full px-2 py-0.5 text-xs border rounded bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:ring-2 focus:ring-indigo-500 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${isDirty ? 'border-amber-300 dark:border-amber-600' : 'border-stone-300 dark:border-stone-600'}`}
+                            />
+                            <span className="text-xs text-stone-400 dark:text-stone-500 select-none shrink-0">E</span>
+                          </div>
+                        ) : (
+                          <div className="px-2 py-0.5 text-xs text-stone-800 dark:text-stone-200">
+                            {record.overkill != null ? `${record.overkill}E` : ''}
+                          </div>
+                        )}
+                      </td>
+                    )}
                       {!isComparisonMode && (
                         <td className="py-0.5 px-2">
                           {!isArchived ? (
@@ -407,7 +452,7 @@ function GuildRaidTable({
                 <td className="py-1 px-3 text-xs text-stone-500 dark:text-stone-400">
                   {medianScore}
                 </td>
-                {!isComparisonMode && <td colSpan={3}></td>}
+                {!isComparisonMode && <td colSpan={showOverkill ? 4 : 3}></td>}
               </tr>
             </tbody>
           </table>
