@@ -286,6 +286,13 @@ export default function GuildRaidManager() {
           if (scoreA !== scoreB) {
             return sortConfig.order === 'desc' ? scoreB - scoreA : scoreA - scoreB;
           }
+          const overkillA = editor.draftRecords[a.id!]?.overkill ?? raidData.records[a.id!]?.overkill ?? null;
+          const overkillB = editor.draftRecords[b.id!]?.overkill ?? raidData.records[b.id!]?.overkill ?? null;
+          const oA = overkillA != null ? Number(overkillA) : -Infinity;
+          const oB = overkillB != null ? Number(overkillB) : -Infinity;
+          if (oA !== oB) {
+            return sortConfig.order === 'desc' ? oB - oA : oA - oB;
+          }
         }
         const roleOrder: Record<string, number> = { leader: 1, coleader: 2, member: 3 };
         const orderA = roleOrder[a.role] || 99;
@@ -428,6 +435,7 @@ export default function GuildRaidManager() {
               onFetchGhostRecords={fetchGhostRecordsForMember}
               onAddGhostRecord={handleAddGhostRecord}
               onDeleteGhostRecord={handleDeleteGhostRecord}
+              showOverkill={db.guilds[guildId]?.tier === 1}
             />
           ))}
         </div>
