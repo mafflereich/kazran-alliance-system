@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/store';
 import { supabase } from '@/shared/api/supabase';
@@ -41,6 +41,9 @@ export default function GuildRaidManager() {
   const [prevSeasonRecords, setPrevSeasonRecords] = useState<Record<string, any> | null>(null);
   const [prevSeasonRecordsLoading, setPrevSeasonRecordsLoading] = useState(false);
   const [memberMoveAllMembers, setMemberMoveAllMembers] = useState<Member[]>([]);
+  const [archivedSeasonExtraMembers, setArchivedSeasonExtraMembers] = useState<Record<string, Member>>({});
+  const dbMembersRef = useRef(db.members);
+  useEffect(() => { dbMembersRef.current = db.members; }, [db.members]);
 
   const { ghostRecords, fetchGhostRecordsForMember, fetchGhostRecordsForMembers, handleAddGhostRecord: addGhostRecord, handleDeleteGhostRecord } = useGhostRecords();
   const { availableGuilds, guildsByTier, guildMemberCounts } = useGuildStats(canManage, targetTier);
@@ -94,7 +97,46 @@ export default function GuildRaidManager() {
   useEffect(() => {
     setPrevSeasonRecords(null);
     setMemberMoveAllMembers([]);
+    setArchivedSeasonExtraMembers({});
   }, [raidData.selectedSeason?.id]);
+
+  // Fetch members who have records in an archived season but aren't in db.members
+  useEffect(() => {
+    if (!raidData.isSelectedSeasonArchived || Object.keys(raidData.records).length === 0) {
+      setArchivedSeasonExtraMembers({});
+      return;
+    }
+    const missingIds = Object.keys(raidData.records).filter(id => !dbMembersRef.current[id]);
+    if (missingIds.length === 0) {
+      setArchivedSeasonExtraMembers({});
+      return;
+    }
+    supabase
+      .from('members')
+      .select(RAID_MEMBER_COLUMNS)
+      .in('id', missingIds)
+      .then(({ data }: { data: any[] | null }) => {
+        if (!data) return;
+        const memberMap: Record<string, Member> = {};
+        data.forEach((m: any) => {
+          const memberNotes = Array.isArray(m.member_notes) ? m.member_notes[0] : m.member_notes;
+          memberMap[String(m.id)] = {
+            id: String(m.id),
+            name: m.name || '',
+            guildId: m.guild_id ? String(m.guild_id) : '',
+            role: m.role || 'member',
+            records: {},
+            color: m.color,
+            status: m.status,
+            note: memberNotes?.note || '',
+            isReserved: memberNotes?.is_reserved || false,
+            archiveRemark: memberNotes?.archive_remark || '',
+          };
+        });
+        setArchivedSeasonExtraMembers(memberMap);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raidData.isSelectedSeasonArchived, raidData.records]);
 
   // Fetch all data needed for memberMove tab when it is opened
   useEffect(() => {
@@ -223,8 +265,11 @@ export default function GuildRaidManager() {
 
   const sortedMembersMap = useMemo(() => {
     const map: Record<string, Member[]> = {};
+    const membersSource = raidData.isSelectedSeasonArchived
+      ? { ...db.members, ...archivedSeasonExtraMembers }
+      : db.members;
     for (const guildId of selectedGuildIds) {
-      const guildMembers = Object.values(db.members).filter(m => {
+      const guildMembers = Object.values(membersSource).filter(m => {
         if (raidData.isSelectedSeasonArchived) {
           return raidData.records[m.id!]?.season_guild === guildId;
         }
@@ -254,7 +299,7 @@ export default function GuildRaidManager() {
       });
     }
     return map;
-  }, [selectedGuildIds, db.members, raidData.records, raidData.isSelectedSeasonArchived, sortConfig, editor.draftRecords]);
+  }, [selectedGuildIds, db.members, archivedSeasonExtraMembers, raidData.records, raidData.isSelectedSeasonArchived, sortConfig, editor.draftRecords]);
 
   const handleAddGhostRecord = useCallback(async (memberId: string) => {
     await addGhostRecord(memberId, raidData.selectedSeason?.season_number);
@@ -332,6 +377,7 @@ export default function GuildRaidManager() {
           prevSeasonRecords={prevSeasonRecords}
           prevSeasonRecordsLoading={prevSeasonRecordsLoading}
           memberMoveAllMembers={memberMoveAllMembers}
+          forceHideOverkill={true}
         />
 
         {error && (

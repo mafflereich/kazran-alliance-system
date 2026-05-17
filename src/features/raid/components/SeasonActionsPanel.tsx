@@ -36,6 +36,7 @@ interface ManagerActionsModalProps {
   prevSeasonRecords?: Record<string, MemberRaidRecord> | null;
   prevSeasonRecordsLoading?: boolean;
   memberMoveAllMembers?: Member[];
+  forceHideOverkill?: boolean;
 }
 
 const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
@@ -68,6 +69,7 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
   prevSeasonRecords = null,
   prevSeasonRecordsLoading = false,
   memberMoveAllMembers,
+  forceHideOverkill = false,
 }) => {
   const { t } = useTranslation(['raid', 'translation']);
   const [confirmType, setConfirmType] = React.useState<'archive' | 'delete_score' | 'delete_note' | 'delete_overkill' | null>(null);
@@ -256,9 +258,11 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
                     placeholder="—"
                     className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <p className="mt-1 text-xs text-stone-400 dark:text-stone-500">
-                    {t('raid.score_threshold_hint', '成員分數為此數字以上時，方可以填寫其超殺。不填寫此數字時，所有成員都不能填寫超殺。')}
-                  </p>
+                  {!forceHideOverkill && (
+                    <p className="mt-1 text-xs text-stone-400 dark:text-stone-500">
+                      {t('raid.score_threshold_hint', '成員分數為此數字以上時，方可以填寫其超殺。不填寫此數字時，所有成員都不能填寫超殺。')}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -386,9 +390,11 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
                     placeholder="—"
                     className="w-full px-3 py-2 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
-                  <p className="mt-1 text-xs text-stone-400 dark:text-stone-500">
-                    {t('raid.score_threshold_hint', '成員分數為此數字以上時，方可以填寫其超殺。不填寫此數字時，所有成員都不能填寫超殺。')}
-                  </p>
+                  {!forceHideOverkill && (
+                    <p className="mt-1 text-xs text-stone-400 dark:text-stone-500">
+                      {t('raid.score_threshold_hint', '成員分數為此數字以上時，方可以填寫其超殺。不填寫此數字時，所有成員都不能填寫超殺。')}
+                    </p>
+                  )}
                 </div>
 
                 <div>
