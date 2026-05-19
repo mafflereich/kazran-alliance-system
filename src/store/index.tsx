@@ -215,12 +215,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 1. 先檢查資料庫有沒有這個人的 profile
       let { data: existingProfile, error: profileError } = await supabase
         .from('profiles')
-        .select('id, user_role, user_guilds, display_name, avatar_url')
+        .select('id, auth_id, user_role, user_guilds, display_name, avatar_url')
         .eq('discord_id', discordId)
         .maybeSingle();
 
-      // 2. 如果沒有 profile，代表是全新登入（或之前同步失敗），強制觸發 Edge Function
-      const shouldSync = forceSync || !existingProfile;
+      // 2. 如果沒有 profile，或 profile 存在但 auth_id 為 null（管理員手動建立、從未登入同步），觸發 Edge Function
+      const shouldSync = forceSync || !existingProfile || !existingProfile.auth_id;
 
       if (shouldSync) {
         try {

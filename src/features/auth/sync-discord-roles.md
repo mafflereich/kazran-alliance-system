@@ -203,7 +203,7 @@ serve(async (req) => {
       .eq('discord_id', discord_id)
       .single();
 
-    const shouldUpdateId = !existingProfile?.id?.includes(matchedId);
+    const shouldUpdateId = matchedId !== null && !existingProfile?.id?.includes(matchedId);
     
     const dataRow = {
       discord_id: discord_id,
