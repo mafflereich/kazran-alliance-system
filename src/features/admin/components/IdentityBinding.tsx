@@ -54,6 +54,7 @@ export default function IdentityBinding() {
             isLoading={binding.isLoading}
             selectedProfile={binding.selectedProfile}
             onSelectProfile={binding.setSelectedProfile}
+            onDeleteProfile={binding.handleDeleteProfileClick}
           />
         ) : (
           <MultiMatchPanel
@@ -105,6 +106,14 @@ export default function IdentityBinding() {
         message={t('binding.confirm_bind', { name: binding.confirmModal.member?.name })}
         onConfirm={binding.executeSingleBind}
         onCancel={() => binding.setConfirmModal({ isOpen: false, member: null })}
+      />
+
+      <ConfirmModal
+        isOpen={binding.deleteProfileModal.isOpen}
+        title={t('binding.delete_profile', '刪除 Profile')}
+        message={t('binding.confirm_delete_profile', { name: binding.deleteProfileModal.profile?.display_name })}
+        onConfirm={binding.executeDeleteProfile}
+        onCancel={() => binding.setDeleteProfileModal({ isOpen: false, profile: null })}
       />
     </div>
   );

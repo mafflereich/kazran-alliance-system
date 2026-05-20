@@ -18,6 +18,10 @@ export function useIdentityBinding() {
     isOpen: false,
     member: null,
   });
+  const [deleteProfileModal, setDeleteProfileModal] = useState<{ isOpen: boolean; profile: Profile | null }>({
+    isOpen: false,
+    profile: null,
+  });
 
   const [mode, setMode] = useState<'single' | 'multi'>('single');
   const [leftSearchQuery, setLeftSearchQuery] = useState('');
@@ -215,6 +219,34 @@ export function useIdentityBinding() {
     }
   };
 
+  const handleDeleteProfileClick = (profile: Profile) => {
+    setDeleteProfileModal({ isOpen: true, profile });
+  };
+
+  const executeDeleteProfile = async () => {
+    const profile = deleteProfileModal.profile;
+    if (!profile) return;
+
+    setIsBinding(true);
+    setDeleteProfileModal({ isOpen: false, profile: null });
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('discord_id', profile.discord_id);
+      if (error) throw error;
+
+      showToast(t('binding.delete_profile_success', '已刪除 Profile'), 'success');
+      if (selectedProfile?.discord_id === profile.discord_id) setSelectedProfile(null);
+      fetchAllProfiles();
+    } catch (error: any) {
+      console.error('Error deleting profile:', error);
+      showToast(t('binding.delete_profile_failed', { error: error.message }), 'error');
+    } finally {
+      setIsBinding(false);
+    }
+  };
+
   const switchToSingle = () => {
     setMode('single');
     setSelectedProfile(null);
@@ -297,6 +329,10 @@ export function useIdentityBinding() {
     isBinding,
     confirmModal,
     setConfirmModal,
+    deleteProfileModal,
+    setDeleteProfileModal,
+    handleDeleteProfileClick,
+    executeDeleteProfile,
     mode,
     leftSearchQuery,
     setLeftSearchQuery,

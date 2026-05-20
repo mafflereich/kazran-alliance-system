@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Loader2, CheckCircle2, Copy } from 'lucide-react';
+import { Loader2, CheckCircle2, Copy, Trash2 } from 'lucide-react';
 import { Profile } from './types';
 
 interface Props {
@@ -8,9 +8,10 @@ interface Props {
   isLoading: boolean;
   selectedProfile: Profile | null;
   onSelectProfile: (profile: Profile) => void;
+  onDeleteProfile: (profile: Profile) => void;
 }
 
-export default function SingleMatchPanel({ unmatchedProfiles, isLoading, selectedProfile, onSelectProfile }: Props) {
+export default function SingleMatchPanel({ unmatchedProfiles, isLoading, selectedProfile, onSelectProfile, onDeleteProfile }: Props) {
   const { t } = useTranslation('admin');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -80,6 +81,16 @@ export default function SingleMatchPanel({ unmatchedProfiles, isLoading, selecte
                   )}
                 </div>
               </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteProfile(profile);
+                }}
+                className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors shrink-0"
+                title={t('binding.delete_profile', '刪除 Profile')}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
           ))}
         </div>
