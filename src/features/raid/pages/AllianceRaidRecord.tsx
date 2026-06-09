@@ -46,6 +46,7 @@ export default function AllianceRaidRecord() {
   const [hideScoreInTable, setHideScoreInTable] = useState(false);
   const [hideOverkillInTable, setHideOverkillInTable] = useState(false);
   const [hideLatestSeason, setHideLatestSeason] = useState(false);
+  const [hideSeasonDesc, setHideSeasonDesc] = useState(false);
   const [isDisplayOptionsModalOpen, setIsDisplayOptionsModalOpen] = useState(false);
   const [visibleGuildIds, setVisibleGuildIds] = useState<Set<string> | null>(null);
 
@@ -258,6 +259,26 @@ export default function AllianceRaidRecord() {
 
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-stone-700 dark:text-stone-300 whitespace-nowrap">
+                {t('alliance_raid.hide_season_desc')}
+              </span>
+              <button
+                onClick={() => setHideSeasonDesc(!hideSeasonDesc)}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                  hideSeasonDesc ? 'bg-amber-600' : 'bg-stone-300 dark:bg-stone-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                    hideSeasonDesc ? 'translate-x-[18px]' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="h-6 w-px bg-stone-300 dark:bg-stone-700 mx-1"></div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-stone-700 dark:text-stone-300 whitespace-nowrap">
                 {t('alliance_raid.hide_score')}
               </span>
               <button
@@ -367,9 +388,11 @@ export default function AllianceRaidRecord() {
                           <div className="text-[10px] text-stone-600 dark:text-stone-300 font-medium leading-tight">
                             {season.period_text}
                           </div>
-                          <div className="text-[9px] text-stone-500 dark:text-stone-400 font-normal leading-tight">
-                            {season.description}
-                          </div>
+                          {!hideSeasonDesc && (
+                            <div className="text-[9px] text-stone-500 dark:text-stone-400 font-normal leading-tight">
+                              {season.description}
+                            </div>
+                          )}
                         </div>
                       </th>
                     ))}

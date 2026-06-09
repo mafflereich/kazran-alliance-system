@@ -18,6 +18,7 @@
     "generating": "Generating...",
     "include_score": "Include Score",
     "hide_latest_season": "Hide Latest Season",
+    "hide_season_desc": "Hide Season Desc",
     "hide_score": "Hide Score",
     "no_records": "No season records available.",
     "export_failed": "Failed to generate image",

@@ -18,6 +18,7 @@
     "generating": "生成中...",
     "include_score": "包含分數",
     "hide_latest_season": "隱藏最新賽季",
+    "hide_season_desc": "隱藏賽季說明",
     "hide_score": "隱藏分數",
     "no_records": "目前沒有任何賽季記錄。",
     "export_failed": "生成圖片失敗",
