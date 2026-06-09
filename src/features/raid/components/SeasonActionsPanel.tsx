@@ -300,17 +300,19 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
                       {t('raid.keep_scores_label', '保留分數')}
                     </span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={keepOverkill}
-                      onChange={(e) => setKeepOverkill(e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 rounded border-stone-300 focus:ring-indigo-500 dark:border-stone-600 dark:bg-stone-700"
-                    />
-                    <span className="text-sm text-stone-700 dark:text-stone-300">
-                      {t('raid.keep_overkill_label', '保留超殺')}
-                    </span>
-                  </label>
+                  {!forceHideOverkill && (
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={keepOverkill}
+                        onChange={(e) => setKeepOverkill(e.target.checked)}
+                        className="w-4 h-4 text-indigo-600 rounded border-stone-300 focus:ring-indigo-500 dark:border-stone-600 dark:bg-stone-700"
+                      />
+                      <span className="text-sm text-stone-700 dark:text-stone-300">
+                        {t('raid.keep_overkill_label', '保留超殺')}
+                      </span>
+                    </label>
+                  )}
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
