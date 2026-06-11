@@ -36,7 +36,8 @@
     "display_options": "顯示選項",
     "display_options_modal_title": "顯示選項",
     "display_options_apply": "套用",
-    "hide_overkill": "隱藏超殺"
+    "hide_overkill": "隱藏超殺",
+    "invalid_rank_format": "排名格式無效，必須以 %, st, nd, rd, 或 th 結尾（例如：1st、1.0%）"
   },
   "raid": {
     "title_guild_manager": "公會聯合戰管理",

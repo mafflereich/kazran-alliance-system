@@ -36,7 +36,8 @@
     "display_options": "Display Options",
     "display_options_modal_title": "Display Options",
     "display_options_apply": "Apply",
-    "hide_overkill": "Hide Overkill"
+    "hide_overkill": "Hide Overkill",
+    "invalid_rank_format": "Invalid rank format. Must end with %, st, nd, rd, or th (e.g. 1st, 1.0%)"
   },
   "raid": {
     "title_guild_manager": "Guild Raid Manager",
