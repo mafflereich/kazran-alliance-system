@@ -51,7 +51,7 @@ const formatDamageParts = (damage: number, t: any, language: string) => {
 
 export const FiendHunterBoard: React.FC = () => {
   const { t, i18n } = useTranslation(['toolbox']);
-  const { userRole, showToast } = useAppContext();
+  const { showToast } = useAppContext();
   const [seasons, setSeasons] = useState<FiendHunterSeason[]>([]);
   const [selectedSeason, setSelectedSeason] = useState<FiendHunterSeason | null>(null);
   const [bosses, setBosses] = useState<FiendHunterBoss[]>([]);
@@ -64,8 +64,6 @@ export const FiendHunterBoard: React.FC = () => {
   const [isExporting, setIsExporting] = useState(false);
   
   const boardRef = useRef<HTMLDivElement>(null);
-
-  const isAdmin = userRole === 'manager' || userRole === 'admin' || userRole === 'creator';
 
   const fetchSeasons = async () => {
     try {
@@ -235,33 +233,29 @@ export const FiendHunterBoard: React.FC = () => {
               )}
             </div>
             <div className="flex items-center gap-2">
-              {isAdmin && (
-                <>
-                  <button
-                    onClick={() => setIsAddSeasonModalOpen(true)}
-                    className="p-2 text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200 rounded-md hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
-                    title={t('toolbox:fiend_hunter.add_season')}
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setIsEditSeasonModalOpen(true)}
-                    className="p-2 text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200 rounded-md hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
-                    title={t('toolbox:fiend_hunter.edit_season')}
-                    disabled={!selectedSeason}
-                  >
-                    <Settings className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setIsBossModalOpen(true)}
-                    className="p-2 text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200 rounded-md hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
-                    title={t('toolbox:fiend_hunter.manage_bosses')}
-                    disabled={!selectedSeason}
-                  >
-                    <Droplet className="w-4 h-4" />
-                  </button>
-                </>
-              )}
+              <button
+                onClick={() => setIsAddSeasonModalOpen(true)}
+                className="p-2 text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200 rounded-md hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
+                title={t('toolbox:fiend_hunter.add_season')}
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setIsEditSeasonModalOpen(true)}
+                className="p-2 text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200 rounded-md hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
+                title={t('toolbox:fiend_hunter.edit_season')}
+                disabled={!selectedSeason}
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setIsBossModalOpen(true)}
+                className="p-2 text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200 rounded-md hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
+                title={t('toolbox:fiend_hunter.manage_bosses')}
+                disabled={!selectedSeason}
+              >
+                <Droplet className="w-4 h-4" />
+              </button>
               <button
                 onClick={handleExportImage}
                 className="p-2 text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200 rounded-md hover:bg-stone-200 dark:hover:bg-stone-700 transition-colors"
@@ -358,29 +352,25 @@ export const FiendHunterBoard: React.FC = () => {
         </div>
       </div>
 
-      {isAdmin && (
-        <>
-          <FiendHunterAddSeasonModal
-            isOpen={isAddSeasonModalOpen}
-            onClose={() => setIsAddSeasonModalOpen(false)}
-            onSuccess={handleAddSeasonSuccess}
-            nextSeasonNumber={nextSeasonNumber}
-          />
-          <FiendHunterEditSeasonModal
-            isOpen={isEditSeasonModalOpen}
-            onClose={() => setIsEditSeasonModalOpen(false)}
-            onSuccess={handleEditSeasonSuccess}
-            season={selectedSeason}
-          />
-          <FiendHunterManageBossesModal
-            isOpen={isBossModalOpen}
-            onClose={() => setIsBossModalOpen(false)}
-            onSuccess={handleBossesSuccess}
-            season={selectedSeason}
-            initialBosses={bosses}
-          />
-        </>
-      )}
+      <FiendHunterAddSeasonModal
+        isOpen={isAddSeasonModalOpen}
+        onClose={() => setIsAddSeasonModalOpen(false)}
+        onSuccess={handleAddSeasonSuccess}
+        nextSeasonNumber={nextSeasonNumber}
+      />
+      <FiendHunterEditSeasonModal
+        isOpen={isEditSeasonModalOpen}
+        onClose={() => setIsEditSeasonModalOpen(false)}
+        onSuccess={handleEditSeasonSuccess}
+        season={selectedSeason}
+      />
+      <FiendHunterManageBossesModal
+        isOpen={isBossModalOpen}
+        onClose={() => setIsBossModalOpen(false)}
+        onSuccess={handleBossesSuccess}
+        season={selectedSeason}
+        initialBosses={bosses}
+      />
     </div>
   );
 };
