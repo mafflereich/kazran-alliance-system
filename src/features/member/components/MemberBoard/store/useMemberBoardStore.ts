@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { Member, Guild, Role } from '@entities/member/types';
 import { supabase } from '@/shared/api/supabase';
+import { setNoteSegment, removeNoteSegment, PREV_GUILD_TAG } from '@/shared/lib/noteUtils';
 import type { MemberBoardStore, MemberMovePayload, MemberMovePayloadItem } from './types';
 
 const MEMBER_BOARD_STORAGE_KEY = 'memberBoardDraft';
@@ -202,9 +203,10 @@ const getInitialState = (state: { initialMemberStates: typeof initialState.initi
 
 const computeNewNote = (targetGuildId: string, initial: { guildId: string; note?: string }, originalGuild: Guild | undefined) => {
     if (targetGuildId === initial.guildId) {
-        return initial.note;
+        return removeNoteSegment(initial.note, PREV_GUILD_TAG);
     }
-    return originalGuild?.name || initial.note;
+    const prevGuildName = originalGuild?.name || '';
+    return setNoteSegment(initial.note, PREV_GUILD_TAG, prevGuildName);
 };
 
 const moveMemberToGuild = (member: Member, targetGuildId: string, initial: { guildId: string; note?: string } | null, originalGuild: Guild | undefined) => ({
@@ -569,7 +571,7 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
                 return {
                     ...m,
                     guildId: initial.guildId,
-                    note: initial.note || '',
+                    note: removeNoteSegment(initial.note || '', PREV_GUILD_TAG),
                     updatedAt: Date.now()
                 };
             };

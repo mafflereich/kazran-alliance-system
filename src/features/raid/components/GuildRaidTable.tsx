@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Pencil, ArrowDownWideNarrow, ArrowDownNarrowWide, Copy, Check, Ghost } from 'lucide-react';
+import { Search, Pencil, ArrowDownWideNarrow, ArrowDownNarrowWide, Copy, Check, Ghost, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Member, Guild } from '@/entities/member/types';
 import { deduceScore } from '../utils/scoreDeduction';
+import { getPrevGuildName, getCustomNote, setNoteSegment, removeNoteSegment, PREV_GUILD_TAG } from '@/shared/lib/noteUtils';
 import GhostRecordModal from './GhostRecordModal';
 import type { MemberRaidRecord, GuildRaidRecord } from '../types';
 
@@ -418,16 +419,53 @@ function GuildRaidTable({
                       {!isComparisonMode && (
                         <td className="py-0.5 px-2">
                           {!isArchived ? (
-                            <input
-                              type="text"
-                              value={noteValue}
-                              onChange={(e) => onRecordChange(member.id!, 'note', e.target.value)}
-                              onBlur={() => onBlur(member.id!, guildId)}
-                              className={`w-full px-2 py-0.5 text-xs border rounded bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:ring-2 focus:ring-indigo-500 outline-none ${isDirty ? 'border-amber-300 dark:border-amber-600' : 'border-stone-300 dark:border-stone-600'}`}
-                            />
+                            <div className="flex items-center gap-1">
+                              {(() => {
+                                const prevGuild = getPrevGuildName(noteValue);
+                                return prevGuild ? (
+                                  <span className="shrink-0 inline-flex items-center gap-0.5 text-[10px] px-1 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded border border-amber-200 dark:border-amber-700/50 whitespace-nowrap group/badge">
+                                    <span>↑{prevGuild}</span>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const cleaned = removeNoteSegment(noteValue, PREV_GUILD_TAG);
+                                        onRecordChange(member.id!, 'note', cleaned);
+                                        onBlur(member.id!, guildId);
+                                      }}
+                                      className="p-0.5 rounded hover:bg-amber-200 dark:hover:bg-amber-800/50 opacity-0 group-hover/badge:opacity-100 transition-opacity"
+                                      title="移除原公會標籤"
+                                    >
+                                      <X className="w-2.5 h-2.5" />
+                                    </button>
+                                  </span>
+                                ) : null;
+                              })()}
+                              <input
+                                type="text"
+                                value={getCustomNote(noteValue)}
+                                onChange={(e) => {
+                                  const prevGuild = getPrevGuildName(noteValue);
+                                  const fullNote = prevGuild
+                                    ? `${setNoteSegment('', PREV_GUILD_TAG, prevGuild)}${e.target.value ? '\n' + e.target.value : ''}`
+                                    : e.target.value;
+                                  onRecordChange(member.id!, 'note', fullNote);
+                                }}
+                                onBlur={() => onBlur(member.id!, guildId)}
+                                className={`flex-1 min-w-0 px-2 py-0.5 text-xs border rounded bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-100 focus:ring-2 focus:ring-indigo-500 outline-none ${isDirty ? 'border-amber-300 dark:border-amber-600' : 'border-stone-300 dark:border-stone-600'}`}
+                              />
+                            </div>
                           ) : (
                             <div className="px-2 py-0.5 text-xs text-stone-800 dark:text-stone-200 truncate">
-                              {noteValue || ''}
+                              {(() => {
+                                const prevGuild = getPrevGuildName(noteValue);
+                                const customNote = getCustomNote(noteValue);
+                                return (
+                                  <>
+                                    {prevGuild && <span className="text-amber-600 dark:text-amber-400">↑{prevGuild} </span>}
+                                    {customNote}
+                                  </>
+                                );
+                              })()}
                             </div>
                           )}
                         </td>
