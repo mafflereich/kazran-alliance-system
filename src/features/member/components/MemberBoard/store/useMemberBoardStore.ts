@@ -736,10 +736,10 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
                 const memberIds = membersWithChangedNotes.map(m => m.id!);
                 const { data: existingNotes } = await supabase
                     .from('member_notes')
-                    .select('member_id')
+                    .select('member_id, uid')
                     .in('member_id', memberIds);
 
-                const existingMemberIds = new Set(existingNotes?.map(n => n.member_id) || []);
+                const existingMap = new Map<string, string>(existingNotes?.map(n => [n.member_id, n.uid]) || []);
 
                 const notesToSave = membersWithChangedNotes.map(m => ({
                     member_id: m.id,
@@ -747,14 +747,21 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
                     is_reserved: m.isReserved || false,
                 }));
 
-                const toUpdate = notesToSave.filter(n => existingMemberIds.has(n.member_id));
-                const toInsert = notesToSave.filter(n => !existingMemberIds.has(n.member_id));
+                const toUpdate = notesToSave.filter(n => existingMap.has(n.member_id));
+                const toInsert = notesToSave.filter(n => !existingMap.has(n.member_id));
 
                 if (toUpdate.length > 0) {
                     await Promise.all(toUpdate.map(note =>
                         supabase
                             .from('member_notes')
-                            .update({ note: note.note, is_reserved: note.is_reserved })
+                            .update({ note: note.note })
+                            .eq('uid', existingMap.get(note.member_id))
+                    ));
+
+                    await Promise.all(toUpdate.map(note =>
+                        supabase
+                            .from('member_notes')
+                            .update({ is_reserved: note.is_reserved })
                             .eq('member_id', note.member_id)
                     ));
                 }
