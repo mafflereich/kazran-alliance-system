@@ -25,3 +25,13 @@ export interface GuildRaidRecord {
   member_score_median: number;
   note?: string;
 }
+
+export interface GuildRaidLeaderboardRecord {
+  id: string;
+  season_id: string;
+  guild_id: string;
+  score: number;
+  rank: string;
+  member_score_median?: number;
+  overkill?: number | null;
+}
