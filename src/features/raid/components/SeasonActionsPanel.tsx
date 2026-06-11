@@ -300,17 +300,19 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
                       {t('raid.keep_scores_label', '保留分數')}
                     </span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={keepOverkill}
-                      onChange={(e) => setKeepOverkill(e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 rounded border-stone-300 focus:ring-indigo-500 dark:border-stone-600 dark:bg-stone-700"
-                    />
-                    <span className="text-sm text-stone-700 dark:text-stone-300">
-                      {t('raid.keep_overkill_label', '保留超殺')}
-                    </span>
-                  </label>
+                  {!forceHideOverkill && (
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={keepOverkill}
+                        onChange={(e) => setKeepOverkill(e.target.checked)}
+                        className="w-4 h-4 text-indigo-600 rounded border-stone-300 focus:ring-indigo-500 dark:border-stone-600 dark:bg-stone-700"
+                      />
+                      <span className="text-sm text-stone-700 dark:text-stone-300">
+                        {t('raid.keep_overkill_label', '保留超殺')}
+                      </span>
+                    </label>
+                  )}
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -519,23 +521,25 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between p-3 bg-stone-50 dark:bg-stone-900/50 rounded-lg border border-stone-200 dark:border-stone-700">
-                    <div>
-                      <div className="text-sm font-bold text-stone-800 dark:text-stone-200">
-                        {t('raid.delete_overkill_title', '刪除當前賽季超殺')}
+                  {!forceHideOverkill && (
+                    <div className="flex items-center justify-between p-3 bg-stone-50 dark:bg-stone-900/50 rounded-lg border border-stone-200 dark:border-stone-700">
+                      <div>
+                        <div className="text-sm font-bold text-stone-800 dark:text-stone-200">
+                          {t('raid.delete_overkill_title', '刪除當前賽季超殺')}
+                        </div>
+                        <div className="text-xs text-stone-500">
+                          {t('raid.delete_overkill_desc', '將所有成員的超殺清空')}
+                        </div>
                       </div>
-                      <div className="text-xs text-stone-500">
-                        {t('raid.delete_overkill_desc', '將所有成員的超殺清空')}
-                      </div>
+                      <button
+                        onClick={() => setConfirmType('delete_overkill')}
+                        disabled={isDeleting || isSelectedSeasonArchived}
+                        className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-bold disabled:opacity-50"
+                      >
+                        {t('raid.delete_overkill_button', '刪除超殺')}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setConfirmType('delete_overkill')}
-                      disabled={isDeleting || isSelectedSeasonArchived}
-                      className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-xs font-bold disabled:opacity-50"
-                    >
-                      {t('raid.delete_overkill_button', '刪除超殺')}
-                    </button>
-                  </div>
+                  )}
 
                   <div className="flex items-center justify-between p-3 bg-stone-50 dark:bg-stone-900/50 rounded-lg border border-stone-200 dark:border-stone-700">
                     <div>
