@@ -557,13 +557,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const maxSeasonId = seasonData?.[0]?.id || null;
 
-    // Fetch members and the latest season's raid records in parallel.
-    // Splitting into two queries avoids a full cross-join of members × all seasons
-    // which was causing statement timeouts on large datasets.
-    const membersQuery = supabase
-      .from('members')
-      .select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark)');
-
+    // Fetch raid records for the latest season in parallel with members
     const raidRecordsQuery = maxSeasonId
       ? supabase
         .from('member_raid_records')
@@ -571,42 +565,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .eq('season_id', maxSeasonId)
       : Promise.resolve({ data: [] as any[], error: null });
 
-    const [{ data, error }, { data: raidRecordsData, error: raidRecordsError }] = await Promise.all([
-      membersQuery,
-      raidRecordsQuery,
-    ]);
+    // Fetch members with pagination to handle >1000 rows (PostgREST default limit)
+    const PAGE_SIZE = 1000;
+    let allMembersData: any[] = [];
+    let offset = 0;
+    let hasMore = true;
 
-    if (error) {
-      console.error("Error fetching all members:", error);
-      isDebugMode().then(enabled => {
-        if (!enabled) return;
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          console.error("=== DETAILED ERROR LOG FOR MEMBERS FETCH (fetchAllMembers) ===", JSON.stringify({
-            errorDetails: error,
-            errorMessage: error.message,
-            errorCode: (error as any).code,
-            errorDetails2: (error as any).details,
-            errorHint: (error as any).hint,
-            userSession: session?.user ? {
-              id: session.user.id,
-              email: session.user.email,
-              role: session.user.role,
-              app_metadata: session.user.app_metadata,
-              user_metadata: session.user.user_metadata
-            } : null,
-            query: "select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark)')"
-          }, null, 2));
+    while (hasMore) {
+      const { data: pageData, error: pageError } = await supabase
+        .from('members')
+        .select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark)')
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (pageError) {
+        console.error("Error fetching all members:", pageError);
+        isDebugMode().then(enabled => {
+          if (!enabled) return;
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            console.error("=== DETAILED ERROR LOG FOR MEMBERS FETCH (fetchAllMembers) ===", JSON.stringify({
+              errorDetails: pageError,
+              errorMessage: pageError.message,
+              errorCode: (pageError as any).code,
+              errorDetails2: (pageError as any).details,
+              errorHint: (pageError as any).hint,
+              userSession: session?.user ? {
+                id: session.user.id,
+                email: session.user.email,
+                role: session.user.role,
+                app_metadata: session.user.app_metadata,
+                user_metadata: session.user.user_metadata
+              } : null,
+              query: "select('id, name, guild_id, role, records, exclusive_weapons, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark)')"
+            }, null, 2));
+          });
         });
-      });
-      return;
+        return;
+      }
+
+      if (!pageData || pageData.length === 0) {
+        hasMore = false;
+      } else {
+        allMembersData = allMembersData.concat(pageData);
+        offset += PAGE_SIZE;
+        if (pageData.length < PAGE_SIZE) {
+          hasMore = false;
+        }
+      }
     }
+
+    const [{ data: raidRecordsData }] = await Promise.all([raidRecordsQuery]);
 
     const raidRecordsByMemberId = (raidRecordsData || []).reduce((acc, record) => ({ ...acc, [record.member_id]: record }), {});
 
-    const allMembers: Record<string, Member> = data.reduce((acc, member) => {
+    const allMembers: Record<string, Member> = allMembersData.reduce((acc, member) => {
       const camelMember = toCamel<any>(member);
       const memberNotes = Array.isArray(camelMember.memberNotes) ? camelMember.memberNotes[0] : camelMember.memberNotes;
-      // Filter member_raid_records to only include records for the max season ID
 
       const memberRaidRecord = raidRecordsByMemberId[camelMember.id];
       // member_notes keys are in snake_case since toCamel uses { deep: false }
