@@ -821,7 +821,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (note || isReserved) {
       await supabase
         .from('member_notes')
-        .insert({ member_id: newMemberId, note, is_reserved: isReserved });
+        .upsert({ member_id: newMemberId, note, is_reserved: isReserved }, { onConflict: 'member_id' });
     }
 
     if (data) {
@@ -869,36 +869,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const { error } = await supabaseUpdate('members', { ...memberData, updatedAt: now }, { id: memberId });
 
-    // Check if any member_notes fields are being updated
+    // Upsert member_notes fields if any changed. onConflict on member_id makes this
+    // atomic and prevents duplicate rows (relies on UNIQUE(member_id) constraint).
     const hasMemberNotesUpdate = note !== undefined || isReserved !== undefined;
 
     if (hasMemberNotesUpdate) {
-      const { data: existingNote, error: checkError } = await supabase
+      const noteData: Record<string, any> = { member_id: memberId };
+      if (note !== undefined) noteData.note = note;
+      if (isReserved !== undefined) noteData.is_reserved = isReserved;
+
+      const { error: upsertNoteError } = await supabase
         .from('member_notes')
-        .select('uid')
-        .eq('member_id', memberId)
-        .maybeSingle();
-
-      if (checkError) {
-        console.error('Error checking existing note:', checkError);
-      }
-
-      const updateData: any = {};
-      if (note !== undefined) updateData.note = note;
-      if (isReserved !== undefined) updateData.is_reserved = isReserved;
-
-      if (existingNote) {
-        const { error: updateNoteError } = await supabase
-          .from('member_notes')
-          .update(updateData)
-          .eq('member_id', memberId);
-        if (updateNoteError) console.error('Error updating member_notes:', updateNoteError);
-      } else {
-        const { error: insertNoteError } = await supabase
-          .from('member_notes')
-          .insert({ member_id: memberId, ...updateData });
-        if (insertNoteError) console.error('Error inserting member_notes:', insertNoteError);
-      }
+        .upsert(noteData, { onConflict: 'member_id' });
+      if (upsertNoteError) console.error('Error upserting member_notes:', upsertNoteError);
     }
 
     if (error) {
@@ -1049,28 +1032,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (updateError) throw updateError;
 
-    const { data: existingNote, error: checkError } = await supabase
+    const { error: upsertNoteError } = await supabase
       .from('member_notes')
-      .select('uid')
-      .eq('member_id', memberId)
-      .maybeSingle();
-
-    if (checkError) {
-      console.error('Error checking existing note:', checkError);
-    }
-
-    if (existingNote) {
-      const { error: updateNoteError } = await supabase
-        .from('member_notes')
-        .update({ archive_remark: remark })
-        .eq('member_id', memberId);
-      if (updateNoteError) console.error('Error updating archive_remark:', updateNoteError);
-    } else {
-      const { error: insertNoteError } = await supabase
-        .from('member_notes')
-        .insert({ member_id: memberId, archive_remark: remark });
-      if (insertNoteError) console.error('Error inserting archive_remark:', insertNoteError);
-    }
+      .upsert({ member_id: memberId, archive_remark: remark }, { onConflict: 'member_id' });
+    if (upsertNoteError) console.error('Error upserting archive_remark:', upsertNoteError);
 
     // Update local state if needed (optional, depends on if we want to immediately show them in the guild)
     // Usually fetchMembers will handle this when the view changes, but for addMember flow it's good to have.
