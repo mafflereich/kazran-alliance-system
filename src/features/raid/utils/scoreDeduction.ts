@@ -35,18 +35,28 @@ function findCombinations(remaining: number, evenRounds: boolean): { level: numb
   return results;
 }
 
+function computeSeasonSeven(targetScore: number, evenRounds: boolean): DeductionResult[] {
+  const foundResults: DeductionResult[] = [];
+
+  for (let D = 0; D <= SEASON_7_MAX_DEDUCTION; D += SEASON_7_DEDUCTION_STEP) {
+    const remaining = targetScore - D - LANCELOT_SCORE;
+    const combos = findCombinations(remaining, evenRounds);
+    for (const combo of combos) {
+      foundResults.push({ ...combo, deduction: D });
+    }
+  }
+
+  return foundResults;
+}
+
 export function deduceScore(targetScore: number, t: any, evenRounds: boolean = true, isSeasonSeven: boolean = false): string {
   if (targetScore === 0) return '';
 
   if (isSeasonSeven) {
-    const foundResults: DeductionResult[] = [];
-
-    for (let D = 0; D <= SEASON_7_MAX_DEDUCTION; D += SEASON_7_DEDUCTION_STEP) {
-      const remaining = targetScore - D - LANCELOT_SCORE;
-      const combos = findCombinations(remaining, evenRounds);
-      for (const combo of combos) {
-        foundResults.push({ ...combo, deduction: D });
-      }
+    // 優先使用單數回合結果；若沒有符合的，再嘗試包含雙數回合
+    let foundResults = computeSeasonSeven(targetScore, evenRounds);
+    if (foundResults.length === 0 && !evenRounds) {
+      foundResults = computeSeasonSeven(targetScore, true);
     }
 
     if (foundResults.length === 0) return t('raid.deduction_unknown', '不明');
@@ -62,25 +72,10 @@ export function deduceScore(targetScore: number, t: any, evenRounds: boolean = t
       .join('\n');
   }
 
-  const foundResults: DeductionResult[] = [];
-
-  for (let level = 1; level <= 10; level++) {
-    const diffScore = level * 500;
-    if (diffScore > targetScore) continue;
-
-    for (let turn = 1; turn <= 28; turn++) {
-      if (!evenRounds && turn % 2 === 0) continue;
-      const turnScore = 80 - (turn - 1) * 3;
-      if (turnScore <= 0) continue;
-
-      const borrowScores = [4, 3, 0];
-      for (let borrow = 0; borrow < borrowScores.length; borrow++) {
-        const borrowScore = borrowScores[borrow];
-        if (diffScore + turnScore + borrowScore === targetScore) {
-          foundResults.push({ level, turn, borrow });
-        }
-      }
-    }
+  // 優先使用單數回合結果；若沒有符合的，再嘗試包含雙數回合
+  let foundResults = findCombinations(targetScore, evenRounds);
+  if (foundResults.length === 0 && !evenRounds) {
+    foundResults = findCombinations(targetScore, true);
   }
 
   if (foundResults.length === 0) return t('raid.deduction_unknown', '不明');
