@@ -165,22 +165,36 @@ export default function GuildRaidManager() {
           if (prevSeason) prevSeasonId = String(prevSeason.id);
         }
 
-        // Fetch all members + prev season records in parallel
-        const [allMembersResult, prevRecordsResult] = await Promise.all([
-          supabase.from('members').select('id, name, guild_id'),
-          prevSeasonId
-            ? supabase.from('member_raid_records').select('*').eq('season_id', prevSeasonId)
-            : Promise.resolve({ data: null, error: null }),
-        ]);
+        // Fetch all members with pagination (Supabase limits to 1000 rows)
+        const allMembers: any[] = [];
+        const pageSize = 1000;
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('members')
+            .select('id, name, guild_id')
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          allMembers.push(...data);
+          if (data.length < pageSize) break;
+          from += pageSize;
+        }
 
-        if (allMembersResult.data) {
-          setMemberMoveAllMembers(allMembersResult.data.map((m: any) => ({
-            id: String(m.id),
-            name: m.name || '',
-            guildId: m.guild_id ? String(m.guild_id) : '',
-            role: 'member' as const,
-            records: {},
-          })));
+        setMemberMoveAllMembers(allMembers.map((m: any) => ({
+          id: String(m.id),
+          name: m.name || '',
+          guildId: m.guild_id ? String(m.guild_id) : '',
+          role: 'member' as const,
+          records: {},
+        })));
+
+        let prevRecordsResult: { data: any[] | null; error: any } = { data: null, error: null };
+        if (prevSeasonId) {
+          prevRecordsResult = await supabase
+            .from('member_raid_records')
+            .select('*')
+            .eq('season_id', prevSeasonId);
         }
 
         if (prevRecordsResult.data) {

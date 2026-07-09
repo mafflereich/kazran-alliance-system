@@ -63,6 +63,8 @@ export function useMemberMoveAnnounce(
       const member = memberMap.get(memberId);
       const currentGuildId = memberCurrentGuildMap.get(memberId);
 
+      if (!member) console.log(member);
+
       if (!isCurrentSeasonArchived) {
         if (!prevRecord && currentGuildId) {
           const toGuild = guildMap.get(String(currentGuildId));
@@ -70,7 +72,7 @@ export function useMemberMoveAnnounce(
 
           memberMoves.set(memberId, {
             memberId,
-            name: member?.name || memberId,
+            name: member?.name || '已刪除成員',
             fromGuild: '',
             toGuild: toGuild.name || '未知公會',
             action: 'move'
@@ -81,7 +83,7 @@ export function useMemberMoveAnnounce(
 
           memberMoves.set(memberId, {
             memberId,
-            name: member?.name || prevRecord.member_id || memberId,
+            name: member?.name || '已刪除成員',
             fromGuild: fromGuild.name || '未知公會',
             toGuild: '',
             action: 'kick'
@@ -95,7 +97,7 @@ export function useMemberMoveAnnounce(
 
             memberMoves.set(memberId, {
               memberId,
-              name: member?.name || prevRecord.member_id || memberId,
+              name: member?.name || '已刪除成員',
               fromGuild: fromGuild.name || '未知公會',
               toGuild: toGuild.name || '未知公會',
               action: 'move'
@@ -109,7 +111,7 @@ export function useMemberMoveAnnounce(
 
           memberMoves.set(memberId, {
             memberId,
-            name: member?.name || currentRecord.member_id || memberId,
+            name: member?.name || '已刪除成員',
             fromGuild: '',
             toGuild: toGuild.name || '未知公會',
             action: 'move'
@@ -120,7 +122,7 @@ export function useMemberMoveAnnounce(
 
           memberMoves.set(memberId, {
             memberId,
-            name: member?.name || prevRecord.member_id || memberId,
+            name: member?.name || '已刪除成員',
             fromGuild: fromGuild.name || '未知公會',
             toGuild: '',
             action: 'kick'
@@ -134,7 +136,7 @@ export function useMemberMoveAnnounce(
 
             memberMoves.set(memberId, {
               memberId,
-              name: member?.name || currentRecord.member_id || prevRecord.member_id || memberId,
+              name: member?.name || '已刪除成員',
               fromGuild: fromGuild.name || '未知公會',
               toGuild: toGuild.name || '未知公會',
               action: 'move'
@@ -185,16 +187,16 @@ export function useMemberMoveAnnounce(
     const sortedSummaries = summaries.sort((a, b) => {
       const guildA = guildNameMap.get(a.guildName);
       const guildB = guildNameMap.get(b.guildName);
-      
+
       const tierA = guildA?.tier || 99;
       const tierB = guildB?.tier || 99;
-      
+
       if (tierA !== tierB) return tierA - tierB;
-      
+
       const orderA = guildA?.orderNum || 99;
       const orderB = guildB?.orderNum || 99;
       if (orderA !== orderB) return orderA - orderB;
-      
+
       return a.action === 'kick' ? -1 : 1;
     });
 

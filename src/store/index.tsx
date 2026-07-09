@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Database, Guild, Member, Costume, Role, User, Character, ArchivedMember, ArchiveHistory, Toast, ToastType, Setting, ApplyMail, AccessControl } from '@/entities/member/types';
-import { supabase, supabaseInsert, supabaseKey, supabaseUpdate, supabaseUpsert, toCamel } from '@/shared/api/supabase';
+import { supabase, supabaseInsert, supabaseKey, supabaseUpdate, supabaseUpsert, toCamel, fetchAllPaginated } from '@/shared/api/supabase';
 import { isDebugMode } from '@/shared/api/debugMode';
 import { v4 as uuidv4 } from 'uuid';
 import { useTranslation } from 'react-i18next';
@@ -459,12 +459,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const selectQuery = columns;
 
-    const { data, error } = await supabase
-      .from('members')
-      .select(selectQuery)
-      .eq('guild_id', guildId) as unknown as { data: any[], error: Error };
-
-    if (error) {
+    let data: any[];
+    try {
+      data = await fetchAllPaginated('members', selectQuery, q => q.eq('guild_id', guildId));
+    } catch (error: any) {
       console.error("Error fetching members:", error);
       isDebugMode().then(enabled => {
         if (!enabled) return;
@@ -472,9 +470,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           console.error("=== DETAILED ERROR LOG FOR MEMBERS FETCH (fetchMembers) ===", JSON.stringify({
             errorDetails: error,
             errorMessage: error.message,
-            errorCode: (error as any).code,
-            errorDetails2: (error as any).details,
-            errorHint: (error as any).hint,
+            errorCode: error.code,
+            errorHint: error.hint,
             userSession: session?.user ? {
               id: session.user.id,
               email: session.user.email,

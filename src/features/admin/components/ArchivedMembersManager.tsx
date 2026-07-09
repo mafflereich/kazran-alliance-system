@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabase, toCamel } from '@/shared/api/supabase';
+import { supabase, toCamel, fetchAllPaginated } from '@/shared/api/supabase';
 import { useAppContext } from '@/store';
 import { Archive, History, RotateCcw, ChevronDown, ChevronUp, X, AlertCircle, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -31,28 +31,22 @@ export default function ArchivedMembersManager() {
   const fetchArchivedMembers = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('members')
-        .select(`
+      const data = await fetchAllPaginated<any>('members', `
+        id,
+        name,
+        status,
+        member_notes(archive_remark),
+        members_archive_history (
           id,
-          name,
-          status,
-          member_notes(archive_remark),
-          members_archive_history (
-            id,
-            member_id,
-            from_guild_id,
-            archive_reason,
-            archived_at,
-            guilds (
-              name
-            )
+          member_id,
+          from_guild_id,
+          archive_reason,
+          archived_at,
+          guilds (
+            name
           )
-        `)
-        .eq('status', 'archived')
-        .order('archived_at', { referencedTable: 'members_archive_history', ascending: false });
-
-      if (error) throw error;
+        )
+      `, q => q.eq('status', 'archived').order('archived_at', { referencedTable: 'members_archive_history', ascending: false }));
 
       // Sort history arrays manually just in case Supabase order isn't perfect for nested arrays
       const members = (data as any[]).map(member => {

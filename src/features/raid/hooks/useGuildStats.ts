@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { supabase } from '@/shared/api/supabase';
+import { supabase, fetchAllPaginated } from '@/shared/api/supabase';
 import { useAppContext } from '@/store';
 
 export function useGuildStats(canManage: boolean, targetTier: number) {
@@ -7,18 +7,18 @@ export function useGuildStats(canManage: boolean, targetTier: number) {
   const [guildMemberCounts, setGuildMemberCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    supabase
-      .from('members')
-      .select('guild_id')
-      .eq('status', 'active')
-      .then(({ data }: { data: { guild_id: string }[] | null }) => {
-        if (!data) return;
+    (async () => {
+      try {
+        const data = await fetchAllPaginated<{ guild_id: string }>('members', 'guild_id', q => q.eq('status', 'active'));
         const counts: Record<string, number> = {};
         data.forEach((row: { guild_id: string }) => {
           if (row.guild_id) counts[row.guild_id] = (counts[row.guild_id] || 0) + 1;
         });
         setGuildMemberCounts(counts);
-      });
+      } catch (err) {
+        console.error('Failed to fetch guild member counts:', err);
+      }
+    })();
   }, []);
 
   const availableGuilds = useMemo(() => {

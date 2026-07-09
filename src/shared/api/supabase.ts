@@ -103,5 +103,27 @@ export async function supabaseUpsert<T>(
     };
 }
 
+/** Helper to fetch all rows from a table with automatic pagination (Supabase/PostgREST default limit is 1000). */
+export async function fetchAllPaginated<T = any>(
+  table: string,
+  selectQuery: string,
+  applyFilters?: (query: any) => any,
+): Promise<T[]> {
+  const PAGE_SIZE = 1000;
+  const allData: T[] = [];
+  let from = 0;
+  while (true) {
+    let query = rawSupabase.from(table).select(selectQuery).range(from, from + PAGE_SIZE - 1);
+    if (applyFilters) query = applyFilters(query);
+    const { data, error } = await query;
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allData.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return allData;
+}
+
 // 包裝後的 client（推薦在專案中都使用這個）
 export const supabase = rawSupabase;

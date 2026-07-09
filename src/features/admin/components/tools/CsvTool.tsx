@@ -3,7 +3,7 @@ import { useAppContext } from '@/store';
 import { Download, FileUp } from 'lucide-react';
 import ConfirmModal from '@shared/ui/ConfirmModal';
 import { useTranslation } from 'react-i18next';
-import { supabase } from '@/shared/api/supabase';
+import { supabase, fetchAllPaginated } from '@/shared/api/supabase';
 
 export default function CsvTool({
   isProcessing,
@@ -199,17 +199,15 @@ export default function CsvTool({
           return;
         }
 
-        const [guildsResult, seasonsResult, membersResult] = await Promise.all([
+        const [guildsResult, seasonsResult] = await Promise.all([
           supabase.from('guilds').select('id, name'),
           supabase.from('raid_seasons').select('id, season_number'),
-          supabase.from('members').select('id, name'),
         ]);
         if (guildsResult.error) throw guildsResult.error;
         if (seasonsResult.error) throw seasonsResult.error;
-        if (membersResult.error) throw membersResult.error;
         const guildsData = guildsResult.data!;
         const seasonsData = seasonsResult.data!;
-        const membersData = membersResult.data!;
+        const membersData = await fetchAllPaginated<{ id: string; name: string }>('members', 'id, name');
 
         const existingMembersMap: Record<string, string> = {};
         membersData.forEach(m => {
