@@ -17,25 +17,32 @@ export async function fetchMemberSecrets(memberIds: string[]): Promise<Record<st
   const ids = [...new Set((memberIds || []).filter(Boolean))];
   if (ids.length === 0) return {};
 
-  try {
-    const { data, error } = await supabase.rpc('get_member_equipment', {
-      p_member_ids: ids,
-    });
-    if (error) {
-      console.error('Error fetching member sensitive data via get_member_equipment:', error);
-      return {};
-    }
+  // 分塊呼叫，避免單一 request 攜帶過大 p_member_ids 陣列，
+  // 也避免 DB 端單一語句一次處理太多成員（配合 DB 端集合式 RPC）。
+  const CHUNK_SIZE = 500;
+  const map: Record<string, MemberSecretRow> = {};
 
-    const map: Record<string, MemberSecretRow> = {};
-    (data || []).forEach((row: any) => {
-      if (!row || !row.id) return;
-      map[String(row.id)] = {
-        equipment: row.equipment ?? undefined,
-        records: row.records ?? undefined,
-        exclusiveWeapons: row.exclusive_weapons ?? undefined,
-        refiningTraces: row.refining_traces ?? undefined,
-      };
-    });
+  try {
+    for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+      const chunk = ids.slice(i, i + CHUNK_SIZE);
+      const { data, error } = await supabase.rpc('get_member_equipment', {
+        p_member_ids: chunk,
+      });
+      if (error) {
+        console.error(`Error fetching member sensitive data (chunk ${i / CHUNK_SIZE}):`, error);
+        continue;
+      }
+
+      (data || []).forEach((row: any) => {
+        if (!row || !row.id) return;
+        map[String(row.id)] = {
+          equipment: row.equipment ?? undefined,
+          records: row.records ?? undefined,
+          exclusiveWeapons: row.exclusive_weapons ?? undefined,
+          refiningTraces: row.refining_traces ?? undefined,
+        };
+      });
+    }
     return map;
   } catch (err) {
     console.error('Error calling get_member_equipment:', err);

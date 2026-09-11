@@ -13,26 +13,44 @@ import { logEvent } from '@/analytics';
 export default function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { db, isRoleLoading, userGuildRoles, userRole, currentUser, fetchAllMembers } = useAppContext();
+  const { db, isRoleLoading, userRole } = useAppContext();
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const membersFetchedRef = React.useRef(false);
+  // 每公會統計快取（DB 端 1h 過期重算），避免首頁載入全體成員敏感資料
+  const [guildStatCache, setGuildStatCache] = useState<Record<string, { traces: number; filled: number; lastUpdate: number }> | null>(null);
 
-  const canSeeAllGuilds = userRole === 'admin' || userRole === 'creator' || userRole === 'manager';
-
-  // 登入後載入全體成員（含煉痕/服裝紀錄），供首頁統計使用
+  // 登入後讀取首頁統計快取
   useEffect(() => {
     if (isRoleLoading) return;
-    if (userRole) {
-      if (!membersFetchedRef.current) {
-        membersFetchedRef.current = true;
-        fetchAllMembers();
-      }
-    } else {
-      membersFetchedRef.current = false;
+    if (!userRole) {
+      setGuildStatCache(null);
+      return;
     }
-  }, [userRole, isRoleLoading, fetchAllMembers]);
+
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.rpc('get_home_page_stats');
+      if (cancelled) return;
+      if (error || !data) {
+        console.error('Error fetching home page stats:', error);
+        return;
+      }
+
+      const map: Record<string, { traces: number; filled: number; lastUpdate: number }> = {};
+      (data as any[]).forEach((row) => {
+        if (!row?.guild_id) return;
+        map[String(row.guild_id)] = {
+          traces: Number(row.refining_traces_total) || 0,
+          filled: Number(row.people_filled_count) || 0,
+          lastUpdate: Number(row.last_update_ms) || 0,
+        };
+      });
+      setGuildStatCache(map);
+    })();
+
+    return () => { cancelled = true; };
+  }, [userRole, isRoleLoading]);
 
   const handleGuildSelect = async (guildId: string) => {
     if (userRole) {
@@ -59,26 +77,22 @@ export default function Login() {
   const isLoggedIn = !!userRole;
 
   // 每張公會卡的統計：煉痕總數 / 多少人填了自己的服裝 / 最後更新日
+  // （來自 DB 端過期重算的快取，不再逐請求載入全體成員）
   const guildStats = React.useMemo(() => {
     const stats: Record<string, { traces: number; filled: number; lastUpdate: number }> = {};
 
     Object.entries(db.guilds).forEach(([id, guild]) => {
       if (guild.isDisplay === false) return;
-      const members = Object.values(db.members).filter(m => m && m.guildId === id && m.status !== 'archived');
-      let traces = 0;
-      let filled = 0;
-      let lastUpdate = 0;
-      members.forEach(m => {
-        traces += Number(m.refiningTraces) || 0;
-        if (Number(m.refiningTraces) > 0) filled += 1;
-        const upd = Math.max(m.updatedAt ?? 0, m.costumesUpdatedAt ?? 0, m.equipmentUpdatedAt ?? 0);
-        if (upd > lastUpdate) lastUpdate = upd;
-      });
-      stats[id] = { traces, filled, lastUpdate };
+      const cached = guildStatCache?.[id];
+      stats[id] = {
+        traces: cached?.traces ?? 0,
+        filled: cached?.filled ?? 0,
+        lastUpdate: cached?.lastUpdate ?? 0,
+      };
     });
 
     return stats;
-  }, [db.guilds, db.members]);
+  }, [db.guilds, guildStatCache]);
 
   // 各梯隊總和
   const tierSums = React.useMemo(() => {
