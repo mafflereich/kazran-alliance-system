@@ -11,7 +11,7 @@ export function useGhostRecords() {
     try {
       const { data, error } = await supabase
         .from('ghost_records')
-        .select('id, uid, member_id, season_number, created_at')
+        .select('uid, member_id, season_number, created_at')
         .order('created_at', { ascending: false });
 
       if (error && error.code !== '42P01') throw error;
@@ -35,7 +35,7 @@ export function useGhostRecords() {
     try {
       const { data, error } = await supabase
         .from('ghost_records')
-        .select('id, uid, member_id, season_number, created_at')
+        .select('uid, member_id, season_number, created_at')
         .eq('member_id', memberId)
         .order('created_at', { ascending: false });
 
@@ -76,7 +76,7 @@ export function useGhostRecords() {
           ...prev,
           [memberId]: [data[0], ...(prev[memberId] || [])]
         }));
-        Logger.info({ source: 'raid_manager', action: 'add_ghost_record', message: '新增幽靈紀錄', details: { memberId, seasonNumber, recordId: data[0].id } });
+        Logger.info({ source: 'raid_manager', action: 'add_ghost_record', message: '新增幽靈紀錄', details: { memberId, seasonNumber, recordId: data[0].uid } });
       }
     } catch (err) {
       console.error('Error adding ghost record:', err);
@@ -92,7 +92,7 @@ export function useGhostRecords() {
     try {
       const { data, error } = await supabase
         .from('ghost_records')
-        .select('id, uid, member_id, season_number, created_at')
+        .select('uid, member_id, season_number, created_at')
         .in('member_id', unfetched)
         .order('created_at', { ascending: false });
 
@@ -133,9 +133,7 @@ export function useGhostRecords() {
     try {
       let query = supabase.from('ghost_records').delete();
 
-      if (record.id) {
-        query = query.eq('id', record.id);
-      } else if (record.uid) {
+      if (record.uid) {
         query = query.eq('uid', record.uid);
       } else if (record.created_at) {
         query = query.eq('member_id', memberId).eq('created_at', record.created_at);
@@ -149,14 +147,10 @@ export function useGhostRecords() {
 
       setGhostRecords(prev => ({
         ...prev,
-        [memberId]: (prev[memberId] || []).filter(r => {
-          if (record.id) return r.id !== record.id;
-          if (record.uid) return r.uid !== record.uid;
-          return r.created_at !== record.created_at;
-        })
+        [memberId]: (prev[memberId] || []).filter(r => r.uid !== record.uid)
       }));
 
-      Logger.warn({ source: 'raid_manager', action: 'delete_ghost_record', message: '刪除幽靈紀錄', details: { memberId, recordId: record.id ?? record.uid } });
+      Logger.warn({ source: 'raid_manager', action: 'delete_ghost_record', message: '刪除幽靈紀錄', details: { memberId, recordId: record.uid } });
     } catch (err) {
       console.error('Error deleting ghost record:', err);
       Logger.error({ source: 'raid_manager', action: 'delete_ghost_record', message: '刪除幽靈紀錄失敗', details: { memberId, error: (err as any).message } });

@@ -73,7 +73,7 @@ export default function GhostRecordModal({
                   {[...ghostRecords[member.id!]]
                     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                     .map((record, idx) => (
-                      <tr key={record.id || record.uid || idx} className="border-b border-stone-100 dark:border-stone-700/50 group/ghost">
+                      <tr key={record.uid || idx} className="border-b border-stone-100 dark:border-stone-700/50 group/ghost">
                         <td className="py-2 text-stone-800 dark:text-stone-200">
                           {record.season_number ? `S${record.season_number}` : '-'}
                         </td>

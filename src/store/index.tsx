@@ -750,9 +750,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }, {});
         const allMemberIds = Object.keys(allMembers);
         if (allMemberIds.length > 0) {
-          const secrets = await fetchMemberSecrets(allMemberIds);
-          const merged = applySecretsToMembers(Object.values(allMembers), secrets);
-          merged.forEach((m) => { if (m.id) allMembers[m.id] = m; });
+          // MemberBoard 只顯示 score / overkill / seasonNote（來自 member_raid_records），
+          // 不需要 equipment 等敏感資料；不在此呼叫 fetchMemberSecrets（會把全部成員
+          // 丟進 get_member_equipment RPC，導致 timeout / HTTP 500）。
         }
         setDbState(prev => ({ ...prev, members: allMembers }));
       }

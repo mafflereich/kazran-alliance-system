@@ -41,17 +41,17 @@ export const canUserAccessPage = (
   return hasAccess;
 };
 
-// 公會級管理頁面權限：改按「正/副會長」判斷（creator/admin 亦為全域管理），取代 DC 身分組的 manager 角色。
-// canManageGuild() 已包含 creator/admin 或所屬公會正/副會長。
+// 公會級管理頁面權限：正/副會長（canManageGuild）或「後台存取權限設定」任一符合即可。
+// 這樣 Discord manager 角色也能依 access_control 設定檢視頁面，同時保留正/副會長的身分判定。
 export const canUserAccessGuildPage = (
   pageId: string,
   userRole: string | undefined,
   accessControl: Record<string, AccessControl>,
   canManageGuild: () => boolean,
 ): boolean => {
-  // 公會級管理頁面：以 canManageGuild（正/副會長）為依據
+  // 公會級管理頁面：正/副會長 或 accessControl 角色規則皆可
   if (isGuildManagementPage(pageId)) {
-    return canManageGuild();
+    return canManageGuild() || canUserAccessPage(pageId, userRole, accessControl);
   }
   // 其餘頁面維持既有角色規則
   return canUserAccessPage(pageId, userRole, accessControl);
