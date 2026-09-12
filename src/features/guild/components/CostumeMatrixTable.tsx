@@ -56,7 +56,7 @@ export default function CostumeMatrixTable({ members, costumes }: CostumeMatrixT
     <div className="bg-white dark:bg-stone-800 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-700 overflow-hidden">
       <div
         ref={scrollRef}
-        className={`overflow-x-auto cursor-grab [&::-webkit-scrollbar:horizontal]:hidden ${isDragging ? 'cursor-grabbing select-none' : ''}`}
+        className={`overflow-x-auto overflow-y-auto max-h-[70vh] cursor-grab [&::-webkit-scrollbar:horizontal]:hidden ${isDragging ? 'cursor-grabbing select-none' : ''}`}
         onMouseDown={handleMouseDown}
         onMouseLeave={handleMouseLeave}
         onMouseUp={handleMouseUp}
@@ -99,7 +99,7 @@ export default function CostumeMatrixTable({ members, costumes }: CostumeMatrixT
           <tbody>
             {sortedMembers.map(member => (
               <tr key={member.id} className="border-b border-stone-100 dark:border-stone-700">
-                <td className="p-2.5 font-medium text-stone-800 dark:text-stone-200 sticky left-0 bg-white dark:bg-stone-800 border-r border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c] whitespace-nowrap">
+                <td className="p-2.5 font-medium text-stone-800 dark:text-stone-200 sticky left-0 z-10 bg-white dark:bg-stone-800 border-r border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c] whitespace-nowrap">
                   <span className={member.role === 'leader'
                     ? 'px-1.5 py-0.5 rounded bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
                     : member.role === 'coleader'
