@@ -2,7 +2,7 @@ import React from 'react';
 import { User, EyeOff, Lock, ArrowDownNarrowWide, ArrowDownWideNarrow } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAppContext } from '@/store';
-import { EQUIPMENT_CATEGORIES } from '@/entities/member/types';
+import { EQUIPMENT_CATEGORIES, PLAY_MODE_OPTIONS } from '@/entities/member/types';
 import { normalizeEquipment, normalizePlayPreferences, normalizeEquipmentVisibility, canViewCategoryForUI } from '@/shared/lib/equipment';
 
 interface EquipmentTableProps {
@@ -136,6 +136,7 @@ export default function EquipmentTable({
               const isCurrentUser = !!(userProfileId && userProfileId.split(',').map(uid => uid.trim()).filter(Boolean).includes(id));
               const equipment = normalizeEquipment(member.equipment);
               const playPrefs = normalizePlayPreferences(member.playPreferences);
+              const sortedModes = [...(playPrefs.modes || [])].sort((a, b) => PLAY_MODE_OPTIONS.indexOf(a) - PLAY_MODE_OPTIONS.indexOf(b));
               return (
               <tr key={id} className={`border-b border-stone-100 dark:border-stone-700 transition-colors group ${isCurrentUser ? 'hover:bg-stone-50 dark:hover:bg-stone-700' : ''}`}>
                 <td
@@ -183,7 +184,7 @@ export default function EquipmentTable({
                   <div className="flex flex-col items-center gap-1.5">
                     {playPrefs.modes.length > 0 && (
                       <div className="flex flex-wrap justify-center gap-1">
-                        {playPrefs.modes.map(mode => (
+                        {sortedModes.map(mode => (
                           <span key={mode} className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 whitespace-nowrap">
                             {t(`equipment.modes_opt.${mode}`)}
                           </span>
