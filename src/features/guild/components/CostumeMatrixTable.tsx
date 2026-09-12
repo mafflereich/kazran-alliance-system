@@ -65,7 +65,7 @@ export default function CostumeMatrixTable({ members, costumes }: CostumeMatrixT
         <table className="w-full text-left border-collapse min-w-max">
           <thead>
             <tr className="bg-stone-50 dark:bg-stone-700 text-stone-600 dark:text-stone-300">
-              <th className="p-2.5 font-semibold sticky left-0 bg-stone-50 dark:bg-stone-700 z-30 border-r border-b-2 border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c]">
+              <th className="p-2.5 font-semibold sticky top-0 left-0 bg-stone-50 dark:bg-stone-700 z-30 border-r border-b-2 border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c]">
                 {t('common.member')}
               </th>
               {costumes.map(c => (
