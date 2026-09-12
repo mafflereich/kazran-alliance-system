@@ -1,7 +1,7 @@
 import { AccessControl } from '@/entities/member/types';
 
 // 公會級管理頁面：正/副會長（取代 manager 角色）可存取
-const GUILD_MANAGEMENT_PAGES = ['guild_raid_manager', 'member_board', 'application_mailbox'];
+const GUILD_MANAGEMENT_PAGES = ['guild_raid_manager', 'member_board'];
 
 export const isGuildManagementPage = (pageId: string): boolean =>
   GUILD_MANAGEMENT_PAGES.includes(pageId);

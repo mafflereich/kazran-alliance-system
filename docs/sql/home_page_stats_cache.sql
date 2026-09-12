@@ -56,11 +56,10 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  -- 串行化重算：同一時間只想讓一個請求在做刪除+重建
+  -- 串行化重算：同一時間只想讓一個請求在做重建
   PERFORM pg_advisory_xact_lock(hashtext('home_page_stats_refresh'));
 
-  DELETE FROM public.home_page_stats;
-
+  -- 以 UPSERT 覆寫（Supabase 不允許無 WHERE 的 DELETE）
   INSERT INTO public.home_page_stats (
     guild_id,
     refining_traces_total,
@@ -81,7 +80,25 @@ BEGIN
   FROM public.members m
   WHERE m.guild_id IS NOT NULL
     AND COALESCE(m.status, '') <> 'archived'
-  GROUP BY m.guild_id;
+  GROUP BY m.guild_id
+  ON CONFLICT (guild_id) DO UPDATE SET
+    refining_traces_total = EXCLUDED.refining_traces_total,
+    people_filled_count   = EXCLUDED.people_filled_count,
+    last_update_ms        = EXCLUDED.last_update_ms,
+    updated_at            = EXCLUDED.updated_at;
+
+  -- 清除已不再存在（或已無存活成員）的公會列（附 WHERE，符合刪除規則）
+  DELETE FROM public.home_page_stats h
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM (
+      SELECT DISTINCT m.guild_id
+      FROM public.members m
+      WHERE m.guild_id IS NOT NULL
+        AND COALESCE(m.status, '') <> 'archived'
+    ) live
+    WHERE live.guild_id = h.guild_id
+  );
 END;
 $$;
 
@@ -105,7 +122,7 @@ AS $$
 BEGIN
   -- 全表都沒有夠新的快取（或表為空）→ 先重算一次
   IF COALESCE(
-    (SELECT MAX(updated_at) FROM public.home_page_stats),
+    (SELECT MAX(h.updated_at) FROM public.home_page_stats h),
     'epoch'
   ) < now() - interval '1 hour' THEN
     PERFORM public.refresh_home_page_stats();
