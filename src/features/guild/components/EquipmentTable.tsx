@@ -3,7 +3,7 @@ import { User, EyeOff, Lock, ArrowDownNarrowWide, ArrowDownWideNarrow } from 'lu
 import { useTranslation } from 'react-i18next';
 import { useAppContext } from '@/store';
 import { EQUIPMENT_CATEGORIES, PLAY_MODE_OPTIONS } from '@/entities/member/types';
-import { normalizeEquipment, normalizePlayPreferences, normalizeEquipmentVisibility, canViewCategoryForUI } from '@/shared/lib/equipment';
+import { normalizeEquipment, normalizePlayPreferences, normalizeEquipmentVisibility, canViewCategoryForUI, isManagerRole } from '@/shared/lib/equipment';
 
 interface EquipmentTableProps {
   members: [string, any][];
@@ -164,9 +164,9 @@ export default function EquipmentTable({
                           : <EyeOff className="w-3.5 h-3.5 text-stone-300 dark:text-stone-500" />
                       ) : null}
                     </div>
-                    {(member.updatedAt || member.refiningTraces != null) && (
+                    {(member.updatedAt || (isManagerRole(userRole) && member.refiningTraces != null)) && (
                       <div className="flex items-center gap-2 mt-0.5">
-                        {member.refiningTraces != null && member.refiningTraces > 0 && (
+                        {isManagerRole(userRole) && member.refiningTraces != null && member.refiningTraces > 0 && (
                           <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400" title={t('equipment.refining_traces')}>
                             ✦ {member.refiningTraces}
                           </span>
