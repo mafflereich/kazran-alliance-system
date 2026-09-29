@@ -210,7 +210,8 @@
   },
   "access": {
     "page": "頁面",
-    "notice": "勾選後該職位的使用者將能在 Header 看到連結並進入該頁面。"
+    "notice": "勾選後該職位的使用者將能在 Header 看到連結並進入該頁面。",
+    "notice_guild_pages": "公會聯合戰管理與 Team Assign Board 為公會幹部頁面：公會正/副會長視同 MANAGER，取消勾選 MANAGER 也會一併擋下他們；creator / admin 則不受本表限制。"
   },
   "binding": {
     "title": "身份管理",

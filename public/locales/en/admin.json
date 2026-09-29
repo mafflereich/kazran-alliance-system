@@ -210,7 +210,8 @@
   },
   "access": {
     "page": "Page",
-    "notice": "Selected roles will be able to see the link in the header and access the page."
+    "notice": "Selected roles will be able to see the link in the header and access the page.",
+    "notice_guild_pages": "Guild Raid Manager and Team Assign Board are guild-officer pages: guild leaders / co-leaders count as MANAGER, so unchecking MANAGER also blocks them. creator / admin are not restricted by this table."
   },
   "binding": {
     "title": "Profiles Manager",

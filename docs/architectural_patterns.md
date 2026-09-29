@@ -51,8 +51,10 @@ src/features/{feature}/
 ## 4. 權限控制：角色基礎存取控制（RBAC）
 
 - **角色定義**：`src/shared/lib/access.ts`
-  - `getDefaultRoles(pageId)`（行 3）— 各頁面預設可存取角色
-  - `canUserAccessPage()`（行 17）— 檢查使用者權限
+  - `getDefaultRoles(pageId)`（行 11）— 各頁面預設可存取角色
+  - `canUserAccessPage()`（行 32）— 檢查使用者權限（後台 `access_control` 為唯一依據，未設定才用預設值）
+  - `canUserAccessGuildPage()`（行 57）— 公會級頁面（`guild_raid_manager` / `member_board`）權限：
+    creator / admin 一律放行；其餘使用者依後台勾選的角色，公會正/副會長等同 MANAGER（需勾選 MANAGER 才放行）
 - **角色層級**：`creator` > `admin` > `manager` > `member`
 - **路由保護**：`src/shared/ui/ProtectedRoute.tsx` 包裝受保護路由
 - **路由設定**：`src/app/routes.tsx:32-47` — 各路由指定 `pageId`

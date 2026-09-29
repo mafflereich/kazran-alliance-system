@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '@/store';
 import { Lock, Check, Users, Mail, Gamepad2, Trophy, AlertCircle, BookUser, Wrench, Save, RotateCcw, Settings, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { getDefaultRoles } from '@/shared/lib/access';
 
 export default function AccessControlManager() {
   const { t } = useTranslation(['admin', 'translation']);
@@ -23,20 +24,6 @@ export default function AccessControlManager() {
     { id: 'toolbox', label: t('header.toolbox_title', '小工具'), icon: <Wrench className="w-5 h-5" /> },
     { id: 'admin_settings', label: t('header.admin_settings', '後台設定'), icon: <Settings className="w-5 h-5" /> },
   ];
-
-  const getDefaultRoles = (pageId: string): ('member' | 'manager' | 'admin' | 'creator')[] => {
-    switch (pageId) {
-      case 'costume_list': return ['member', 'manager', 'admin', 'creator'];
-      case 'my_costumes': return ['member', 'manager', 'admin', 'creator'];
-      case 'application_mailbox': return ['member', 'manager', 'admin', 'creator'];
-      case 'arcade': return ['manager', 'admin', 'creator'];
-      case 'guild_raid_manager': return ['manager', 'admin', 'creator'];
-      case 'member_board': return ['manager', 'admin', 'creator'];
-      case 'toolbox': return ['manager', 'admin', 'creator'];
-      case 'admin_settings': return ['admin', 'creator'];
-      default: return ['creator', 'admin'];
-    }
-  };
 
   // Initialize local state from db
   useEffect(() => {
@@ -150,6 +137,9 @@ export default function AccessControlManager() {
           <div>
             <p className="text-sm text-amber-700 dark:text-amber-300">
               {t('access.notice')}
+            </p>
+            <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+              {t('access.notice_guild_pages', '公會聯合戰管理與 Team Assign Board 為公會幹部頁面：公會正/副會長視同 MANAGER，取消勾選 MANAGER 也會一併擋下他們；creator / admin 則不受本表限制。')}
             </p>
           </div>
         </div>
