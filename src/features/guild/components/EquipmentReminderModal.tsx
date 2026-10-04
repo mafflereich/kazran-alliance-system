@@ -2,11 +2,13 @@ import React, { useMemo, useState } from 'react';
 import { X, BellRing, Loader, Check, Copy, AlertCircle, Send, Link2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAppContext } from '@/store';
+import { supabase } from '@/shared/api/supabase';
 
 // 貝拉（Discord bot）API 伺服器
 const BELLA_API_BASE = 'https://chaosop.duckdns.org';
 
 interface EquipmentReminderModalProps {
+  guildId: string;
   guildName: string;
   members: { id: string; name: string }[];
   onClose: () => void;
@@ -23,7 +25,7 @@ interface ReminderResult {
   error?: string;
 }
 
-export default function EquipmentReminderModal({ guildName, members, onClose }: EquipmentReminderModalProps) {
+export default function EquipmentReminderModal({ guildId, guildName, members, onClose }: EquipmentReminderModalProps) {
   const { t } = useTranslation();
   const { showToast } = useAppContext();
   const [isSending, setIsSending] = useState(false);
@@ -42,10 +44,17 @@ export default function EquipmentReminderModal({ guildName, members, onClose }: 
     if (members.length === 0) return;
     setIsSending(true);
     try {
+      // 附上 Supabase 登入憑證，讓貝拉端再次驗證呼叫者權限
+      // （僅該公會正/副會長或 admin / creator 可發送）
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+
       const response = await fetch(`${BELLA_API_BASE}/api/equipmentReminder`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
+          guildId,
           guildName,
           members: members.map(m => m.name),
           systemUrl,
@@ -53,7 +62,13 @@ export default function EquipmentReminderModal({ guildName, members, onClose }: 
         }),
       });
       const data: ReminderResult = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data?.error || `HTTP ${response.status}`);
+      if (!response.ok) {
+        const detail = data?.error || `HTTP ${response.status}`;
+        if (response.status === 401 || response.status === 403) {
+          throw new Error(`${t('equipment.reminder_no_permission', '沒有發送權限（僅該公會正/副會長或 admin / creator）')}：${detail}`);
+        }
+        throw new Error(detail);
+      }
       setResult(data);
       if (dryRun) {
         showToast(t('equipment.reminder_preview_ready', '已產生預覽'), 'info');

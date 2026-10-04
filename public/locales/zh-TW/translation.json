@@ -373,7 +373,7 @@
       "magic_weapon_traveler_friend": "旅行之神的摯友",
       "magic_weapon_destroyer_eye": "毀滅者之眼",
       "magic_weapon_demon_grimoire": "魔王的禁書",
-      "ur_exclusive": "皇家石",
+      "ur_exclusive": "各專用裝備",
       "venom_serpent": "毒蛇之手",
       "life_crit_dmg_lake_ring": "湖水戒指",
       "life_crit_dmg_charm_eye": "魅惑之眼",
@@ -438,6 +438,7 @@
     "reminder_sending": "處理中...",
     "reminder_sent": "貝拉已在公會專區發出通知",
     "reminder_failed": "呼叫貝拉失敗",
+    "reminder_no_permission": "沒有發送權限（僅該公會正/副會長或 admin / creator）",
     "reminder_not_found": "以下成員在 Discord 找不到對應帳號，將以純文字顯示",
     "reminder_channel_candidates": "可用頻道"
   },

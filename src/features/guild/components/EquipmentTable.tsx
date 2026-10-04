@@ -23,6 +23,8 @@ interface EquipmentTableProps {
   getTruncatedName: (name: string, role: string) => string;
   formatDate: (timestamp: number) => string;
   guildName: string;
+  // 是否可管理「本公會」（creator/admin 全域，或該公會正/副會長）→ 決定能否按「請貝拉發送」
+  canManageThisGuild: boolean;
   // 系統設定的「裝備表更新基準時間」（epoch ms）；未設定 / 0 表示不啟用高亮
   reminderCutoff?: number | null;
   onOpenReminder: (outdatedMembers: { id: string; name: string }[]) => void;
@@ -46,6 +48,7 @@ export default function EquipmentTable({
   getTruncatedName,
   formatDate,
   guildName,
+  canManageThisGuild,
   reminderCutoff,
   onOpenReminder
 }: EquipmentTableProps) {
@@ -63,7 +66,8 @@ export default function EquipmentTable({
   }, [visibleMembers, reminderCutoff]);
 
   const outdatedIdSet = React.useMemo(() => new Set(outdatedMembers.map(m => m.id)), [outdatedMembers]);
-  const canNotifyBella = isManagerRole(userRole) && outdatedMembers.length > 0;
+  // 「請貝拉發送」僅限：本公會正/副會長，或 admin / creator（不看 Discord manager 身分組）
+  const canNotifyBella = canManageThisGuild && outdatedMembers.length > 0;
 
   // 觀看者可管理的公會：從其綁定成員身分推得（此表為單一公會視圖）
   const viewerManagedGuildIds = React.useMemo(() => {
@@ -155,7 +159,7 @@ export default function EquipmentTable({
                 >
                   <div className="flex flex-col items-center gap-1">
                     {/* 部位 / 功能敘述：每一件都顯示，避免只看到裝備名而誤會用途
-                        （例：皇家石 → 5星UR專用裝備、造反的決心 → 物理爆率手套） */}
+                        （例：各專用裝備 → 5星UR專用裝備、造反的決心 → 物理爆率手套） */}
                     <span className="text-[9px] font-normal text-stone-400 dark:text-stone-500 whitespace-nowrap">
                       {t(`equipment.categories.${cat.group}`, cat.group)}
                     </span>

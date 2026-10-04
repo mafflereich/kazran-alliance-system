@@ -83,9 +83,12 @@ const LEGACY_EQUIPMENT_GROUPS: LegacyEquipmentGroupDef[] = [
   },
   {
     key: 'ur_exclusive',
+    // 5星UR專用裝備：此欄記錄的是「各專用裝備」的合併數量（非單一裝備），
+    // 因此圖示沿用皇家石作為代表圖，但顯示名稱使用 i18n 的
+    // equipment.items.ur_exclusive（各專用裝備），避免被誤認為只能填皇家石。
     icon: WEAPONS_THUMB('icon_equipment201_21'),
     icons: [
-      { thumb: WEAPONS_THUMB('icon_equipment201_21'), name: '皇家石' },
+      { thumb: WEAPONS_THUMB('icon_equipment201_21'), name: '各專用裝備' },
     ],
   },
   {

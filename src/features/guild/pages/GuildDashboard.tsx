@@ -18,7 +18,7 @@ import { getSortedMembers, getSortedGuilds } from '../utils/sort';
 export default function GuildDashboard({ guildId }: { guildId: string }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { db, isMembersLoading, userGuildRoles, userRole, fetchMembers, userProfileId } = useAppContext();
+  const { db, isMembersLoading, userGuildRoles, userRole, fetchMembers, userProfileId, canManageGuild } = useAppContext();
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [reminderMembers, setReminderMembers] = useState<{ id: string; name: string }[] | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -198,6 +198,7 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
                   getTruncatedName={getTruncatedName}
                   formatDate={formatDate}
                   guildName={guild.name}
+                  canManageThisGuild={canManageGuild(guildId)}
                   reminderCutoff={reminderCutoff}
                   onOpenReminder={setReminderMembers}
                 />
@@ -215,6 +216,7 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
 
       {reminderMembers && (
         <EquipmentReminderModal
+          guildId={guildId}
           guildName={guild.name}
           members={reminderMembers}
           onClose={() => setReminderMembers(null)}

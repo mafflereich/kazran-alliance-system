@@ -373,7 +373,7 @@
       "magic_weapon_traveler_friend": "Travel God's Friend",
       "magic_weapon_destroyer_eye": "Eye of the Destroyer",
       "magic_weapon_demon_grimoire": "Demon's Forbidden Book",
-      "ur_exclusive": "Royaldite",
+      "ur_exclusive": "Exclusive Equipment",
       "venom_serpent": "Venomous Touch",
       "life_crit_dmg_lake_ring": "Ring of the Lake",
       "life_crit_dmg_charm_eye": "Charming Gaze",
@@ -438,6 +438,7 @@
     "reminder_sending": "Processing...",
     "reminder_sent": "Bella posted the notice in the guild channel",
     "reminder_failed": "Failed to call Bella",
+    "reminder_no_permission": "No permission to send (only that guild's leader/co-leader, admin or creator)",
     "reminder_not_found": "These members could not be matched on Discord and will be shown as plain text",
     "reminder_channel_candidates": "Available channels"
   },
