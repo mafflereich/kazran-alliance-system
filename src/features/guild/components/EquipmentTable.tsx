@@ -154,11 +154,11 @@ export default function EquipmentTable({
                   className="p-2 font-semibold text-center text-xs border-r border-b-2 border-stone-200 dark:border-stone-600 last:border-r-0 sticky top-0 bg-stone-50 dark:bg-stone-700 z-20 align-top"
                 >
                   <div className="flex flex-col items-center gap-1">
-                    {cat.group !== cat.key && (
-                      <span className="text-[9px] font-normal text-stone-400 dark:text-stone-500 whitespace-nowrap">
-                        {t(`equipment.categories.${cat.group}`, cat.group)}
-                      </span>
-                    )}
+                    {/* 部位 / 功能敘述：每一件都顯示，避免只看到裝備名而誤會用途
+                        （例：皇家石 → 5星UR專用裝備、造反的決心 → 物理爆率手套） */}
+                    <span className="text-[9px] font-normal text-stone-400 dark:text-stone-500 whitespace-nowrap">
+                      {t(`equipment.categories.${cat.group}`, cat.group)}
+                    </span>
                     <div className="flex items-center justify-center gap-0.5" title={cat.icons?.map(i => i.name).join(' / ')}>
                       {cat.icons?.slice(0, 3).map((ico : any, idx : number) => (
                         <img

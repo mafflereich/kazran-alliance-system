@@ -125,11 +125,10 @@ export default function MemberEquipmentModal({ memberId, onClose }: { memberId: 
                         <div className="font-medium text-stone-800 dark:text-stone-200">
                           {t(`equipment.items.${cat.key}`, cat.name)}
                         </div>
-                        {cat.icons && cat.icons.length > 1 && (
-                          <div className="text-[11px] text-stone-400 dark:text-stone-500">
-                            {cat.icons.map(i => i.name).join(' / ')}
-                          </div>
-                        )}
+                        {/* 部位 / 功能敘述（例：5星UR專用裝備、物理爆率手套） */}
+                        <div className="text-[11px] text-stone-400 dark:text-stone-500">
+                          {t(`equipment.categories.${cat.group}`, cat.group)}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
@@ -290,6 +289,9 @@ export default function MemberEquipmentModal({ memberId, onClose }: { memberId: 
                             : <ChevronRight className="w-4 h-4 text-stone-400" />}
                           <span className="text-sm font-semibold text-stone-700 dark:text-stone-200">
                             {t(`equipment.items.${cat.key}`, cat.name)}
+                          </span>
+                          <span className="text-[10px] text-stone-400 dark:text-stone-500">
+                            {t(`equipment.categories.${cat.group}`, cat.group)}
                           </span>
                           {hasOverride && (
                             <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
