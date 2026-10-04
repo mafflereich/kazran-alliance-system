@@ -34,6 +34,24 @@ export const isManagerRole = (role: string | null): boolean =>
 export const isAdminRole = (role: string | null): boolean =>
   role === 'admin' || role === 'creator';
 
+// 取得成員裝備表最近更新時間（epoch ms）
+//   以 equipmentUpdatedAt（整張裝備表）為準；從未更新過裝備表則為 0。
+//   （刻意不退回 updatedAt：updatedAt 會被移公會、服裝編輯等操作更新，
+//     用來判斷「裝備表是否已更新」會誤放行未更新裝備表的成員。）
+export const getEquipmentUpdatedAt = (
+  member: { equipmentUpdatedAt?: number },
+): number => member.equipmentUpdatedAt ?? 0;
+
+// 成員的裝備表是否「未在系統基準時間之後更新」
+//   cutoff：系統設定的基準時間（epoch ms）。0 / undefined 表示不啟用高亮。
+export const isEquipmentOutdated = (
+  member: { equipmentUpdatedAt?: number },
+  cutoff?: number | null,
+): boolean => {
+  if (!cutoff || cutoff <= 0) return false;
+  return getEquipmentUpdatedAt(member) < cutoff;
+};
+
 // 統一取得隱私級別（向後相容舊布林 isEquipmentHidden）
 export const normalizeEquipmentVisibility = (
   visibility?: EquipmentVisibility,

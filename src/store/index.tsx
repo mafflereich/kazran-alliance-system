@@ -396,21 +396,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         supabase ? supabase.from('guilds').select('id, name, tier, order_num, serial, is_display, username') : { data: [], error: null },
         supabase ? supabase.from('characters').select('id, name, name_e, order_num, atk_type, attribute') : { data: [], error: null },
         supabase ? supabase.from('costumes').select('id, name, name_e, character_id, image_name, order_num, is_new') : { data: [], error: null },
-        supabase ? supabase.from('settings').select('id, bgm_url, bgm_default_volume, index_message, index_percent_type, application_pending_count') : { data: [], error: null },
+        supabase ? supabase.from('settings').select('id, bgm_url, bgm_default_volume, index_message, index_percent_type, application_pending_count, equipment_reminder_at') : { data: [], error: null },
         supabase ? supabase.from('access_control').select('page, roles') : { data: [], error: null },
       ]);
 
       if (guildsRes.error) throw guildsRes.error;
       if (charactersRes.error) throw charactersRes.error;
       if (costumesRes.error) throw costumesRes.error;
-      if (settingsRes.error) throw settingsRes.error;
+      // equipment_reminder_at 為較新的欄位；若 SQL 尚未執行，退回舊欄位清單避免整個 App 離線。
+      let settingsData = settingsRes.data as any[] | null;
+      if (settingsRes.error) {
+        console.warn('Settings select failed, retrying without equipment_reminder_at:', settingsRes.error.message);
+        const retry = await supabase.from('settings').select('id, bgm_url, bgm_default_volume, index_message, index_percent_type, application_pending_count');
+        if (retry.error) throw retry.error;
+        settingsData = (retry.data as any[]) ?? [];
+      }
       // access_control might not exist yet, handle gracefully
       const accessControlData = accessControlRes.error ? [] : accessControlRes.data;
 
       const guilds = (guildsRes.data as any[] || []).reduce((acc, guild) => ({ ...acc, [guild.id]: toCamel(guild) }), {});
       const characters = (charactersRes.data as any[] || []).reduce((acc, char) => ({ ...acc, [char.id]: toCamel(char) }), {});
       const costumes = (costumesRes.data as any[] || []).reduce((acc, costume) => ({ ...acc, [costume.id]: toCamel(costume) }), {});
-      const settings = (settingsRes.data as any[] || []).reduce((acc, setting) => ({ ...acc, [setting.id]: toCamel(setting) }), {});
+      const settings = (settingsData || []).reduce((acc, setting) => ({ ...acc, [setting.id]: toCamel(setting) }), {});
       const accessControl = (accessControlData as any[] || []).reduce((acc, ac) => {
         const camelAc = toCamel<AccessControl>(ac);
         return { ...acc, [camelAc.page]: camelAc };
@@ -1592,10 +1599,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchSettings = async () => {
     if (isOffline) return;
 
-    const { data, error } = await supabase.from('settings').select('id, bgm_url, bgm_default_volume, index_message, index_percent_type, application_pending_count');
-    if (error) {
-      console.error('Error fetching settings:', error);
-      return;
+    const primary = await supabase.from('settings').select('id, bgm_url, bgm_default_volume, index_message, index_percent_type, application_pending_count, equipment_reminder_at');
+    let data = primary.data;
+    if (primary.error) {
+      // equipment_reminder_at 尚未建立時，退回舊欄位清單
+      const retry = await supabase.from('settings').select('id, bgm_url, bgm_default_volume, index_message, index_percent_type, application_pending_count');
+      if (retry.error) {
+        console.error('Error fetching settings:', retry.error);
+        return;
+      }
+      data = retry.data;
     }
 
     if (data) {

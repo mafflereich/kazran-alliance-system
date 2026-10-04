@@ -1,9 +1,9 @@
 import React from 'react';
-import { User, EyeOff, Lock, ArrowDownNarrowWide, ArrowDownWideNarrow } from 'lucide-react';
+import { User, EyeOff, Lock, ArrowDownNarrowWide, ArrowDownWideNarrow, BellRing, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAppContext } from '@/store';
 import { EQUIPMENT_CATEGORIES, PLAY_MODE_OPTIONS } from '@/entities/member/types';
-import { normalizeEquipment, normalizePlayPreferences, normalizeEquipmentVisibility, canViewCategoryForUI, isManagerRole } from '@/shared/lib/equipment';
+import { normalizeEquipment, normalizePlayPreferences, normalizeEquipmentVisibility, canViewCategoryForUI, isManagerRole, isEquipmentOutdated, getEquipmentUpdatedAt } from '@/shared/lib/equipment';
 
 interface EquipmentTableProps {
   members: [string, any][];
@@ -22,6 +22,10 @@ interface EquipmentTableProps {
   isMembersLoading: boolean;
   getTruncatedName: (name: string, role: string) => string;
   formatDate: (timestamp: number) => string;
+  guildName: string;
+  // 系統設定的「裝備表更新基準時間」（epoch ms）；未設定 / 0 表示不啟用高亮
+  reminderCutoff?: number | null;
+  onOpenReminder: (outdatedMembers: { id: string; name: string }[]) => void;
 }
 
 export default function EquipmentTable({
@@ -40,12 +44,26 @@ export default function EquipmentTable({
   scrollRef,
   isMembersLoading,
   getTruncatedName,
-  formatDate
+  formatDate,
+  guildName,
+  reminderCutoff,
+  onOpenReminder
 }: EquipmentTableProps) {
   const { t, i18n } = useTranslation();
 
   // 所有成員都顯示，但依隱私級別對一般成員遮蔽裝備欄位（遊玩傾向/註記仍保留）
   const visibleMembers = React.useMemo(() => members, [members]);
+
+  // 未在系統基準時間後更新裝備表的成員（高亮 + 可一鍵請貝拉通知）
+  const outdatedMembers = React.useMemo(() => {
+    if (!reminderCutoff || reminderCutoff <= 0) return [] as { id: string; name: string }[];
+    return visibleMembers
+      .filter(([, m]: [string, any]) => isEquipmentOutdated(m, reminderCutoff))
+      .map(([id, m]: [string, any]) => ({ id, name: String(m.name ?? '') }));
+  }, [visibleMembers, reminderCutoff]);
+
+  const outdatedIdSet = React.useMemo(() => new Set(outdatedMembers.map(m => m.id)), [outdatedMembers]);
+  const canNotifyBella = isManagerRole(userRole) && outdatedMembers.length > 0;
 
   // 觀看者可管理的公會：從其綁定成員身分推得（此表為單一公會視圖）
   const viewerManagedGuildIds = React.useMemo(() => {
@@ -69,6 +87,30 @@ export default function EquipmentTable({
             <div className="w-8 h-8 border-4 border-stone-200 dark:border-stone-600 border-t-stone-800 dark:border-t-stone-200 rounded-full animate-spin"></div>
             <span className="text-stone-600 dark:text-stone-400 font-medium">{t('common.loading', '載入中...')}</span>
           </div>
+        </div>
+      )}
+      {(reminderCutoff && reminderCutoff > 0) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-stone-200 dark:border-stone-700 bg-stone-50/70 dark:bg-stone-800/60">
+          <div className="flex items-center gap-2 text-sm">
+            <AlertTriangle className={`w-4 h-4 ${outdatedMembers.length > 0 ? 'text-red-500' : 'text-stone-400'}`} />
+            <span className="font-medium text-stone-700 dark:text-stone-200">
+              {t('equipment.reminder_cutoff', '更新基準時間')}: {formatDate(reminderCutoff)}
+            </span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${outdatedMembers.length > 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'}`}>
+              {t('equipment.reminder_outdated_count', { count: outdatedMembers.length, defaultValue: '{{count}} 位未更新' })}
+            </span>
+          </div>
+          {canNotifyBella && (
+            <button
+              type="button"
+              onClick={() => onOpenReminder(outdatedMembers)}
+              title={t('equipment.reminder_notify_bella_title', { guild: guildName, defaultValue: '請貝拉通知 {{guild}} 的成員' })}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold shadow-sm transition-all active:scale-95"
+            >
+              <BellRing className="w-4 h-4" />
+              {t('equipment.reminder_notify_bella', '請貝拉通知')}
+            </button>
+          )}
         </div>
       )}
       <div
@@ -112,6 +154,11 @@ export default function EquipmentTable({
                   className="p-2 font-semibold text-center text-xs border-r border-b-2 border-stone-200 dark:border-stone-600 last:border-r-0 sticky top-0 bg-stone-50 dark:bg-stone-700 z-20 align-top"
                 >
                   <div className="flex flex-col items-center gap-1">
+                    {cat.group !== cat.key && (
+                      <span className="text-[9px] font-normal text-stone-400 dark:text-stone-500 whitespace-nowrap">
+                        {t(`equipment.categories.${cat.group}`, cat.group)}
+                      </span>
+                    )}
                     <div className="flex items-center justify-center gap-0.5" title={cat.icons?.map(i => i.name).join(' / ')}>
                       {cat.icons?.slice(0, 3).map((ico : any, idx : number) => (
                         <img
@@ -125,7 +172,7 @@ export default function EquipmentTable({
                         />
                       ))}
                     </div>
-                    <span>{t(`equipment.categories.${cat.key}`)}</span>
+                    <span>{t(`equipment.items.${cat.key}`, cat.name)}</span>
                   </div>
                 </th>
               ))}
@@ -137,10 +184,11 @@ export default function EquipmentTable({
               const equipment = normalizeEquipment(member.equipment);
               const playPrefs = normalizePlayPreferences(member.playPreferences);
               const sortedModes = [...(playPrefs.modes || [])].sort((a, b) => PLAY_MODE_OPTIONS.indexOf(a) - PLAY_MODE_OPTIONS.indexOf(b));
+              const isOutdated = outdatedIdSet.has(id);
               return (
-              <tr key={id} className={`border-b border-stone-100 dark:border-stone-700 transition-colors group ${isCurrentUser ? 'hover:bg-stone-50 dark:hover:bg-stone-700' : ''}`}>
+              <tr key={id} className={`border-b border-stone-100 dark:border-stone-700 transition-colors group ${isOutdated ? 'animate-highlight-pulse' : ''} ${isCurrentUser ? 'hover:bg-stone-50 dark:hover:bg-stone-700' : ''}`}>
                 <td
-                  className={`p-3 font-medium text-stone-800 dark:text-stone-200 sticky left-0 z-10 bg-white dark:bg-stone-800 border-r border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c] transition-colors ${isCurrentUser ? 'cursor-pointer group-hover:bg-stone-50 dark:group-hover:bg-stone-700' : ''}`}
+                  className={`p-3 font-medium text-stone-800 dark:text-stone-200 sticky left-0 z-10 ${isOutdated ? 'animate-highlight-pulse' : 'bg-white dark:bg-stone-800'} border-r border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c] transition-colors ${isCurrentUser ? 'cursor-pointer group-hover:bg-stone-50 dark:group-hover:bg-stone-700' : ''}`}
                   onClick={() => handleEditClick(id, member.name)}
                 >
                   <div className="flex flex-col">
@@ -163,17 +211,25 @@ export default function EquipmentTable({
                           ? <Lock className="w-3.5 h-3.5 text-red-400 dark:text-red-500" />
                           : <EyeOff className="w-3.5 h-3.5 text-stone-300 dark:text-stone-500" />
                       ) : null}
+                      {isOutdated && (
+                        <span
+                          className="px-1.5 py-0.5 rounded bg-red-600 text-white text-[9px] font-bold whitespace-nowrap"
+                          title={t('equipment.reminder_badge_title', '未在基準時間後更新裝備表')}
+                        >
+                          {t('equipment.reminder_badge', '未更新')}
+                        </span>
+                      )}
                     </div>
-                    {(member.updatedAt || (isManagerRole(userRole) && member.refiningTraces != null)) && (
+                    {(getEquipmentUpdatedAt(member) > 0 || (isManagerRole(userRole) && member.refiningTraces != null)) && (
                       <div className="flex items-center gap-2 mt-0.5">
                         {isManagerRole(userRole) && member.refiningTraces != null && member.refiningTraces > 0 && (
                           <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400" title={t('equipment.refining_traces')}>
                             ✦ {member.refiningTraces}
                           </span>
                         )}
-                        {member.updatedAt && (
-                          <span className="text-[10px] text-stone-400">
-                            {formatDate(member.updatedAt)}
+                        {getEquipmentUpdatedAt(member) > 0 && (
+                          <span className={`text-[10px] ${isOutdated ? 'text-red-500 dark:text-red-400 font-bold' : 'text-stone-400'}`}>
+                            {t('equipment.last_updated', '更新')}: {formatDate(getEquipmentUpdatedAt(member))}
                           </span>
                         )}
                       </div>

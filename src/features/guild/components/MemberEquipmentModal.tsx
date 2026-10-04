@@ -123,7 +123,7 @@ export default function MemberEquipmentModal({ memberId, onClose }: { memberId: 
                       />
                       <div>
                         <div className="font-medium text-stone-800 dark:text-stone-200">
-                          {t(`equipment.categories.${cat.key}`)}
+                          {t(`equipment.items.${cat.key}`, cat.name)}
                         </div>
                         {cat.icons && cat.icons.length > 1 && (
                           <div className="text-[11px] text-stone-400 dark:text-stone-500">
@@ -289,7 +289,7 @@ export default function MemberEquipmentModal({ memberId, onClose }: { memberId: 
                             ? <ChevronDown className="w-4 h-4 text-stone-400" />
                             : <ChevronRight className="w-4 h-4 text-stone-400" />}
                           <span className="text-sm font-semibold text-stone-700 dark:text-stone-200">
-                            {t(`equipment.categories.${cat.key}`)}
+                            {t(`equipment.items.${cat.key}`, cat.name)}
                           </span>
                           {hasOverride && (
                             <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">

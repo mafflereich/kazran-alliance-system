@@ -4,6 +4,7 @@ import { useAppContext } from '@/store';
 import { Shield } from 'lucide-react';
 import MemberEquipmentModal from '../components/MemberEquipmentModal';
 import MemberSearchModal from '../components/MemberSearchModal';
+import EquipmentReminderModal from '../components/EquipmentReminderModal';
 import ConfirmModal from '@shared/ui/ConfirmModal';
 import { truncateName } from '@/shared/lib/utils';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +20,7 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
   const navigate = useNavigate();
   const { db, isMembersLoading, userGuildRoles, userRole, fetchMembers, userProfileId } = useAppContext();
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [reminderMembers, setReminderMembers] = useState<{ id: string; name: string }[] | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
@@ -114,6 +116,12 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
     return members.some(([id]) => userMemberIds.includes(id));
   }, [members, userProfileId]);
 
+  // 系統設定的「裝備表更新基準時間」（epoch ms）：未在該時間後更新的成員會被高亮
+  const reminderCutoff = React.useMemo(() => {
+    const first = db.settings ? Object.values(db.settings)[0] : undefined;
+    return first?.equipmentReminderAt ?? null;
+  }, [db.settings]);
+
   if (!guild) {
     return (
       <div className="h-screen flex flex-col">
@@ -189,6 +197,9 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
                   isMembersLoading={isMembersLoading}
                   getTruncatedName={getTruncatedName}
                   formatDate={formatDate}
+                  guildName={guild.name}
+                  reminderCutoff={reminderCutoff}
+                  onOpenReminder={setReminderMembers}
                 />
             </div>
           </main>
@@ -199,6 +210,14 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
         <MemberEquipmentModal
           memberId={editingMemberId}
           onClose={() => setEditingMemberId(null)}
+        />
+      )}
+
+      {reminderMembers && (
+        <EquipmentReminderModal
+          guildName={guild.name}
+          members={reminderMembers}
+          onClose={() => setReminderMembers(null)}
         />
       )}
 

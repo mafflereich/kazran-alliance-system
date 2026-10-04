@@ -39,16 +39,30 @@ export interface PlayPreferences {
   dedication?: Dedication;
 }
 
-// 裝備類別（每項都記錄 23C / 24C 數量；icon = 代表圖示 thumb URL，icons = 該欄位涵蓋的所有裝備圖示）
-export interface EquipmentCategoryDef {
+// 舊版「部位分組」定義（多件裝備共用一個 23C / 24C 欄位）
+interface LegacyEquipmentGroupDef {
   key: string;
   icon: string;
   icons?: { thumb: string; name: string }[];
 }
 
+// 裝備單件定義（每件各自一欄，記錄 23C / 24C 數量）
+//   key   = 穩定識別碼（members.equipment 的 jsonb key）
+//   icon  = 代表圖示 thumb URL
+//   name  = 預設顯示名稱（i18n 缺漏時的 fallback）
+//   group = 所屬部位分組 key（表頭 / 編輯視窗的分組標示用）
+//   icons = 向後相容欄位（單件時僅含自己一筆）
+export interface EquipmentCategoryDef {
+  key: string;
+  icon: string;
+  name: string;
+  group: string;
+  icons?: { thumb: string; name: string }[];
+}
+
 const WEAPONS_THUMB = (id: string) => `https://image-bd2db.souseha.com/weapons_new/thumbs/${id}_thumb.webp`;
 
-export const EQUIPMENT_CATEGORIES: EquipmentCategoryDef[] = [
+const LEGACY_EQUIPMENT_GROUPS: LegacyEquipmentGroupDef[] = [
   {
     key: 'phys_weapon',
     icon: WEAPONS_THUMB('icon_equipment4101_61'),
@@ -128,6 +142,49 @@ export const EQUIPMENT_CATEGORIES: EquipmentCategoryDef[] = [
     ],
   },
 ];
+
+// ------------------------------------------------------------
+// 需要「分拆成單件」的舊分組 key
+//   → 這些分組原本把多件裝備合併成一個 23C / 24C 欄位，數值無法對應回
+//     單件，因此分拆後既有資料一律清空，由成員重新填寫
+//     （見 docs/sql/split_ur_equipment_items.sql）。
+// ------------------------------------------------------------
+export const SPLIT_LEGACY_GROUP_KEYS = [
+  'phys_weapon',
+  'magic_weapon',
+  'life_crit_dmg',
+  'life_crit_rate',
+  'phys_glove',
+  'magic_glove',
+] as const;
+
+// 舊分組 key → 各單件的穩定 key（順序需與 icons 陣列一致）
+const SPLIT_ITEM_KEYS: Record<string, string[]> = {
+  phys_weapon: ['phys_weapon_dragon_sword', 'phys_weapon_thunder_hammer', 'phys_weapon_piercing_spear'],
+  magic_weapon: ['magic_weapon_traveler_friend', 'magic_weapon_destroyer_eye', 'magic_weapon_demon_grimoire'],
+  life_crit_dmg: ['life_crit_dmg_lake_ring', 'life_crit_dmg_charm_eye'],
+  life_crit_rate: ['life_crit_rate_aesthetic_peak', 'life_crit_rate_harmony_pact'],
+  phys_glove: ['phys_glove_god_arm', 'phys_glove_chief_majesty'],
+  magic_glove: ['magic_glove_betrayal_bond', 'magic_glove_guardian_scale'],
+};
+
+// ------------------------------------------------------------
+// 裝備清單（每個 UR 通用裝備各自一欄）
+//   - 多件分組 → 逐件拆開（key 取 SPLIT_ITEM_KEYS）
+//   - 單件分組 → 沿用原 key（既有資料保留，不清空）
+//   - ur_exclusive（5星UR專用裝備）→ 不參與分拆，維持單欄
+// ------------------------------------------------------------
+export const EQUIPMENT_CATEGORIES: EquipmentCategoryDef[] = LEGACY_EQUIPMENT_GROUPS.flatMap(group => {
+  const icons = group.icons && group.icons.length > 0 ? group.icons : [{ thumb: group.icon, name: group.key }];
+  const itemKeys = SPLIT_ITEM_KEYS[group.key];
+  return icons.map((ico, idx) => ({
+    key: itemKeys?.[idx] ?? group.key,
+    icon: ico.thumb,
+    name: ico.name,
+    group: group.key,
+    icons: [ico],
+  }));
+});
 
 export interface EquipmentItem {
   c23: number; // 23C 數量
@@ -219,6 +276,10 @@ export interface Setting {
   indexPercentType?: 'empty' | 'new_costumes_owned';
   isDebugMode?: boolean;
   applicationPendingCount?: number;
+  // 裝備表「請更新」基準時間（epoch ms）：
+  //   成員的裝備表更新時間若早於此時間點，裝備表會高亮該成員並可一鍵請貝拉通知。
+  //   0 / null / undefined 表示不啟用高亮。
+  equipmentReminderAt?: number;
 }
 
 export interface ApplyMail {

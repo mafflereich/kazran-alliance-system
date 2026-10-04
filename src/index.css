@@ -18,10 +18,23 @@ html, body {
 
 @theme {
   --animate-flash-orange: flash-orange 2s ease-out;
+  --animate-highlight-pulse: highlight-pulse 1.6s ease-in-out infinite;
 
   @keyframes flash-orange {
     0% { background-color: rgba(245, 158, 11, 0.4); }
     100% { background-color: transparent; }
+  }
+
+  /* 裝備表：未在基準時間後更新的成員，持續脈動高亮 */
+  @keyframes highlight-pulse {
+    0%, 100% {
+      background-color: rgba(239, 68, 68, 0.06);
+      box-shadow: inset 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+    50% {
+      background-color: rgba(239, 68, 68, 0.24);
+      box-shadow: inset 4px 0 0 0 rgba(239, 68, 68, 0.85);
+    }
   }
 }
 

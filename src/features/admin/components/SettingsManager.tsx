@@ -3,6 +3,21 @@ import { useAppContext } from '@/store';
 import { Save, Settings } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+// 將 epoch ms 轉為 <input type="datetime-local"> 可用的本地時間字串
+const toDateTimeLocal = (ms?: number | null): string => {
+  if (!ms || ms <= 0) return '';
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+// 將 <input type="datetime-local"> 的值轉回 epoch ms（空字串 → 0，表示停用高亮）
+const fromDateTimeLocal = (value: string): number => {
+  if (!value) return 0;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+};
+
 export default function SettingsManager() {
   const { t } = useTranslation(['admin', 'translation']);
   const { db, updateSetting, showToast, fetchSettings, updateGuild } = useAppContext();
@@ -10,6 +25,9 @@ export default function SettingsManager() {
   const [bgmUrl, setBgmUrl] = useState(db.settings?.[firstSettingId]?.bgmUrl || '');
   const [bgmDefaultVolume, setBgmDefaultVolume] = useState(db.settings?.[firstSettingId]?.bgmDefaultVolume ?? 50);
   const [indexMessage, setIndexMessage] = useState(db.settings?.[firstSettingId]?.indexMessage || '');
+  const [equipmentReminderAt, setEquipmentReminderAt] = useState<string>(
+    toDateTimeLocal(db.settings?.[firstSettingId]?.equipmentReminderAt)
+  );
 
   const getSafeIndexPercentType = (val?: string): 'empty' | 'new_costumes_owned' => {
     return val === 'new_costumes_owned' ? 'new_costumes_owned' : 'empty';
@@ -32,13 +50,14 @@ export default function SettingsManager() {
       setBgmDefaultVolume(db.settings[id].bgmDefaultVolume ?? 50);
       setIndexMessage(db.settings[id].indexMessage || '');
       setIndexPercentType(getSafeIndexPercentType(db.settings[id].indexPercentType));
+      setEquipmentReminderAt(toDateTimeLocal(db.settings[id].equipmentReminderAt));
     }
   }, [db.settings]);
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await updateSetting(firstSettingId, { bgmUrl, bgmDefaultVolume, indexMessage, indexPercentType });
+      await updateSetting(firstSettingId, { bgmUrl, bgmDefaultVolume, indexMessage, indexPercentType, equipmentReminderAt: fromDateTimeLocal(equipmentReminderAt) });
       showToast(t('settings.save_success'), 'success');
     } catch (error: any) {
       console.error("Error saving settings:", error);
@@ -144,6 +163,39 @@ export default function SettingsManager() {
               placeholder={t('settings.message_placeholder')}
               className="w-full p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100 min-h-[100px]"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">
+              {t('settings.equipment_reminder_at', '裝備表更新基準時間')}
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="datetime-local"
+                value={equipmentReminderAt}
+                onChange={(e) => setEquipmentReminderAt(e.target.value)}
+                className="p-3 border border-stone-300 dark:border-stone-600 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100"
+              />
+              <button
+                type="button"
+                onClick={() => setEquipmentReminderAt(toDateTimeLocal(Date.now()))}
+                className="px-3 py-2 bg-stone-200 dark:bg-stone-600 text-stone-800 dark:text-stone-200 rounded-lg font-bold hover:bg-stone-300 dark:hover:bg-stone-500 transition-all active:scale-95 shadow-sm whitespace-nowrap"
+              >
+                {t('settings.set_to_now', '設為現在')}
+              </button>
+              {equipmentReminderAt && (
+                <button
+                  type="button"
+                  onClick={() => setEquipmentReminderAt('')}
+                  className="px-3 py-2 bg-stone-100 dark:bg-stone-700 text-stone-600 dark:text-stone-300 rounded-lg font-bold hover:bg-stone-200 dark:hover:bg-stone-600 transition-all active:scale-95 whitespace-nowrap"
+                >
+                  {t('settings.clear', '清除')}
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-stone-500 dark:text-stone-400 mt-2">
+              {t('settings.equipment_reminder_at_hint', '裝備表更新時間早於此時間點的成員會被高亮標示，管理者可一鍵請貝拉在公會專區通知他們。留空表示停用高亮。')}
+            </p>
           </div>
         </div>
       </div>
