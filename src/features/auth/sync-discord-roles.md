@@ -106,14 +106,29 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`Discord API Error (${response.status}):`, errorText);
-      await logSystemEvent('error', 'discord_api_error', `Discord API 錯誤: ${response.status}`, { errorText, status: response.status }, user_id, discord_id);
+
+      // 【修正】解析 Discord 的錯誤碼，方便分辨真正的失敗原因：
+      //   10007 Unknown Member → 使用者真的不在伺服器（或被踢／退出／封鎖）
+      //   10004 Unknown Guild / 50001 Missing Access → Bot 不在伺服器或沒有 GUILD_MEMBERS 權限
+      //   （這兩種都會回 404/403，過去只記下 status，無法分辨）
+      let discordCode: number | null = null;
+      let discordMessage: string | null = null;
+      try {
+        const parsed = JSON.parse(errorText);
+        discordCode = parsed?.code ?? null;
+        discordMessage = parsed?.message ?? null;
+      } catch (_) {
+        // 非 JSON 內容，維持 null
+      }
+
+      await logSystemEvent('error', 'discord_api_error', `Discord API 錯誤: ${response.status}`, { errorText, status: response.status, discordCode, discordMessage }, user_id, discord_id);
       
       if (response.status === 401) {
         throw new Error("Discord Bot Token 無效或已過期 (401)");
       } else if (response.status === 403) {
         throw new Error("Discord Bot 沒有權限讀取該伺服器的成員資訊 (403)");
       } else if (response.status === 404) {
-        throw new Error("找不到該 Discord 成員或伺服器 (404)");
+        throw new Error(`找不到該 Discord 成員或伺服器 (404)${discordMessage ? ` - ${discordMessage}` : ''}`);
       }
       throw new Error(`Discord API 錯誤: ${response.status} - ${errorText}`);
     }
@@ -203,9 +218,36 @@ serve(async (req) => {
       .eq('discord_id', discord_id)
       .single();
 
-    const shouldUpdateId = matchedId !== null && !existingProfile?.id?.includes(matchedId);
+    let shouldUpdateId = matchedId !== null && !existingProfile?.id?.includes(matchedId);
+
+    // 【修正 23505】profiles.id 上有唯一性約束 (profiles_id_key)。
+    // 若 matchedId 已被「其他 Discord 帳號」的 profile 佔用（同暱稱的第二個帳號、
+    // 管理員手動綁定、或玩家換帳號後舊 profile 沒解除），直接寫入 id 會觸發
+    // 23505 duplicate key → 整筆 upsert 失敗 → profiles 沒有這一列 →
+    // 前端查不到 profile，就誤顯示「您不在指定的公會聯盟中」並把使用者登出。
+    // 因此這裡先檢查佔用者：被別人綁走時不搶綁定，只同步角色，
+    // 綁定衝突交由管理員處理（SQL：docs/sql/fix_profiles_id_conflict.sql）。
+    if (shouldUpdateId && matchedId) {
+      const { data: owner } = await supabase
+        .from('profiles')
+        .select('discord_id, discord_username')
+        .eq('id', matchedId)
+        .maybeSingle();
+
+      if (owner && owner.discord_id !== discord_id) {
+        shouldUpdateId = false;
+        await logSystemEvent(
+          'warn',
+          'id_conflict',
+          '成員已被其他 Discord 帳號綁定，本次僅同步角色、不覆寫綁定',
+          { member_id: matchedId, owner_discord_id: owner.discord_id, owner_username: owner.discord_username },
+          user_id,
+          discord_id
+        );
+      }
+    }
     
-    const dataRow = {
+    const dataRow: Record<string, any> = {
       discord_id: discord_id,
       discord_username: cleanedUsername, // 新增：儲存 Discord 的 username (已移除 #0)
       ...(shouldUpdateId ? { id: matchedId } : {}),
@@ -217,18 +259,48 @@ serve(async (req) => {
     };
 
     // 4. 無條件執行 upsert 寫入 profiles
-    const { error: upsertError } = await supabase
+    let { error: upsertError } = await supabase
       .from('profiles')
       .upsert(dataRow, { onConflict: 'discord_id' });
+
+    // 【修正 23505】保險機制：若仍因 profiles_id_key 衝突而失敗
+    // （例如兩個同暱稱帳號同時登入，上面的佔用檢查被 race condition 繞過），
+    // 拿掉 id 再寫一次，確保 profile 一定能建立，使用者不會被鎖在門外。
+    if (upsertError && upsertError.code === '23505' && (upsertError.message || '').includes('profiles_id_key')) {
+      await logSystemEvent(
+        'warn',
+        'id_conflict_fallback',
+        'upsert 因 profiles_id_key 衝突失敗，改為不寫入 id 重試',
+        { member_id: matchedId, error: upsertError.message },
+        user_id,
+        discord_id
+      );
+
+      const rowWithoutId: Record<string, any> = { ...dataRow };
+      delete rowWithoutId.id;
+
+      const retry = await supabase
+        .from('profiles')
+        .upsert(rowWithoutId, { onConflict: 'discord_id' });
+
+      upsertError = retry.error;
+    }
       
     if (upsertError) {
        console.error("寫入 profiles 發生錯誤:", upsertError);
        // 這是最關鍵的 Log：紀錄 Upsert 失敗的詳細原因與當下的 dataRow
        await logSystemEvent('error', 'upsert_profile_failed', '寫入 profiles 發生錯誤', { error: upsertError, dataRow }, user_id, discord_id);
-    } else {
-       // 成功時也可以記錄一筆 Info
-       await logSystemEvent('info', 'sync_success', '成功同步 Discord 角色與 Profile', { role, guildRoles, matchedId }, user_id, discord_id);
+
+       // 【修正】明確回傳失敗狀態，讓前端能區分「同步失敗」與「真的不在伺服器」，
+       // 不再一律顯示 not_in_guild（前端會改顯示 login.sync_failed）。
+       return new Response(
+         JSON.stringify({ error: "寫入 profiles 失敗", code: "upsert_failed", detail: upsertError.message }),
+         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+       );
     }
+
+    // 成功時記錄一筆 Info（boundId 為 null 代表本次沒有寫入成員綁定）
+    await logSystemEvent('info', 'sync_success', '成功同步 Discord 角色與 Profile', { role, guildRoles, matchedId, boundId: dataRow.id ?? null }, user_id, discord_id);
 
     return new Response(
       JSON.stringify({ success: true, role, guildRoles: guildRoles.join(',') }),
@@ -240,7 +312,7 @@ serve(async (req) => {
     await logSystemEvent('fatal', 'unhandled_exception', err.message || '未知的例外錯誤', { stack: err.stack, parsedBody }, parsedBody?.user_id, parsedBody?.discord_id);
     
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ error: err.message, code: 'sync_failed' }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -267,7 +339,12 @@ function getMemberAvatarUrl(
     hash = globalAvatarHash;
   } else {
     // 完全沒頭像 → 預設
-    // 這裡如果 userId 是 undefined，BigInt 會拋錯，現在會被外層 catch 捕捉並寫入 system_logs
+    // 【修正】userId 為 undefined 時 BigInt 會拋錯 → 被外層 catch 變成
+    // unhandled_exception (500) → 整個同步失敗、使用者被誤判不在伺服器。
+    // 因此先退回 index 0，不讓頭像問題擋掉登入。
+    if (!userId) {
+      return `https://cdn.discordapp.com/embed/avatars/0.png?size=${size}`;
+    }
     const defaultIndex = Number(BigInt(userId) >> 22n) % 6; // 新系統推薦
     return `https://cdn.discordapp.com/embed/avatars/${defaultIndex}.png?size=${size}`;
   }
@@ -278,3 +355,5 @@ function getMemberAvatarUrl(
 
   return `${baseUrl}${extension}?size=${size}`;
 }
+
+

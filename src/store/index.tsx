@@ -289,6 +289,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 2. 如果沒有 profile，或 profile 存在但 auth_id 為 null（管理員手動建立、從未登入同步），觸發 Edge Function
       const shouldSync = forceSync || !existingProfile || !existingProfile.auth_id;
 
+      // 用來區分「真的不在伺服器」與「Edge Function 同步失敗」這兩種同樣會查不到 profile 的情況。
+      // 沒有這個旗標時，任何同步失敗（例如 profiles.id 唯一鍵衝突 23505）都會被誤報成
+      // not_in_guild，讓管理員查錯方向。
+      let syncFailed = false;
+
       if (shouldSync) {
         try {
           const { data, error: invokeError } = await supabase.functions.invoke('sync-discord-roles', {
@@ -304,11 +309,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
 
           if (invokeError) {
+            syncFailed = true;
             console.error('Edge function returned an error:', invokeError);
           } else {
             console.log('Edge function synced successfully:', data);
           }
         } catch (error) {
+          syncFailed = true;
           console.error('Error invoking edge function:', error);
         }
 
@@ -332,10 +339,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         Logger.warn({
           source: 'frontend_auth',
           action: 'unauthorized_login',
-          message: '未授權的登入嘗試 (不在公會內)',
+          message: syncFailed
+            ? '登入同步失敗 (Edge Function 回報錯誤，請看同時段的 edge_sync_discord 日誌)'
+            : '未授權的登入嘗試 (不在公會內)',
           user_id: user.id,
           discord_id: discordId,
-          details: { username: discordUsername }
+          details: { username: discordUsername, syncFailed }
         });
 
         // 強制登出並清空狀態
@@ -347,8 +356,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUserProfileId(null);
 
         // 延遲一點點顯示 Toast，確保畫面已經準備好
+        // 注意：i18n key 必須帶 `login.` 命名空間前綴（translation.json 的 login 物件），
+        // 少了前綴 i18next 會找不到鍵，直接把原始 key 當成文案顯示（使用者只會看到 "not_in_guild"）。
         setTimeout(() => {
-          showToast(t('not_in_guild'), 'error');
+          showToast(t(syncFailed ? 'login.sync_failed' : 'login.not_in_guild'), 'error');
         }, 500);
       }
     } catch (error) {

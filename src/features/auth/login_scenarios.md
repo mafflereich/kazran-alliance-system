@@ -27,8 +27,15 @@
 * **條件**：登入者雖然成功授權，但其 Discord 帳號並未加入系統指定的聯盟 Discord 伺服器。
 * **發生階段**：授權完成並導回系統後，前端嘗試同步資料時。
 * **系統提示**：系統會強制將該使用者登出，並在畫面右下角（或上方）顯示紅色的 Toast 提示：
-  > **「登入失敗：您不在指定的公會聯盟中」**
+  > **「登入失敗：您不在指定的公會聯盟中」**（i18n key：`login.not_in_guild`）
 * **後台紀錄**：系統會自動在 `system_logs` 中記錄一筆 `level: 'warn'`，`action: 'unauthorized_login'` 的日誌，方便管理員追蹤未授權的登入嘗試。
+* **⚠️ 重要：這是一個 catch-all 分支，不代表使用者真的不在伺服器。**
+  前端只要「同步後仍查不到 `profiles` 這一列」就會走同一條分支並登出，可能原因包括：
+  1. Edge Function 失敗：Bot 不在該伺服器、Bot Token 失效、Discord API 429、或 `username` 為空（400）。
+  2. `profiles` UPSERT 失敗：最常見是 `23505 duplicate key ... profiles_id_key` —— 該遊戲成員已被**另一個** Discord 帳號的 profile 綁走（同暱稱的第二個帳號、玩家換帳號、管理員手動綁定）。修復 SQL：`docs/sql/fix_profiles_id_conflict.sql`。
+  3. `profiles` 讀取被 RLS 阻擋，或同一 `discord_id` 有重複列導致 `.maybeSingle()` 失敗。
+  分辨方式：查看同時段的系統日誌（`discord_api_error` 的 `details.status`／`errorText`、`upsert_profile_failed`、`id_conflict`、`sync_success`）。
+  若為 Edge Function 同步失敗，前端會改顯示 **「登入失敗：身分資料同步失敗…請聯絡管理員」**（i18n key：`login.sync_failed`），且日誌 `details.syncFailed = true`。
 
 ### 情境 C：使用者在伺服器內，但缺少「棕二」身份組
 * **條件**：登入者已經加入聯盟 Discord 伺服器，但在伺服器中尚未被賦予任何包含「公會成員-棕色2」字樣的身份組。

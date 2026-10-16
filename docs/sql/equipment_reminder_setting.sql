@@ -12,6 +12,12 @@
 -- 執行方式：Supabase 後台 → SQL Editor 整段執行（可重複執行）。
 -- ============================================================
 
+-- 避免 DDL 長時間等鎖：ADD COLUMN 需要 ACCESS EXCLUSIVE 鎖，
+-- 一旦被其他交易擋住，後面所有對 settings 的查詢都會排在它後面
+-- （鎖佇列效應），嚴重時會讓 PostgREST 連線被佔滿。
+-- 設了 lock_timeout 之後，等不到鎖會直接失敗，而不是把整張表卡死。
+SET lock_timeout = '5s';
+
 ALTER TABLE public.settings
   ADD COLUMN IF NOT EXISTS equipment_reminder_at bigint;
 

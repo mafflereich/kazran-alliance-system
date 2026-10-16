@@ -264,6 +264,7 @@
     "wrong_password": "Wrong password",
     "login_failed": "Guild login failed:",
     "not_in_guild": "Login failed: You are not in the specified guild alliance",
+    "sync_failed": "Login failed: Your profile could not be synced (possibly an identity binding conflict). Please contact an admin.",
     "system_title": "Kazran Alliance System",
     "select_guild": "Select Guild",
     "no_guilds": "No guilds available",

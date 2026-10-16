@@ -264,6 +264,7 @@
     "wrong_password": "密碼錯誤",
     "login_failed": "公會登入失敗:",
     "not_in_guild": "登入失敗：您不在指定的公會聯盟中",
+    "sync_failed": "登入失敗：身分資料同步失敗（可能為身分綁定衝突），請聯絡管理員協助處理",
     "system_title": "Kazran 聯盟系統",
     "select_guild": "選擇公會",
     "no_guilds": "目前沒有任何公會",
