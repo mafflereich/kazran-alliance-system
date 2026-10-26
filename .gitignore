@@ -15,3 +15,4 @@ public/meta.json
 # 資料庫備份（含成員個資，不進版控）
 backups/
 supabase/schema.sql
+.claude/
