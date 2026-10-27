@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { useMemberBoardStore } from './store/useMemberBoardStore';
 
 export default function ConnectionLines() {
-    const { localMembers, stagingMembers } = useMemberBoardStore();
+    const localMembers = useMemberBoardStore(state => state.localMembers);
+    const stagingMembers = useMemberBoardStore(state => state.stagingMembers);
     const [lines, setLines] = useState<{ x1: number; y1: number; x2: number; y2: number }[]>([]);
     const linesRef = useRef(lines);
     const containerRef = useRef<SVGSVGElement>(null);

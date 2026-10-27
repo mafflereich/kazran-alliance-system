@@ -1,6 +1,7 @@
 // src/components/MemberBoard/MemberCard/MemberCard.tsx
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { TooltipProvider } from "@radix-ui/react-tooltip";
+import { useTranslation } from 'react-i18next';
 import type { Member, Guild } from '@entities/member/types';
 import { useMemberBoardStore } from '../store/useMemberBoardStore';
 import {
@@ -8,7 +9,8 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/shared/ui/Tooltip";
-import { getPrevGuildName, getCustomNote, stripAllTags } from '@/shared/lib/noteUtils';
+import { getPrevGuildName, getCustomNote } from '@/shared/lib/noteUtils';
+import { MEMBER_CARD_EQUIPMENT_ITEMS } from '@/shared/lib/equipmentShowcase';
 
 type Props = {
     member: Member;
@@ -19,7 +21,7 @@ type Props = {
     isVice?: boolean;
     fixedWidth: number;
     index?: number;
-    originalGuild?: Guild;
+    originalGuild?: Guild | null;
     isInDeletionArea?: boolean;
 };
 
@@ -33,7 +35,7 @@ const COLOR_CLASSES: Record<string, string> = {
     pink: 'bg-pink-700 border-pink-500 hover:bg-pink-600 text-white',
 };
 
-export default function MemberCard({
+function MemberCard({
     member,
     isSelected,
     isMultiSelectMode,
@@ -46,7 +48,15 @@ export default function MemberCard({
     isInDeletionArea = false,
 }: Props) {
 
-    const { initialMemberStates, localGuilds, openContextMenu } = useMemberBoardStore();
+    const { t } = useTranslation();
+
+    // 以 selector 訂閱，避免其他成員的選取 / 裝備讀取狀態造成所有卡片重繪
+    const initialMemberStates = useMemberBoardStore(state => state.initialMemberStates);
+    const localGuilds = useMemberBoardStore(state => state.localGuilds);
+    const openContextMenu = useMemberBoardStore(state => state.openContextMenu);
+    const equipmentCounts = useMemberBoardStore(state => (
+        member.id ? state.equipmentCounts[member.id] : undefined
+    ));
 
     const nameRef = useRef<HTMLDivElement>(null);
     const [isNameTruncated, setIsNameTruncated] = useState(false);
@@ -134,6 +144,24 @@ export default function MemberCard({
         };
     }, [member.note, member.seasonNote]);
 
+    // 最右側：24C 毒蛇 / 主神 / 龍鱗（小圖示 + xN）
+    const equipmentCountRows = member.id
+        ? MEMBER_CARD_EQUIPMENT_ITEMS.map(item => {
+            const value = equipmentCounts ? equipmentCounts[item.key] : undefined;
+            const isPending = equipmentCounts === undefined;
+            const isHidden = value === null;
+            const display = isPending ? 'x…' : isHidden ? 'x—' : `x${value}`;
+            const itemName = t(`equipment.items.${item.key}`, { defaultValue: item.name });
+            const title = isPending
+                ? t('member_board.equipment_loading', { name: itemName })
+                : isHidden
+                    ? t('member_board.equipment_hidden', { name: itemName })
+                    : t('member_board.equipment_count', { name: itemName, value });
+
+            return { ...item, value, isPending, isHidden, display, title };
+        })
+        : [];
+
     return (
         <TooltipProvider delayDuration={200}>
             <Tooltip open={member.isReserved ? undefined : false}>
@@ -201,8 +229,8 @@ export default function MemberCard({
                             </div>
 
                             {/* 右邊：總分 */}
-                            <div className="flex-shrink-0 text-right">
-                                <div className="text-[18px] font-medium transition-colors hover:text-emerald-300 text-emerald-400">
+                            <div className="shrink-0 text-right">
+                                <div className="text-[16px] leading-none font-medium tabular-nums transition-colors hover:text-emerald-300 text-emerald-400">
                                     {member.score ?? 0}
                                 </div>
                             </div>
@@ -213,6 +241,37 @@ export default function MemberCard({
                             <span className="max-w-[120px] truncate text-[18px] px-1 bg-amber-500/20 text-amber-300 rounded border border-amber-500/30 whitespace-nowrap inline-block">
                                 ↑ {finalOriginalGuild.name}
                             </span>
+                        )}
+
+                        {/* 最右側：24C 毒蛇 / 主神 / 龍鱗（小圖示 + xN） */}
+                        {equipmentCountRows.length > 0 && (
+                            <div
+                                className="mt-0.5 flex w-fit items-center gap-2 self-end rounded-md border border-white/10 bg-gray-950/65 px-1.5 py-0.5"
+                                aria-label={t('member_board.equipment_24c')}
+                            >
+                                {equipmentCountRows.map(row => (
+                                    <span
+                                        key={row.key}
+                                        title={row.title}
+                                        aria-label={row.title}
+                                        className={`flex items-center gap-0.5 leading-none ${row.isPending || row.isHidden ? 'text-gray-500' : row.accentClass}`}
+                                    >
+                                        <img
+                                            src={row.icon}
+                                            alt=""
+                                            width={14}
+                                            height={14}
+                                            loading="lazy"
+                                            decoding="async"
+                                            draggable={false}
+                                            className={`h-3.5 w-3.5 rounded-[2px] object-contain ${row.isPending || row.isHidden || row.value === 0 ? 'opacity-40 grayscale' : 'opacity-95'}`}
+                                        />
+                                        <span className="text-[10px] font-semibold tabular-nums">
+                                            {row.display}
+                                        </span>
+                                    </span>
+                                ))}
+                            </div>
                         )}
 
                         {/* 備註（名字下方） */}
@@ -246,3 +305,21 @@ export default function MemberCard({
         </TooltipProvider>
     );
 }
+
+/**
+ * MemberBoard 可能同時渲染數百張卡片。
+ * 這裡刻意忽略 callback 的 identity（皆由同一 member id 與穩定的 store action 產生），
+ * 只比較真正會影響畫面的 props，避免選取 / 裝備讀取進度造成整批卡片重繪。
+ */
+const arePropsEqual = (prev: Props, next: Props) =>
+    prev.member === next.member &&
+    prev.isSelected === next.isSelected &&
+    prev.isMultiSelectMode === next.isMultiSelectMode &&
+    prev.isLeader === next.isLeader &&
+    prev.isVice === next.isVice &&
+    prev.fixedWidth === next.fixedWidth &&
+    prev.index === next.index &&
+    prev.originalGuild === next.originalGuild &&
+    prev.isInDeletionArea === next.isInDeletionArea;
+
+export default memo(MemberCard, arePropsEqual);

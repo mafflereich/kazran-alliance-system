@@ -3,7 +3,10 @@ import { Search, X, Archive, User } from 'lucide-react';
 import { useMemberBoardStore } from './store/useMemberBoardStore';
 
 export default function ArchivedSearchArea() {
-    const { isArchivedSearchOpen, openArchivedSearch, closeArchivedSearch, archivedMembers, archivedMembersLoading } = useMemberBoardStore();
+    const isArchivedSearchOpen = useMemberBoardStore(state => state.isArchivedSearchOpen);
+    const closeArchivedSearch = useMemberBoardStore(state => state.closeArchivedSearch);
+    const archivedMembers = useMemberBoardStore(state => state.archivedMembers);
+    const archivedMembersLoading = useMemberBoardStore(state => state.archivedMembersLoading);
     const [searchQuery, setSearchQuery] = useState('');
 
     const filteredMembers = useMemo(() => {

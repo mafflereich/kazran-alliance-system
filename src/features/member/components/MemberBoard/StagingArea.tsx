@@ -1,10 +1,15 @@
 // src/features/member/components/MemberBoard/StagingArea.tsx
+import { memo } from 'react';
 import { Inbox } from 'lucide-react';
 import MemberCard from './MemberCard/MemberCard';
 import { useMemberBoardStore } from './store/useMemberBoardStore';
 
-export default function StagingArea() {
-    const { stagingMembers, selectedIds, isMultiSelectMode, toggleSelect, moveSelectedMembers } = useMemberBoardStore();
+function StagingArea() {
+    const stagingMembers = useMemberBoardStore(state => state.stagingMembers);
+    const selectedIds = useMemberBoardStore(state => state.selectedIds);
+    const isMultiSelectMode = useMemberBoardStore(state => state.isMultiSelectMode);
+    const toggleSelect = useMemberBoardStore(state => state.toggleSelect);
+    const moveSelectedMembers = useMemberBoardStore(state => state.moveSelectedMembers);
 
     const handleStagingClick = (e: React.MouseEvent) => {
         if (isMultiSelectMode && selectedIds.size > 0) {
@@ -70,3 +75,5 @@ export default function StagingArea() {
         </div>
     );
 }
+
+export default memo(StagingArea);

@@ -3,7 +3,8 @@ import { useMemberBoardStore } from './store/useMemberBoardStore';
 import { useState } from 'react';
 
 export default function NotificationModal() {
-    const { notification, closeNotification } = useMemberBoardStore();
+    const notification = useMemberBoardStore(state => state.notification);
+    const closeNotification = useMemberBoardStore(state => state.closeNotification);
     const [copied, setCopied] = useState(false);
 
     if (!notification.isOpen) return null;

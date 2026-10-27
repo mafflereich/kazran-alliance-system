@@ -1,4 +1,5 @@
 import type { Member, Guild, Role } from '@entities/member/types';
+import type { MemberEquipmentCounts } from '@/shared/lib/equipmentShowcase';
 
 export type ArchiveMember = {
     id: string;
@@ -62,6 +63,11 @@ export type MemberBoardState = {
     isArchivedSearchOpen: boolean;
     archivedMembers: ArchiveMember[];
     archivedMembersLoading: boolean;
+    archivedMembersLoaded: boolean;
+    equipmentCounts: Record<string, MemberEquipmentCounts>;
+    equipmentCountsLoading: boolean;
+    equipmentCountsError: string | null;
+    lastInitSignature: string | null;
 };
 
 export type MemberBoardActions = {
@@ -98,6 +104,7 @@ export type MemberBoardActions = {
     openArchivedSearch: () => void;
     closeArchivedSearch: () => void;
     fetchArchivedMembers: () => Promise<void>;
+    fetchEquipmentCounts: (memberIds: string[], force?: boolean) => Promise<void>;
 };
 
 export type MemberBoardStore = MemberBoardState & MemberBoardActions;

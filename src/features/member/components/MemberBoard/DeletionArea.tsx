@@ -1,10 +1,16 @@
 // src/features/member/components/MemberBoard/DeletionArea.tsx
+import { memo } from 'react';
 import { Trash2 } from 'lucide-react';
 import MemberCard from './MemberCard/MemberCard';
 import { useMemberBoardStore } from './store/useMemberBoardStore';
 
-export default function DeletionArea() {
-    const { deletedMembers, selectedIds, isMultiSelectMode, toggleSelect, localGuilds, initialMemberStates } = useMemberBoardStore();
+function DeletionArea() {
+    const deletedMembers = useMemberBoardStore(state => state.deletedMembers);
+    const selectedIds = useMemberBoardStore(state => state.selectedIds);
+    const isMultiSelectMode = useMemberBoardStore(state => state.isMultiSelectMode);
+    const toggleSelect = useMemberBoardStore(state => state.toggleSelect);
+    const localGuilds = useMemberBoardStore(state => state.localGuilds);
+    const initialMemberStates = useMemberBoardStore(state => state.initialMemberStates);
 
     if (deletedMembers.length === 0) return null;
 
@@ -59,3 +65,5 @@ export default function DeletionArea() {
         </div>
     );
 }
+
+export default memo(DeletionArea);

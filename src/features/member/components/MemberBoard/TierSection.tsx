@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import GuildSection from './GuildSection';
 import type { Guild, Member } from '@entities/member/types';
 
@@ -8,7 +9,7 @@ type Props = {
   guilds: GuildWithMembers[];
 };
 
-export default function TierSection({ tier, guilds }: Props) {
+function TierSection({ tier, guilds }: Props) {
   const cardFixedWidth = 180;
 
   return (
@@ -29,3 +30,5 @@ export default function TierSection({ tier, guilds }: Props) {
     </section>
   );
 }
+
+export default memo(TierSection);

@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import MemberCard from './MemberCard/MemberCard';
 import type { Guild, Member } from '@entities/member/types';
 import { useMemberBoardStore } from './store/useMemberBoardStore';
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, memo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 type GuildWithMembers = Guild & { members: Member[] };
@@ -13,8 +13,12 @@ type Props = {
     cardWidth: number;  // 固定卡片寬度，由 TierSection 傳入
 };
 
-export default function GuildSection({ guild, cardWidth }: Props) {
-    const { selectedIds, isMultiSelectMode, toggleSelect, addMember, moveSelectedMembers } = useMemberBoardStore();
+function GuildSection({ guild, cardWidth }: Props) {
+    const selectedIds = useMemberBoardStore(state => state.selectedIds);
+    const isMultiSelectMode = useMemberBoardStore(state => state.isMultiSelectMode);
+    const toggleSelect = useMemberBoardStore(state => state.toggleSelect);
+    const addMember = useMemberBoardStore(state => state.addMember);
+    const moveSelectedMembers = useMemberBoardStore(state => state.moveSelectedMembers);
     const [isAdding, setIsAdding] = useState(false);
     const [newMemberName, setNewMemberName] = useState('');
     const containerRef = useRef<HTMLDivElement>(null);
@@ -195,3 +199,5 @@ export default function GuildSection({ guild, cardWidth }: Props) {
         </div>
     );
 }
+
+export default memo(GuildSection);

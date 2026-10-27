@@ -2,7 +2,10 @@ import { X } from 'lucide-react';
 import { useMemberBoardStore } from './store/useMemberBoardStore';
 
 export default function ArchiveModal() {
-    const { archiveModal, closeArchiveModal, updateArchiveMemberReason, confirmArchiveAndSave } = useMemberBoardStore();
+    const archiveModal = useMemberBoardStore(state => state.archiveModal);
+    const closeArchiveModal = useMemberBoardStore(state => state.closeArchiveModal);
+    const updateArchiveMemberReason = useMemberBoardStore(state => state.updateArchiveMemberReason);
+    const confirmArchiveAndSave = useMemberBoardStore(state => state.confirmArchiveAndSave);
 
     if (!archiveModal.isOpen) return null;
 

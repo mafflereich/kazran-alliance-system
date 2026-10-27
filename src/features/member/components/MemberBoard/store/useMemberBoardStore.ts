@@ -2,11 +2,47 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import type { Member, Guild, Role } from '@entities/member/types';
 import { supabase } from '@/shared/api/supabase';
+import { fetchMemberEquipmentCounts } from '@/shared/api/memberEquipmentCounts';
+import { extractMemberEquipmentCounts, type MemberEquipmentCounts } from '@/shared/lib/equipmentShowcase';
 import { Logger } from '@/shared/utils/logger';
 import { setNoteSegment, removeNoteSegment, PREV_GUILD_TAG } from '@/shared/lib/noteUtils';
 import type { MemberBoardStore, MemberMovePayload, MemberMovePayloadItem } from './types';
 
 const MEMBER_BOARD_STORAGE_KEY = 'memberBoardDraft';
+
+// 只保留最新一次裝備數量請求的結果，避免先發後至的舊請求覆蓋新狀態
+let equipmentCountsRequestSeq = 0;
+
+/**
+ * 用來判斷 MemberBoard 是否需要重新初始化。
+ * `initialMembers` / `initialGuilds` 在父層每次 render 都會建立新陣列，
+ * 若直接依陣列 identity 反覆 init，會重設選取狀態、history 並重複合併草稿。
+ */
+const buildInitSignature = (members: Member[], guilds: Guild[]): string => {
+    const memberPart = members
+        .map(m => [
+            m.id ?? '',
+            m.name,
+            m.guildId,
+            m.role,
+            m.color ?? '',
+            m.note ?? '',
+            m.updatedAt ?? 0,
+            m.score ?? 0,
+            m.seasonNote ?? '',
+            m.overkill ?? '',
+            m.isReserved ? 1 : 0,
+        ].join('\u0001'))
+        .sort()
+        .join('\u0002');
+
+    const guildPart = guilds
+        .map(g => [g.id ?? '', g.name, g.tier ?? '', g.orderNum ?? ''].join('\u0001'))
+        .sort()
+        .join('\u0002');
+
+    return `${guildPart}\u0003${memberPart}`;
+};
 
 const buildGuildGroups = (members: Member[], guilds: Guild[], getGuildId: (m: Member) => string): Record<string, string[]> => {
     const groups: Record<string, string[]> = {};
@@ -48,9 +84,30 @@ const clearPersistedDraft = () => {
     localStorage.removeItem(MEMBER_BOARD_STORAGE_KEY);
 };
 
+// localStorage 只需要在「草稿資料本身」變動時寫入。
+// 選取、右鍵選單、裝備數量讀取進度等狀態變化都會觸發 subscribe，
+// 若每次都 JSON.stringify 上千位成員會造成明顯卡頓。
+let lastPersistedRefs: {
+    localMembers?: Member[];
+    localGuilds?: Guild[];
+    stagingMembers?: Member[];
+    deletedMembers?: Member[];
+    initialMemberStates?: Record<string, unknown>;
+} = {};
+
 const persistDraft = (state: any) => {
     if (typeof window === 'undefined') return;
     if (!state.isDraftInitialized || state.skipPersistUntilModified) return;
+
+    if (
+        lastPersistedRefs.localMembers === state.localMembers &&
+        lastPersistedRefs.localGuilds === state.localGuilds &&
+        lastPersistedRefs.stagingMembers === state.stagingMembers &&
+        lastPersistedRefs.deletedMembers === state.deletedMembers &&
+        lastPersistedRefs.initialMemberStates === state.initialMemberStates
+    ) {
+        return;
+    }
 
     const data = {
         localMembers: state.localMembers,
@@ -62,6 +119,13 @@ const persistDraft = (state: any) => {
 
     try {
         localStorage.setItem(MEMBER_BOARD_STORAGE_KEY, JSON.stringify(data));
+        lastPersistedRefs = {
+            localMembers: state.localMembers,
+            localGuilds: state.localGuilds,
+            stagingMembers: state.stagingMembers,
+            deletedMembers: state.deletedMembers,
+            initialMemberStates: state.initialMemberStates,
+        };
     } catch (error) {
         if (error instanceof DOMException && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
             console.warn('localStorage quota exceeded for memberBoardDraft, skipping persistence: ', error);
@@ -161,6 +225,11 @@ const initialState = {
     isArchivedSearchOpen: false,
     archivedMembers: [] as { id: string; name: string; guildName: string; reason: string }[],
     archivedMembersLoading: false,
+    archivedMembersLoaded: false,
+    equipmentCounts: {} as Record<string, MemberEquipmentCounts>,
+    equipmentCountsLoading: false,
+    equipmentCountsError: null as string | null,
+    lastInitSignature: null as string | null,
 };
 
 const MAX_HISTORY_STEPS = 30;
@@ -306,6 +375,13 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
             return;
         }
 
+        // 資料來源沒變就不重新初始化：避免父層每次 render 都重設選取 / history，
+        // 也避免反覆合併 localStorage 草稿。
+        const initSignature = buildInitSignature(members, guilds);
+        if (currentState.isDraftInitialized && currentState.lastInitSignature === initSignature) {
+            return;
+        }
+
         const resolvedInitialStates: Record<string, { guildId: string; note?: string; role?: Role; color?: string; isReserved?: boolean }> = {};
         members.forEach(m => {
             if (m.id) {
@@ -383,6 +459,7 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
                 initialMemberStates: mergedInitialStates,
                 isDraftInitialized: true,
                 skipPersistUntilModified: true,
+                lastInitSignature: initSignature,
             });
             return;
         }
@@ -399,6 +476,7 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
             initialMemberStates: resolvedInitialStates,
             isDraftInitialized: true,
             skipPersistUntilModified: true,
+            lastInitSignature: initSignature,
         });
     },
 
@@ -799,7 +877,15 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
         window.location.reload();
     },
 
-    openArchivedSearch: () => set({ isArchivedSearchOpen: true }),
+    openArchivedSearch: () => {
+        set({ isArchivedSearchOpen: true });
+
+        // 封存名單改成「第一次開啟才載入」，避免每次進入看板都多打一次 API。
+        const state = get();
+        if (!state.archivedMembersLoaded && !state.archivedMembersLoading) {
+            void state.fetchArchivedMembers();
+        }
+    },
     closeArchivedSearch: () => set({ isArchivedSearchOpen: false }),
 
     fetchArchivedMembers: async () => {
@@ -818,7 +904,7 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
 
             if (error) {
                 console.error('載入封存成員失敗', error);
-                set({ archivedMembers: [], archivedMembersLoading: false });
+                set({ archivedMembers: [], archivedMembersLoading: false, archivedMembersLoaded: false });
             } else {
                 set({
                     archivedMembers: (data || []).map((m) => ({
@@ -828,11 +914,75 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
                         reason: m.archive_reason || '',
                     })),
                     archivedMembersLoading: false,
+                    archivedMembersLoaded: true,
                 });
             }
         } catch (err) {
             console.error('載入封存成員失敗', err);
-            set({ archivedMembers: [], archivedMembersLoading: false });
+            set({ archivedMembers: [], archivedMembersLoading: false, archivedMembersLoaded: false });
+        }
+    },
+
+    fetchEquipmentCounts: async (memberIds, force = false) => {
+        const ids = [...new Set((memberIds || []).filter(Boolean))];
+        if (ids.length === 0) return;
+
+        const state = get();
+        // 已經有資料（含 0）就不重抓；force 用於「讀取失敗後重試」。
+        const pendingIds = ids.filter(id => force || !state.equipmentCounts[id]);
+        if (pendingIds.length === 0) return;
+
+        // 若成員身上已經有完整裝備資料（例如先逛過公會裝備表），
+        // 直接在前端換算，完全不用打 RPC。
+        const memberMap = new Map<string, Member>();
+        [...state.localMembers, ...state.stagingMembers, ...state.deletedMembers].forEach(m => {
+            if (m.id) memberMap.set(m.id, m);
+        });
+
+        const resolved: Record<string, MemberEquipmentCounts> = {};
+        const requestIds: string[] = [];
+
+        pendingIds.forEach(id => {
+            const equipment = memberMap.get(id)?.equipment;
+            if (equipment) {
+                resolved[id] = extractMemberEquipmentCounts(equipment);
+            } else {
+                requestIds.push(id);
+            }
+        });
+
+        if (Object.keys(resolved).length > 0) {
+            set(s => ({ equipmentCounts: { ...s.equipmentCounts, ...resolved } }));
+        }
+        if (requestIds.length === 0) return;
+
+        const requestSeq = ++equipmentCountsRequestSeq;
+        set({ equipmentCountsLoading: true, equipmentCountsError: null });
+
+        try {
+            const fetched = await fetchMemberEquipmentCounts(requestIds, { force });
+
+            // 有更新的請求正在進行時，舊結果直接丟棄
+            if (equipmentCountsRequestSeq !== requestSeq) return;
+
+            const next = { ...get().equipmentCounts };
+            Object.entries(fetched).forEach(([id, counts]) => {
+                next[id] = counts;
+            });
+
+            const successCount = Object.keys(fetched).length;
+            set({
+                equipmentCounts: next,
+                equipmentCountsLoading: false,
+                equipmentCountsError: successCount > 0 ? null : 'equipment_counts_unavailable',
+            });
+        } catch (err) {
+            if (equipmentCountsRequestSeq !== requestSeq) return;
+            console.error('載入成員 24C 裝備數量失敗', err);
+            set({
+                equipmentCountsLoading: false,
+                equipmentCountsError: 'equipment_counts_unavailable',
+            });
         }
     },
 }));

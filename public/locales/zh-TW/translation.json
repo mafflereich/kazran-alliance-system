@@ -443,6 +443,15 @@
     "reminder_not_found": "以下成員在 Discord 找不到對應帳號，將以純文字顯示",
     "reminder_channel_candidates": "可用頻道"
   },
+  "member_board": {
+    "equipment_24c": "24C 裝備數量",
+    "equipment_count": "{{name}} 24C：x{{value}}",
+    "equipment_hidden": "{{name}} 24C：未公開",
+    "equipment_loading": "{{name}} 24C：讀取中",
+    "equipment_loading_short": "24C 裝備讀取中",
+    "equipment_load_failed": "24C 裝備數量讀取失敗",
+    "equipment_retry": "裝備讀取失敗，重試"
+  },
   "my_costumes": {
     "title": "服裝表",
     "desc": "填寫你的輸出服裝練度與 UR 專用武器；管理者可檢視全部成員的服裝狀態。",

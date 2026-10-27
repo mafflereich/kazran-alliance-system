@@ -443,6 +443,15 @@
     "reminder_not_found": "These members could not be matched on Discord and will be shown as plain text",
     "reminder_channel_candidates": "Available channels"
   },
+  "member_board": {
+    "equipment_24c": "24C Equipment",
+    "equipment_count": "{{name}} 24C: x{{value}}",
+    "equipment_hidden": "{{name}} 24C: not shared",
+    "equipment_loading": "{{name}} 24C: loading",
+    "equipment_loading_short": "Loading 24C equipment",
+    "equipment_load_failed": "Failed to load 24C equipment counts",
+    "equipment_retry": "Equipment load failed — retry"
+  },
   "my_costumes": {
     "title": "Costume Table",
     "desc": "Fill in your output costume levels and UR exclusive weapons. Managers can view all members' costume status.",

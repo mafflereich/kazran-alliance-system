@@ -1,6 +1,7 @@
 // src/components/MemberBoard/MemberBoard.tsx
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import { useTranslation } from 'react-i18next';
 import { useMemberBoardStore } from './store/useMemberBoardStore';
 import { buildTieredData } from './utils/dataUtils';
 import TierSection from './TierSection';
@@ -12,7 +13,7 @@ import MemberCardContextMenu from './MemberCard/MemberCardContextMenu';
 import DeletionArea from './DeletionArea';
 import ConnectionLines from './ConnectionLines';
 import ArchivedSearchArea from './ArchivedSearchArea';
-import { RotateCcw, CheckSquare, Square, Archive } from 'lucide-react';
+import { RotateCcw, CheckSquare, Square, Archive, Loader2, AlertTriangle } from 'lucide-react';
 
 type Props = {
     initialMembers: Member[];
@@ -21,10 +22,14 @@ type Props = {
 };
 
 export default function MemberBoard({ initialMembers, initialGuilds, onSave }: Props) {
+    const { t } = useTranslation();
+
     const {
         init,
         localMembers,
         localGuilds,
+        stagingMembers,
+        deletedMembers,
         saveToDatabase,
         isMultiSelectMode,
         setMultiSelectMode,
@@ -39,13 +44,32 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
         redoStack,
         showNotification,
         discardDraft,
-        fetchArchivedMembers,
+        equipmentCountsLoading,
+        equipmentCountsError,
+        fetchEquipmentCounts,
     } = useMemberBoardStore();
 
     useEffect(() => {
         init(initialMembers, initialGuilds);
-        fetchArchivedMembers();
-    }, [initialMembers, initialGuilds, init, fetchArchivedMembers]);
+    }, [initialMembers, initialGuilds, init]);
+
+    // 看板上的成員 id（含暫存 / 刪除區）→ 只在成員增減時抓取 24C 裝備數量
+    const equipmentMemberIds = useMemo(() => {
+        const ids = new Set<string>();
+        [...localMembers, ...stagingMembers, ...deletedMembers].forEach(member => {
+            if (member.id) ids.add(member.id);
+        });
+        return [...ids];
+    }, [localMembers, stagingMembers, deletedMembers]);
+
+    const equipmentMemberIdsKey = equipmentMemberIds.join(',');
+
+    useEffect(() => {
+        if (!equipmentMemberIdsKey) return;
+        void fetchEquipmentCounts(equipmentMemberIds);
+        // 僅以 id 集合變化觸發，避免成員在公會間移動時重抓
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [equipmentMemberIdsKey, fetchEquipmentCounts]);
 
     const handleSave = async () => {
         await saveToDatabase();
@@ -238,6 +262,24 @@ export default function MemberBoard({ initialMembers, initialGuilds, onSave }: P
                     <Archive size={14} />
                     <span>封存搜尋</span>
                 </button>
+
+                {equipmentCountsLoading && (
+                    <span className="flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-900/80 px-2.5 py-1.5 text-xs text-gray-400">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>{t('member_board.equipment_loading_short')}</span>
+                    </span>
+                )}
+
+                {!equipmentCountsLoading && equipmentCountsError && (
+                    <button
+                        onClick={() => { void fetchEquipmentCounts(equipmentMemberIds, true); }}
+                        title={t('member_board.equipment_load_failed')}
+                        className="flex items-center gap-1.5 rounded-lg border border-red-800 bg-red-950/80 px-2.5 py-1.5 text-xs text-red-300 transition hover:bg-red-900/80"
+                    >
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        <span>{t('member_board.equipment_retry')}</span>
+                    </button>
+                )}
             </div>
             <TransformWrapper
                 initialScale={0.6}
