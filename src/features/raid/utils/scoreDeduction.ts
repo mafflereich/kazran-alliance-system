@@ -14,7 +14,7 @@ function findCombinations(remaining: number, evenRounds: boolean): { level: numb
   const results: { level: number; turn: number; borrow: number }[] = [];
   if (remaining <= 0) return results;
 
-  for (let level = 1; level <= 10; level++) {
+  for (let level = 1; level <= 15; level++) {
     const diffScore = level * 500;
     if (diffScore > remaining) continue;
 
