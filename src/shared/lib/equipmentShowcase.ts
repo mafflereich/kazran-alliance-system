@@ -23,7 +23,11 @@ export type MemberEquipmentCounts = Record<MemberCardEquipmentKey, number | null
 
 const CATEGORY_MAP = new Map(EQUIPMENT_CATEGORIES.map(category => [category.key, category]));
 
-/** 卡片用的圖示 / 名稱 / 顏色（顏色需為完整 Tailwind class，避免動態拼接被 purge）。 */
+/**
+ * 卡片用的字母代號 / 圖示 / 名稱 / 顏色。
+ *   code：成員卡以「字母 + xN」呈現（毒蛇 A、主神 B、龍鱗 C），不再使用圖示。
+ *   顏色需為完整 Tailwind class，避免動態拼接被 purge。
+ */
 export const MEMBER_CARD_EQUIPMENT_ITEMS = MEMBER_CARD_EQUIPMENT_KEYS.map(key => {
   const category = CATEGORY_MAP.get(key);
   const accentClass =
@@ -32,9 +36,16 @@ export const MEMBER_CARD_EQUIPMENT_ITEMS = MEMBER_CARD_EQUIPMENT_KEYS.map(key =>
       : key === 'phys_glove_chief_majesty'
         ? 'text-amber-300'
         : 'text-sky-300';
+  const code =
+    key === 'venom_serpent'
+      ? 'A'
+      : key === 'phys_glove_chief_majesty'
+        ? 'B'
+        : 'C';
 
   return {
     key,
+    code,
     icon: category?.icon ?? '',
     name: category?.name ?? key,
     accentClass,

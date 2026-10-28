@@ -144,7 +144,7 @@ function MemberCard({
         };
     }, [member.note, member.seasonNote]);
 
-    // 最右側：24C 毒蛇 / 主神 / 龍鱗（小圖示 + xN）
+    // 最右側：24C 毒蛇(A) / 主神(B) / 龍鱗(C)，以「字母 + xN」呈現；x0 不顯示
     const equipmentCountRows = member.id
         ? MEMBER_CARD_EQUIPMENT_ITEMS.map(item => {
             const value = equipmentCounts ? equipmentCounts[item.key] : undefined;
@@ -159,7 +159,7 @@ function MemberCard({
                     : t('member_board.equipment_count', { name: itemName, value });
 
             return { ...item, value, isPending, isHidden, display, title };
-        })
+        }).filter(row => row.value !== 0)
         : [];
 
     return (
@@ -243,10 +243,10 @@ function MemberCard({
                             </span>
                         )}
 
-                        {/* 最右側：24C 毒蛇 / 主神 / 龍鱗（小圖示 + xN） */}
+                        {/* 最右側：24C 毒蛇(A) / 主神(B) / 龍鱗(C)（字母 + xN，x0 不顯示） */}
                         {equipmentCountRows.length > 0 && (
                             <div
-                                className="mt-0.5 flex w-fit items-center gap-2 self-end rounded-md border border-white/10 bg-gray-950/65 px-1.5 py-0.5"
+                                className="mt-0.5 flex w-fit items-center gap-1.5 self-end rounded-md border border-white/10 bg-gray-950/65 px-1.5 py-0.5"
                                 aria-label={t('member_board.equipment_24c')}
                             >
                                 {equipmentCountRows.map(row => (
@@ -254,19 +254,10 @@ function MemberCard({
                                         key={row.key}
                                         title={row.title}
                                         aria-label={row.title}
-                                        className={`flex items-center gap-0.5 leading-none ${row.isPending || row.isHidden ? 'text-gray-500' : row.accentClass}`}
+                                        className={`flex items-center gap-0.5 text-[10px] leading-none ${row.isPending || row.isHidden ? 'text-gray-500' : row.accentClass}`}
                                     >
-                                        <img
-                                            src={row.icon}
-                                            alt=""
-                                            width={14}
-                                            height={14}
-                                            loading="lazy"
-                                            decoding="async"
-                                            draggable={false}
-                                            className={`h-3.5 w-3.5 rounded-[2px] object-contain ${row.isPending || row.isHidden || row.value === 0 ? 'opacity-40 grayscale' : 'opacity-95'}`}
-                                        />
-                                        <span className="text-[10px] font-semibold tabular-nums">
+                                        <span className="font-bold">{row.code}</span>
+                                        <span className="font-semibold tabular-nums">
                                             {row.display}
                                         </span>
                                     </span>

@@ -48,3 +48,7 @@
 
 ## 8. 後台監控介面 (已實作)
 已在 Admin Panel 中新增「系統日誌」頁面，讓管理員直接在網頁上查看與篩選系統日誌。
+
+- **分頁**：每頁 50 筆，使用 Supabase `range(from, to)` + `count: 'exact'` 於伺服器端分頁，畫面下方顯示總筆數與頁碼切換，可瀏覽 100 筆以外的歷史日誌。
+- **搜尋**：於伺服器端以 `or(...)` 對 `message`、`action`、`source`、`discord_id` 做 `ilike` 模糊比對（300ms debounce），因此可搜尋全部日誌而非僅目前載入的頁面。`user_id` 為 UUID 欄位，僅在輸入完整 UUID 時以 `eq` 比對（UUID 無法使用 `ilike`）。
+- **層級篩選**：以 `level=in.(info,warn,error,fatal)` 於伺服器端過濾，切換篩選或搜尋時自動回到第 1 頁。

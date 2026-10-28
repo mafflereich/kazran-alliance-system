@@ -1,7 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/shared/api/supabase';
-import { RefreshCw, AlertTriangle, Info, XCircle, AlertOctagon, Search, X, Eye } from 'lucide-react';
+import { RefreshCw, AlertTriangle, Info, XCircle, AlertOctagon, Search, X, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+
+const PAGE_SIZE = 50;
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * PostgREST 的 or() 語法以逗號分隔條件，且支援 * 作為 ilike 的萬用字元，
+ * 因此搜尋字串中的逗號、括號、引號與反斜線必須先移除，避免查詢語法被破壞。
+ */
+const sanitizeSearchTerm = (term: string) =>
+  term.replace(/[,()"\\]/g, ' ').replace(/\s+/g, ' ').trim();
+
+/**
+ * 組成伺服器端搜尋條件。
+ * 注意：user_id 是 UUID 欄位，直接 ilike 會造成 PostgreSQL 型別錯誤，
+ * 因此僅在輸入完整 UUID 時以 eq 比對。
+ */
+const buildSearchFilter = (term: string): string | null => {
+  const cleaned = sanitizeSearchTerm(term);
+  if (!cleaned) return null;
+
+  const conditions = [
+    `message.ilike.*${cleaned}*`,
+    `action.ilike.*${cleaned}*`,
+    `source.ilike.*${cleaned}*`,
+    `discord_id.ilike.*${cleaned}*`,
+  ];
+
+  if (UUID_PATTERN.test(cleaned)) {
+    conditions.push(`user_id.eq.${cleaned}`);
+  }
+
+  return conditions.join(',');
+};
 
 interface SystemLog {
   id: string;
@@ -20,38 +54,71 @@ export default function SystemLogsManager() {
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState<SystemLog | null>(null);
-  
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  // 只採納最後一次請求的結果，避免快速換頁 / 搜尋時的競態覆蓋
+  const requestIdRef = useRef(0);
+
   // Filters
   const [levelFilter, setLevelFilter] = useState<string[]>(['error', 'fatal']);
   const [searchQuery, setSearchQuery] = useState('');
-  
-  const fetchLogs = async () => {
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+
+  const fetchLogs: (targetPage?: number, queryText?: string) => Promise<void> = useCallback(async (targetPage: number = 1, queryText: string = '') => {
+    const requestId = ++requestIdRef.current;
+    const safePage = Math.max(1, targetPage);
+    const from = (safePage - 1) * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
     setLoading(true);
     try {
       let query = supabase
         .from('system_logs')
-        .select('id, created_at, level, source, action, user_id, discord_id, message')
+        .select('id, created_at, level, source, action, user_id, discord_id, message', { count: 'exact' })
         .order('created_at', { ascending: false })
-        .limit(100);
-        
+        .range(from, to);
+
       if (levelFilter.length > 0) {
         query = query.in('level', levelFilter);
       }
-      
-      const { data, error } = await query;
-      
+
+      const searchFilter = buildSearchFilter(queryText);
+      if (searchFilter) {
+        query = query.or(searchFilter);
+      }
+
+      const { data, error, count } = await query;
+
+      // 已有較新的請求在跑，捨棄這次結果
+      if (requestId !== requestIdRef.current) return;
+
       if (error) {
         console.error('Failed to fetch system logs:', error);
         return;
       }
-      
-      setLogs(data as SystemLog[]);
+
+      setLogs((data ?? []) as SystemLog[]);
+      setTotalCount(count ?? 0);
+
+      // 資料筆數變動（例如舊日誌被清理）導致目前頁碼超出範圍時，退回最後一頁
+      const lastPage = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
+      if (safePage > lastPage) {
+        await fetchLogs(lastPage, queryText);
+        return;
+      }
+
+      setPage(safePage);
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       console.error('Error fetching logs:', err);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, [levelFilter]);
 
   const openLogDetails = async (log: SystemLog) => {
     try {
@@ -74,21 +141,24 @@ export default function SystemLogsManager() {
     }
   };
 
+  // 搜尋輸入 debounce，避免每次按鍵都打 DB
   useEffect(() => {
-    fetchLogs();
-  }, [levelFilter]);
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  const filteredLogs = logs.filter(log => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      log.message.toLowerCase().includes(q) ||
-      (log.discord_id && log.discord_id.toLowerCase().includes(q)) ||
-      (log.user_id && log.user_id.toLowerCase().includes(q)) ||
-      log.action.toLowerCase().includes(q) ||
-      log.source.toLowerCase().includes(q)
-    );
-  });
+  // 篩選條件或搜尋字串變動時，一律回到第 1 頁重新查詢
+  useEffect(() => {
+    fetchLogs(1, debouncedQuery);
+  }, [fetchLogs, debouncedQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+
+  const goToPage = (targetPage: number) => {
+    const clamped = Math.min(Math.max(1, targetPage), totalPages);
+    if (clamped === page) return;
+    fetchLogs(clamped, debouncedQuery);
+  };
 
   const toggleLevel = (level: string) => {
     setLevelFilter(prev => 
@@ -121,7 +191,7 @@ export default function SystemLogsManager() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-xl font-bold text-stone-800 dark:text-stone-100">{t('system_logs.title', '系統日誌')}</h2>
         <button 
-          onClick={fetchLogs}
+          onClick={() => fetchLogs(page, debouncedQuery)}
           disabled={loading}
           className="flex items-center gap-2 px-4 py-2 bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 rounded-lg transition-colors disabled:opacity-50"
         >
@@ -179,14 +249,14 @@ export default function SystemLogsManager() {
                     {t('system_logs.loading', '載入中...')}
                   </td>
                 </tr>
-              ) : filteredLogs.length === 0 ? (
+              ) : logs.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-stone-500 dark:text-stone-400">
                     {t('system_logs.no_results', '找不到符合的日誌')}
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map(log => (
+                logs.map(log => (
                   <tr key={log.id} className="hover:bg-stone-50 dark:hover:bg-stone-700/30 transition-colors">
                     <td className="px-4 py-3 whitespace-nowrap text-stone-600 dark:text-stone-300 text-xs">
                       {new Date(log.created_at).toLocaleString()}
@@ -221,6 +291,36 @@ export default function SystemLogsManager() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-900/50">
+          <div className="text-xs text-stone-500 dark:text-stone-400">
+            {t('system_logs.total_count', '共 {{total}} 筆', { total: totalCount })}
+            <span className="mx-1.5">·</span>
+            {t('system_logs.per_page', '每頁 {{size}} 筆', { size: PAGE_SIZE })}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => goToPage(page - 1)}
+              disabled={page <= 1 || loading}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              {t('system_logs.prev_page', '上一頁')}
+            </button>
+            <span className="text-xs font-medium text-stone-600 dark:text-stone-300 whitespace-nowrap">
+              {t('system_logs.page_indicator', '第 {{page}} / {{totalPages}} 頁', { page, totalPages })}
+            </span>
+            <button
+              onClick={() => goToPage(page + 1)}
+              disabled={page >= totalPages || loading}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {t('system_logs.next_page', '下一頁')}
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 

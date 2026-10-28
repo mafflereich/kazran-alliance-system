@@ -311,7 +311,12 @@
     "source_module": "Source Module",
     "action_category": "Action Category",
     "details_json": "Details (JSON)",
-    "none": "None"
+    "none": "None",
+    "total_count": "{{total}} total",
+    "per_page": "{{size}} per page",
+    "prev_page": "Previous",
+    "next_page": "Next",
+    "page_indicator": "Page {{page}} / {{totalPages}}"
   },
   "common": {
     "refresh": "Refresh",

@@ -311,7 +311,12 @@
     "source_module": "來源模組",
     "action_category": "動作分類",
     "details_json": "詳細資料 (Details JSON)",
-    "none": "無"
+    "none": "無",
+    "total_count": "共 {{total}} 筆",
+    "per_page": "每頁 {{size}} 筆",
+    "prev_page": "上一頁",
+    "next_page": "下一頁",
+    "page_indicator": "第 {{page}} / {{totalPages}} 頁"
   },
   "common": {
     "refresh": "重新整理",
