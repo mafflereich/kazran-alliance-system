@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/shared/api/supabase';
+import { supabase, fetchAllPaginated } from '@/shared/api/supabase';
+import { readQuery } from '@/shared/api/http';
 import { useTranslation } from 'react-i18next';
 import { useAppContext } from '@/store';
 import { Logger } from '@/shared/utils/logger';
@@ -21,14 +22,16 @@ export function useAllianceRaidRecord() {
   const fetchRaidData = async () => {
     setLoading(true);
     try {
-      const [seasonsRes, recordsRes] = await Promise.all([
-        supabase.from('raid_seasons').select('id, season_number, period_text, score_threshold, description, even_rounds, is_archived').order('season_number', { ascending: false }),
-        supabase.from('guild_raid_records').select('id, season_id, guild_id, note, member_score_median, score, rank, overkill'),
+      const [seasonsRes, recordsData] = await Promise.all([
+        readQuery<any[]>(() =>
+          supabase.from('raid_seasons').select('id, season_number, period_text, score_threshold, description, even_rounds, is_archived').order('season_number', { ascending: false })
+        ),
+        // 全表查詢一定要分頁，否則公會數 × 賽季數 > 1000 時會被靜默截斷
+        fetchAllPaginated<any>('guild_raid_records', 'id, season_id, guild_id, note, member_score_median, score, rank, overkill'),
       ]);
       if (seasonsRes.error) throw seasonsRes.error;
-      if (recordsRes.error) throw recordsRes.error;
-      setSeasons(seasonsRes.data || []);
-      setRecords(recordsRes.data || []);
+      setSeasons((seasonsRes.data || []) as RaidSeason[]);
+      setRecords(recordsData as GuildRaidLeaderboardRecord[]);
     } catch (err: any) {
       console.error('Error fetching raid data:', err);
       setError(err.message);

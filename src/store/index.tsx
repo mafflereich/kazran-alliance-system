@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Database, Guild, Member, Costume, Role, User, Character, ArchivedMember, ArchiveHistory, Toast, ToastType, Setting, ApplyMail, AccessControl, Equipment, PlayPreferences, EquipmentVisibility, CostumeRecord, CategoryVisibility } from '@/entities/member/types';
 import { supabase, supabaseInsert, supabaseKey, supabaseUpdate, supabaseUpsert, toCamel, toSnake, fetchAllPaginated } from '@/shared/api/supabase';
-import { fetchMemberSecrets, applySecretsToMembers } from '@/shared/api/memberSecrets';
+import { loadMemberSecrets, applySecretsToMembers } from '@/shared/api/memberSecrets';
+import { getLatestSeasonId } from '@/shared/api/latestSeason';
+import { writeQuery, readQuery } from '@/shared/api/http';
 import { isDebugMode } from '@/shared/api/debugMode';
 import { Logger } from '@/shared/utils/logger';
 import { v4 as uuidv4 } from 'uuid';
@@ -241,6 +243,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     applyProfileState(profile, user.user_metadata?.full_name || user.user_metadata?.name || 'User');
   };
 
+  /**
+   * 自助建立「尚未綁定成員」的 profile。
+   *
+   * 為什麼需要：原本登入完全依賴 Edge Function 的暱稱比對，
+   * 比對失敗（改名、撞名、23505）就查不到 profile → 被強制登出（not_in_guild）。
+   * 現在即使比對不到，也讓使用者登入，並在畫面上認領自己（再由會長/管理員核准）。
+   *
+   * DB 端 policy（profiles_insert_self）已限制：
+   *   auth_id 必須是自己、id 必須為 NULL、user_role 只能是 member。
+   */
+  const selfProvisionProfile = async (
+    user: any,
+    discordId: string,
+    discordUsername?: string,
+  ) => {
+    const payload = {
+      discord_id: discordId,
+      auth_id: user.id,
+      display_name: discordUsername
+        || user.user_metadata?.full_name
+        || user.user_metadata?.name
+        || null,
+      avatar_url: user.user_metadata?.avatar_url || null,
+      user_role: 'member',
+    };
+
+    const { error: insertError } = await writeQuery(() =>
+      supabase.from('profiles').insert(payload)
+    );
+
+    if (insertError) {
+      console.warn('[selfProvisionProfile] 建立 profile 失敗：', insertError);
+      return null;
+    }
+
+    const { data: created } = await readQuery<any>(() =>
+      supabase
+        .from('profiles')
+        .select('id, user_role, user_guilds, display_name, avatar_url')
+        .eq('discord_id', discordId)
+        .maybeSingle()
+    );
+
+    return created ?? null;
+  };
+
   const loadDiscordRoles = async (forceSync: boolean = false) => {
     if (currentUserRef.current) return;
     if (!supabase) return;
@@ -331,9 +379,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (existingProfile) {
         applyProfileState(existingProfile, discordUsername || 'User');
-      } else {
-        // 如果同步後還是沒有 profile，代表他不在公會內，或是發生了其他錯誤
-        console.warn('Unauthorized login attempt: User not in guild or profile missing.');
+        return;
+      }
+
+      // 找不到 profile：允許自助建立一筆「尚未綁定任何成員」的 profile，
+      // 讓使用者能登入並在畫面上認領自己（不再被迫登出）。
+      const selfProvisioned = await selfProvisionProfile(user, discordId, discordUsername);
+      if (selfProvisioned) {
+        applyProfileState(selfProvisioned, discordUsername || 'User');
+        Logger.info({
+          source: 'frontend_auth',
+          action: 'self_provision_profile',
+          message: '建立未綁定的 profile（等待認領成員）',
+          details: { discordId },
+        });
+        return;
+      }
+
+      {
+        // 連 profile 都建不起來（極少數情況）→ 維持原本的強制登出流程
+        console.warn('Unauthorized login attempt: profile missing and self-provision failed.');
 
         // 寫入系統日誌
         Logger.warn({
@@ -399,6 +464,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const removeToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  /**
+   * 敏感資料（裝備 / 紀錄）載入失敗時的統一提示。
+   * 絕對不要靜默略過 —— 那會讓使用者以為資料消失了。
+   */
+  const warnSecretsFailure = (scope: string, failedChunks: number, failedCount: number) => {
+    if (failedCount === 0) return;
+    console.error(`[${scope}] ${failedCount} 位成員的敏感資料載入失敗`);
+    Logger.warn({
+      source: 'data_fetch',
+      action: scope,
+      message: '成員敏感資料載入失敗（部分）',
+      details: { failedChunks, failedCount },
+    });
+    showToast(t('common.fetch_failed'), 'error');
   };
 
   const fetchInitialData = async () => {
@@ -555,24 +636,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsMembersLoading(true);
     }
 
-    // First, get the max ID from raid_seasons
-    const { data: seasonData, error: seasonError } = await supabase
-      .from('raid_seasons')
-      .select('id')
-      .order('id', { ascending: false })
-      .limit(1);
-
-    if (seasonError) {
-      console.error("Error fetching raid seasons:", seasonError);
-    }
-
-    const maxSeasonId = seasonData?.[0]?.id || null;
+    // 最新賽季 id（30 秒快取，避免每次進公會頁都重打一次 raid_seasons）
+    const maxSeasonId = await getLatestSeasonId();
 
     const selectQuery = columns;
+    // 巢狀的 member_raid_records 只取本賽季，避免把每位成員「所有賽季」的紀錄都拉下來
+    const hasRaidRecordEmbed = selectQuery.includes('member_raid_records(');
 
     let data: any[];
     try {
-      data = await fetchAllPaginated('members', selectQuery, q => q.eq('guild_id', guildId));
+      data = await fetchAllPaginated('members', selectQuery, q => {
+        let query = q.eq('guild_id', guildId);
+        if (hasRaidRecordEmbed && maxSeasonId !== null) {
+          query = query.eq('member_raid_records.season_id', maxSeasonId);
+        }
+        return query;
+      });
     } catch (error: any) {
       console.error("Error fetching members:", error);
       isDebugMode().then(enabled => {
@@ -601,7 +680,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return false;
     }
 
-    const newMembers = data.reduce((acc, member) => {
+    const newMembers = data.reduce<Record<string, Member>>((acc, member) => {
       const camelMember = toCamel<any>(member);
       const memberNotes = Array.isArray(camelMember.memberNotes) ? camelMember.memberNotes[0] : camelMember.memberNotes;
 
@@ -635,7 +714,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const memberIds = Object.keys(newMembers);
     if (memberIds.length > 0) {
-      const secrets = await fetchMemberSecrets(memberIds);
+      const { secrets, failedChunks, failedMemberIds } = await loadMemberSecrets(memberIds);
+      warnSecretsFailure('fetch_members', failedChunks, failedMemberIds.length);
       const merged = applySecretsToMembers(Object.values(newMembers), secrets);
       merged.forEach((m) => { if (m.id) newMembers[m.id] = m; });
     }
@@ -665,74 +745,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let success = true;
 
     try {
-      // First, get the max ID from raid_seasons
-      const { data: seasonData, error: seasonError } = await supabase
-        .from('raid_seasons')
-        .select('id')
-        .order('id', { ascending: false })
-        .limit(1);
+      // 最新賽季 id（30 秒快取）
+      const maxSeasonId = await getLatestSeasonId();
 
-      if (seasonError) {
-        console.error("Error fetching raid seasons:", seasonError);
-      }
-
-      const maxSeasonId = seasonData?.[0]?.id || null;
-
-      // Fetch raid records for the latest season in parallel with members
-      const raidRecordsQuery = maxSeasonId
+      // 本賽季的所有戰記分數（一次撈完，避免每位成員各打一次）
+      const raidRecordsQuery = maxSeasonId !== null
         ? supabase
           .from('member_raid_records')
           .select('member_id, score, season_note, overkill')
           .eq('season_id', maxSeasonId)
         : Promise.resolve({ data: [] as any[], error: null });
 
-      // Fetch members with pagination to handle >1000 rows (PostgREST default limit)
-      const PAGE_SIZE = 1000;
+      // keyset 分頁（ORDER BY id）：不會因並行寫入跳列/重複列，也不會被 1000 筆上限截斷
       let allMembersData: any[] = [];
-      let offset = 0;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data: pageData, error: pageError } = await supabase
-          .from('members')
-          .select('id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark)')
-          .range(offset, offset + PAGE_SIZE - 1);
-
-        if (pageError) {
-          console.error("Error fetching all members:", pageError);
-          isDebugMode().then(enabled => {
-            if (!enabled) return;
-            supabase.auth.getSession().then(({ data: { session } }) => {
-              console.error("=== DETAILED ERROR LOG FOR MEMBERS FETCH (fetchAllMembers) ===", JSON.stringify({
-                errorDetails: pageError,
-                errorMessage: pageError.message,
-                errorCode: (pageError as any).code,
-                errorDetails2: (pageError as any).details,
-                errorHint: (pageError as any).hint,
-                userSession: session?.user ? {
-                  id: session.user.id,
-                  email: session.user.email,
-                  role: session.user.role,
-                  app_metadata: session.user.app_metadata,
-                  user_metadata: session.user.user_metadata
-                } : null,
-                query: "select('id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark)')"
-              }, null, 2));
-            });
+      try {
+        allMembersData = await fetchAllPaginated<any>(
+          'members',
+          'id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark)',
+          undefined,
+          { pageSize: 500 },
+        );
+      } catch (pageError: any) {
+        console.error("Error fetching all members:", pageError);
+        isDebugMode().then(enabled => {
+          if (!enabled) return;
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            console.error("=== DETAILED ERROR LOG FOR MEMBERS FETCH (fetchAllMembers) ===", JSON.stringify({
+              errorDetails: pageError,
+              errorMessage: pageError?.message,
+              errorCode: pageError?.code,
+              errorDetails2: pageError?.details,
+              errorHint: pageError?.hint,
+              userSession: session?.user ? {
+                id: session.user.id,
+                email: session.user.email,
+                role: session.user.role,
+                app_metadata: session.user.app_metadata,
+                user_metadata: session.user.user_metadata
+              } : null,
+              query: "select('id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark)')"
+            }, null, 2));
           });
-          success = false;
-          break;
-        }
-
-        if (!pageData || pageData.length === 0) {
-          hasMore = false;
-        } else {
-          allMembersData = allMembersData.concat(pageData);
-          offset += PAGE_SIZE;
-          if (pageData.length < PAGE_SIZE) {
-            hasMore = false;
-          }
-        }
+        });
+        success = false;
       }
 
       const [{ data: raidRecordsData }] = await Promise.all([raidRecordsQuery]);
@@ -806,7 +861,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const newMembers: Record<string, Member> = data.reduce((acc, m) => ({ ...acc, [m.id!]: toCamel<Member>(m) }), {});
 
-      const secrets = await fetchMemberSecrets(Object.keys(newMembers));
+      const { secrets, failedChunks, failedMemberIds } = await loadMemberSecrets(Object.keys(newMembers));
+      warnSecretsFailure('load_members_by_ids', failedChunks, failedMemberIds.length);
       const merged = applySecretsToMembers(Object.values(newMembers), secrets);
       merged.forEach((m) => { if (m.id) newMembers[m.id] = m; });
 
@@ -839,6 +895,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (!includeArchived) {
       queryBuilder = queryBuilder.eq('status', 'active');
+    }
+
+    // 只取「本賽季」的戰記：否則 embedded 會回傳該成員所有賽季的紀錄，
+    // 後面取 [0] 就可能拿到舊賽季的分數（看起來像資料錯了/少了）。
+    const maxSeasonId = await getLatestSeasonId();
+    if (maxSeasonId !== null) {
+      queryBuilder = queryBuilder.eq('member_raid_records.season_id', maxSeasonId);
     }
 
     const { data, error, count } = await queryBuilder;
@@ -895,7 +958,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     const searchIds = mappedResults.map(m => m.id).filter((id): id is string => !!id);
-    const secrets = await fetchMemberSecrets(searchIds);
+    const { secrets, failedChunks, failedMemberIds } = await loadMemberSecrets(searchIds);
+    warnSecretsFailure('search_members', failedChunks, failedMemberIds.length);
     const memberData = applySecretsToMembers(mappedResults, secrets);
 
     return {
@@ -1452,9 +1516,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     try {
-      await Promise.all(updates.map(u =>
-        supabaseUpdate('characters', { orderNum: u.orderNum }, { id: u.id })
-      ));
+      // 一次 RPC 更新整批順序；原本是 N 個單列 update 並行，
+      // 瀏覽器同網域只有 ~6 條連線，第 7 筆開始就是排隊，拖一次要等好幾秒。
+      const { error } = await writeQuery(() =>
+        supabase.rpc('update_order', {
+          p_table: 'characters',
+          p_rows: updates.map(u => ({ id: u.id, order_num: u.orderNum })),
+        })
+      );
+      if (error) throw error;
       Logger.info({ source: 'character_management', action: 'update_characters_order', message: '更新角色順序', details: { updates } });
     } catch (error) {
       console.error('Error updating characters order:', error);
@@ -1535,9 +1605,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     try {
-      await Promise.all(updates.map((u) =>
-        supabaseUpdate('costumes', { orderNum: u.orderNum }, { id: u.id })
-      ));
+      // 一次 RPC 更新整批順序（原因同 updateCharactersOrder）
+      const { error } = await writeQuery(() =>
+        supabase.rpc('update_order', {
+          p_table: 'costumes',
+          p_rows: updates.map(u => ({ id: u.id, order_num: u.orderNum })),
+        })
+      );
+      if (error) throw error;
       Logger.info({ source: 'costume_management', action: 'update_costumes_order', message: '更新服裝順序', details: { updates } });
     } catch (error) {
       console.error('Error updating costumes order:', error);

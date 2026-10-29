@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/shared/api/supabase';
+import { invalidateLatestSeasonId } from '@/shared/api/latestSeason';
 import { useAppContext } from '@/store';
 import { Logger } from '@/shared/utils/logger';
 import type { RaidSeason, MemberRaidRecord, GuildRaidRecord } from '../types';
@@ -78,6 +79,8 @@ export function useSeasonManager({
         const createdSeason = data[0];
         setSeasons(prev => [createdSeason, ...prev].sort((a, b) => b.season_number - a.season_number));
         setSelectedSeasonId(String(createdSeason.id));
+        // 新賽季＝新的「最新賽季」，讓 getLatestSeasonId() 的快取立即失效
+        invalidateLatestSeasonId();
         // Copy previous season's guild notes
         const previousSeason = seasons.length > 0 ? seasons[0] : null;
         if (previousSeason) {

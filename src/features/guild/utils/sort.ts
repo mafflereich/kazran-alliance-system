@@ -109,9 +109,18 @@ export const getSortedGuilds = (
   canSeeAllGuilds: boolean,
   userGuildRoles: string[]
 ) => {
-  const guildsToDisplay = Object.entries(guildsData);
+  // userGuildRoles 是 profiles.user_guilds（公會「名稱」的逗號清單）。
+  // 一般成員只會看到自己所屬的公會；管理者（canSeeAllGuilds）看到全部。
+  const allowedNames = new Set(
+    (userGuildRoles || []).map(name => String(name).trim().toLowerCase()).filter(Boolean)
+  );
 
-  return (guildsToDisplay as [string, any][])
+  const guildsToDisplay = (Object.entries(guildsData) as [string, any][])
+    .filter(([, guild]) =>
+      canSeeAllGuilds || allowedNames.has(String(guild?.name ?? '').trim().toLowerCase())
+    );
+
+  return guildsToDisplay
     .sort((a, b) => {
       const tierA = a[1].tier || 99;
       const tierB = b[1].tier || 99;

@@ -122,6 +122,12 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
     return first?.equipmentReminderAt ?? null;
   }, [db.settings]);
 
+  // 側邊欄公會清單：一般成員只會列出自己所屬公會（與 DB 端 RLS 一致）。
+  // 放在早退之前，確保 hooks 的呼叫順序固定。
+  const sortedGuilds = React.useMemo(() => {
+    return getSortedGuilds(db.guilds, canSeeAllGuilds, userGuildRoles);
+  }, [db.guilds, canSeeAllGuilds, userGuildRoles]);
+
   if (!guild) {
     return (
       <div className="h-screen flex flex-col">
@@ -130,6 +136,33 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
             <Shield className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('errors.guild_not_found')}</h2>
             <p className="text-stone-500 dark:text-stone-400 mb-6">{t('dashboard.guild_not_found_desc', '該公會不存在或已被刪除。')}</p>
+            <button
+              onClick={() => navigate('/')}
+              className="px-6 py-2 bg-stone-800 dark:bg-stone-600 text-white rounded-lg hover:bg-stone-700 dark:hover:bg-stone-500 transition-colors"
+            >
+              {t('dashboard.return_to_list', '返回公會列表')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 一般成員只能看自己所屬公會的資料（與 DB 端 RLS 的 my_guild_ids() 一致）。
+  // 管理者（creator / admin / manager）不受限。
+  const canViewThisGuild = canSeeAllGuilds
+    || userGuildRoles.some(name =>
+      String(name).trim().toLowerCase() === String(guild.name ?? '').trim().toLowerCase()
+    );
+
+  if (!canViewThisGuild) {
+    return (
+      <div className="h-screen flex flex-col">
+        <div className="flex-1 flex items-center justify-center bg-stone-100 dark:bg-stone-900">
+          <div className="text-center p-8 bg-white dark:bg-stone-800 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-700 max-w-md">
+            <Shield className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('dashboard.no_permission')}</h2>
+            <p className="text-stone-500 dark:text-stone-400 mb-6">{guild.name}</p>
             <button
               onClick={() => navigate('/')}
               className="px-6 py-2 bg-stone-800 dark:bg-stone-600 text-white rounded-lg hover:bg-stone-700 dark:hover:bg-stone-500 transition-colors"
@@ -152,10 +185,6 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
     const ss = String(d.getSeconds()).padStart(2, '0');
     return `${yyyy}/${mm}/${dd} ${hh}:${min}:${ss}`;
   };
-
-  const sortedGuilds = React.useMemo(() => {
-    return getSortedGuilds(db.guilds, canSeeAllGuilds, userGuildRoles);
-  }, [db.guilds, canSeeAllGuilds, userGuildRoles]);
 
   return (
     <div className="min-h-screen bg-stone-100 dark:bg-stone-900">

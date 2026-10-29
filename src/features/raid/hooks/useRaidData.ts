@@ -115,7 +115,7 @@ export function useRaidData(
 
     const memberRaidRecordsChannel = supabase
       .channel(`member_raid_records_${selectedSeasonId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'member_raid_records' }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'member_raid_records', filter: `season_id=eq.${selectedSeasonId}` }, (payload) => {
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
           const newRecord = payload.new as MemberRaidRecord;
           if (String(newRecord.season_id) !== String(selectedSeasonId)) return;
@@ -131,7 +131,7 @@ export function useRaidData(
 
     const guildRaidRecordsChannel = supabase
       .channel(`guild_raid_records_${selectedSeasonId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_raid_records' }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_raid_records', filter: `season_id=eq.${selectedSeasonId}` }, (payload) => {
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
           const newRecord = payload.new as GuildRaidRecord;
           if (String(newRecord.season_id) !== String(selectedSeasonId)) return;

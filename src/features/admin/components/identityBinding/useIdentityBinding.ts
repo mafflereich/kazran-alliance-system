@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '@/store';
-import { supabase } from '@/shared/api/supabase';
+import { supabase, fetchAllPaginated } from '@/shared/api/supabase';
 import { Logger } from '@/shared/utils/logger';
 import { useTranslation } from 'react-i18next';
 import { Member } from '@/entities/member/types';
@@ -41,9 +41,14 @@ export function useIdentityBinding() {
   const fetchAllProfiles = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.from('profiles').select('id, discord_id, discord_username, display_name, avatar_url');
-      if (error) throw error;
-      setAllProfiles(data || []);
+      // keyset 分頁：profiles 超過 PostgREST 的 1000 列上限時不會被靜默截斷
+      const data = await fetchAllPaginated<any>(
+        'profiles',
+        'id, discord_id, discord_username, display_name, avatar_url',
+        undefined,
+        { orderBy: 'discord_id', pageSize: 500 },
+      );
+      setAllProfiles((data || []) as Profile[]);
     } catch (error) {
       console.error('Error fetching profiles:', error);
       showToast(t('binding.fetch_failed', '無法取得資料'), 'error');
@@ -57,6 +62,26 @@ export function useIdentityBinding() {
     [allProfiles]
   );
 
+  /**
+   * member_id → 綁定的 profile（O(1) 查找）。
+   * 原本是「每個成員都 allProfiles.find(...split())」＝ O(成員數 × profile 數)，
+   * 1,259 位成員 × 682 筆 profile ≈ 86 萬次字串切割，每打一個字都要重算。
+   * 改成預先建 Map 後，查詢是 O(1)，整個過程只切 685 次。
+   */
+  const profileByMemberId = useMemo(() => {
+    const map = new Map<string, Profile>();
+    allProfiles.forEach(profile => {
+      (profile.id || '')
+        .split(',')
+        .map(id => id.trim())
+        .filter(Boolean)
+        .forEach(memberId => {
+          if (!map.has(memberId)) map.set(memberId, profile);
+        });
+    });
+    return map;
+  }, [allProfiles]);
+
   const leftSearchResults = useMemo(() => {
     if (!leftSearchQuery.trim()) return [];
     const query = leftSearchQuery.toLowerCase();
@@ -65,11 +90,7 @@ export function useIdentityBinding() {
     if (leftSearchType === 'name') {
       Object.values(db.members).forEach(member => {
         if (member.status === 'active' && member.name.toLowerCase().includes(query)) {
-          const boundProfile = member.id
-            ? allProfiles.find(p =>
-                p.id?.split(',').map(id => id.trim()).filter(Boolean).includes(member.id!)
-              ) ?? null
-            : null;
+          const boundProfile = member.id ? (profileByMemberId.get(member.id) ?? null) : null;
           results.push({ member, profile: boundProfile });
         }
       });
@@ -87,7 +108,7 @@ export function useIdentityBinding() {
     }
 
     return results;
-  }, [leftSearchQuery, leftSearchType, db.members, allProfiles]);
+  }, [leftSearchQuery, leftSearchType, db.members, allProfiles, profileByMemberId]);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -132,9 +153,7 @@ export function useIdentityBinding() {
     setIsBinding(true);
     setConfirmModal({ isOpen: false, member: null });
     try {
-      const isAlreadyBound = allProfiles.some(p =>
-        p.id?.split(',').map(id => id.trim()).filter(Boolean).includes(member.id)
-      );
+      const isAlreadyBound = member.id ? profileByMemberId.has(member.id) : false;
       if (isAlreadyBound) {
         showToast(t('binding.already_bound', '此成員已綁定其他 Discord 帳號'), 'error');
         return;
@@ -330,6 +349,7 @@ export function useIdentityBinding() {
     db,
     allProfiles,
     unmatchedProfiles,
+    profileByMemberId,
     leftSearchResults,
     searchResults,
     isLoading,

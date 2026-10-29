@@ -24,6 +24,16 @@ export type MemberMovePayload = {
     archiveReason?: string;
 };
 
+/**
+ * MemberBoard「儲存看板」後，依來源公會彙整的分組摘要。
+ * 注意：這不是送到外部 API 的格式 —— 外部 API 要的是 `MemberMovePayload`（含 listName），
+ * 由 `MemberMoveAnnounceTab` 自行組裝。
+ */
+export type MemberMoveGroup = {
+    guildName: string;
+    members: MemberMovePayloadItem[];
+};
+
 export type MemberBoardState = {
     localMembers: Member[];
     localGuilds: Guild[];
@@ -92,7 +102,7 @@ export type MemberBoardActions = {
     setSelectedIds: (ids: Set<string>) => void;
     clearDeletedMembers: () => void;
     pasteMembers: (pasted: Member[]) => void;
-    buildApiPayload: () => MemberMovePayload[];
+    buildApiPayload: () => MemberMoveGroup[];
     closeNotification: () => void;
     showNotification: (title: string, message: string, type?: 'success' | 'error' | 'info', copyContent?: string, confirmLabel?: string, onConfirm?: () => void) => void;
     openArchiveModal: (members: ArchiveMember[]) => void;

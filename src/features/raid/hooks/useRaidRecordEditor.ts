@@ -1,8 +1,38 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/shared/api/supabase';
+import { writeQuery } from '@/shared/api/http';
 import { useAppContext } from '@/store';
 import { Logger } from '@/shared/utils/logger';
 import type { MemberRaidRecord, GuildRaidRecord } from '../types';
+
+/** 同一次編輯動作的合併寫入窗口（毫秒） */
+const FLUSH_DELAY_MS = 600;
+/** 單次 flush 最多寫入幾位成員（避免 payload 過大） */
+const MAX_BATCH_SIZE = 100;
+
+const clampScore = (value: unknown): number =>
+  Math.min(Math.max(Number(value) || 0, 0), 10000);
+
+const normalizeOverkill = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
+type GuildMedianRow = { guild_id: string; member_score_median: number };
+
+/** RPC 尚未建立（migration 未套用）時的錯誤碼 */
+const isMissingRpcError = (error: any): boolean => {
+  const code = String(error?.code ?? '');
+  const message = String(error?.message ?? '');
+  return code === 'PGRST202'
+    || code === '42883'
+    || /could not find the function|function .* does not exist|schema cache/i.test(message);
+};
+
+/** 自動重試上限，避免持續失敗時無限輪詢 */
+const MAX_SAVE_RETRIES = 3;
+
 
 interface Options {
   selectedSeasonId: string;
@@ -25,7 +55,7 @@ export function useRaidRecordEditor({
   guildRaidRecords,
   setGuildRaidRecords,
 }: Options) {
-  const { db, updateMember, updateMembersNotes } = useAppContext();
+  const { db, setDb, updateMembersNotes } = useAppContext();
 
   const [draftRecords, setDraftRecords] = useState<Record<string, MemberRaidRecord>>({});
   const [saving, setSaving] = useState(false);
@@ -39,17 +69,24 @@ export function useRaidRecordEditor({
   const guildRaidRecordsRef = useRef(guildRaidRecords);
   guildRaidRecordsRef.current = guildRaidRecords;
 
-  // Per-member debounce timers for auto-save (300 ms)
-  const saveTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  /** 待寫入的成員：memberId → guildId（決定中位數要重算哪個公會） */
+  const dirtyRef = useRef<Map<string, string>>(new Map());
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 自動儲存連續失敗次數（成功後歸零） */
+  const retryCountRef = useRef(0);
 
   // Clear drafts when switching season or comparison mode
   useEffect(() => {
     if (Object.keys(draftRecordsRef.current).length > 0) setDraftRecords({});
   }, [selectedSeasonId, isComparisonMode]);
 
-  // Clear all pending save timers on unmount
+  // 離頁 / 元件卸載時，把還沒送出的變更寫出去（best effort）
+  const flushRef = useRef<() => Promise<void>>(async () => { });
   useEffect(() => {
-    return () => { Object.values(saveTimersRef.current).forEach(clearTimeout); };
+    return () => {
+      if (flushTimerRef.current) clearTimeout(flushTimerRef.current);
+      void flushRef.current();
+    };
   }, []);
 
   const handleRecordChange = useCallback((memberId: string, field: 'score' | 'note' | 'season_note' | 'overkill', value: string | number | null) => {
@@ -110,68 +147,203 @@ export function useRaidRecordEditor({
     setGuildRaidRecords(prev => ({ ...prev, [guildId]: guildRecord }));
   }, [isSelectedSeasonArchived, selectedSeasonId]); // recordsRef/dbMembersRef/guildRaidRecordsRef are stable refs
 
-  const doAutoSave = useCallback(async (memberId: string, guildId: string) => {
-    const draft = draftRecordsRef.current[memberId];
-    if (!draft) return;
+  /**
+   * 把 dirty 名單合併成「一次 RPC」寫入。
+   *
+   * 舊版：每改一格 → debounce 300ms → 4~5 個 request
+   *       （member_raid_records upsert + members update + member_notes upsert
+   *        + guild_raid_records upsert + system_logs insert）
+   * 新版：600ms 內的編輯合併成 1 個 `save_raid_records_bulk`，
+   *       分數 / 備註 / 中位數在同一個 transaction 內完成。
+   */
+  const flushDirty = useCallback(async (): Promise<void> => {
+    if (flushTimerRef.current) {
+      clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
 
-    const originalRecord = recordsRef.current[memberId];
-    const originalNote = dbMembersRef.current[memberId]?.note || '';
+    const dirty = dirtyRef.current;
+    if (dirty.size === 0 || !selectedSeasonId) return;
 
-    const scoreChanged = draft.score !== (originalRecord?.score ?? 0);
-    const seasonNoteChanged = (draft.season_note || '') !== (originalRecord?.season_note || '');
-    const noteChanged = (draft.note || '') !== originalNote;
-    const overkillChanged = (draft.overkill ?? null) !== (originalRecord?.overkill ?? null);
+    const batch = [...dirty.entries()].slice(0, MAX_BATCH_SIZE);
+    batch.forEach(([id]) => dirty.delete(id));
 
-    if (!scoreChanged && !seasonNoteChanged && !noteChanged && !overkillChanged) {
-      setDraftRecords(prev => { const next = { ...prev }; delete next[memberId]; return next; });
+    const unchangedIds: string[] = [];
+    const changed = batch.flatMap(([memberId, guildId]) => {
+      const draft = draftRecordsRef.current[memberId];
+      if (!draft) return [];
+
+      const committed = recordsRef.current[memberId];
+      const originalNote = dbMembersRef.current[memberId]?.note || '';
+
+      const score = clampScore(draft.score);
+      const seasonNote = draft.season_note || '';
+      const overkill = normalizeOverkill(draft.overkill);
+      const note = draft.note ?? '';
+
+      const scoreChanged = score !== (committed?.score ?? 0);
+      const seasonNoteChanged = seasonNote !== (committed?.season_note || '');
+      const noteChanged = note !== originalNote;
+      const overkillChanged = overkill !== (committed?.overkill ?? null);
+
+      if (!scoreChanged && !seasonNoteChanged && !noteChanged && !overkillChanged) {
+        unchangedIds.push(memberId);
+        return [];
+      }
+
+      return [{
+        memberId,
+        guildId,
+        score,
+        seasonNote,
+        overkill,
+        note,
+        noteChanged,
+        seasonGuild: draft.season_guild ?? committed?.season_guild ?? null,
+      }];
+    });
+
+    const dropDrafts = (ids: string[]) => {
+      if (ids.length === 0) return;
+      setDraftRecords(prev => {
+        const next = { ...prev };
+        ids.forEach(id => { delete next[id]; });
+        return next;
+      });
+    };
+
+    if (changed.length === 0) {
+      dropDrafts(unchangedIds);
       return;
     }
 
     setSaving(true);
     try {
-      const { note, ...raidRecord } = draft;
+      const rows = changed.map(c => ({
+        member_id: c.memberId,
+        score: c.score,
+        season_note: c.seasonNote,
+        overkill: c.overkill,
+        season_guild: c.seasonGuild,
+        ...(c.noteChanged ? { note: c.note } : {}),
+      }));
 
-      const payload = {
-        ...raidRecord,
-        overkill: raidRecord.overkill != null && !isNaN(Number(raidRecord.overkill)) ? Number(raidRecord.overkill) : null,
-      };
+      // 內容全部是 upsert（idempotent），timeout 時可安全重試一次
+      const { data, error: rpcError } = await writeQuery<GuildMedianRow[]>(
+        () => supabase.rpc('save_raid_records_bulk', {
+          p_season_id: Number(selectedSeasonId),
+          p_rows: rows,
+        }),
+        { retries: 1 },
+      );
 
-      const { error } = await supabase
-        .from('member_raid_records')
-        .upsert(payload, { onConflict: 'season_id, member_id' });
+      if (rpcError) throw rpcError;
 
-      if (error) throw error;
+      retryCountRef.current = 0;
 
-      if (noteChanged) await updateMember(memberId, { note });
-
-      const nextRecords = { ...recordsRef.current, [memberId]: payload as MemberRaidRecord };
+      // 1) 更新已提交的 records
+      const nextRecords = { ...recordsRef.current };
+      rows.forEach(row => {
+        const { note: _note, ...recordFields } = row;
+        nextRecords[row.member_id] = {
+          ...recordsRef.current[row.member_id],
+          ...recordFields,
+          season_id: selectedSeasonId,
+        } as MemberRaidRecord;
+      });
       setRecords(nextRecords);
 
-      setDraftRecords(prev => { const next = { ...prev }; delete next[memberId]; return next; });
+      // 2) 中位數由 DB 在同一個 transaction 算好回傳，前端不必再打一次 upsert
+      if (data && data.length > 0) {
+        setGuildRaidRecords(prev => {
+          const next = { ...prev };
+          data.forEach(row => {
+            next[row.guild_id] = {
+              ...prev[row.guild_id],
+              season_id: selectedSeasonId,
+              guild_id: row.guild_id,
+              member_score_median: row.member_score_median,
+            };
+          });
+          return next;
+        });
+      }
 
-      if (scoreChanged) await updateGuildMedian(guildId, nextRecords);
+      // 3) 同步本地 db.members 的 note，避免 noteChanged 之後一直成立
+      const noteUpdates = changed.filter(c => c.noteChanged).map(c => ({ id: c.memberId, note: c.note }));
+      if (noteUpdates.length > 0) {
+        const now = Date.now();
+        setDb(prev => {
+          const members = { ...prev.members };
+          noteUpdates.forEach(({ id, note }) => {
+            if (members[id]) members[id] = { ...members[id], note, updatedAt: now };
+          });
+          return { ...prev, members };
+        });
+      }
+
+      // 4) 清掉已寫入的草稿
+      dropDrafts([...changed.map(c => c.memberId), ...unchangedIds]);
 
       Logger.info({
         source: 'raid_manager',
-        action: 'auto_save_member_record',
-        message: '自動儲存成員戰記',
-        details: {
-          memberId,
-          guildId,
-          score: payload.score,
-          seasonNote: payload.season_note,
-          overkill: payload.overkill,
-          noteChanged,
-        },
+        action: 'auto_save_member_records',
+        message: '自動儲存成員戰記（批次）',
+        details: { seasonId: selectedSeasonId, count: rows.length, memberIds: rows.map(r => r.member_id) },
       });
     } catch (err: any) {
       console.error('Auto-save failed:', err);
-      Logger.error({ source: 'raid_manager', action: 'auto_save_member_record', message: '自動儲存成員戰記失敗', details: { memberId, guildId, error: err.message } });
-      setError(err.message);
+
+      // 若 RPC 尚未建立（例如 migration 還沒套用），不要無限重試，
+      // 直接保留草稿並給出明確訊息，避免使用者誤以為已存檔。
+      if (isMissingRpcError(err)) {
+        setError('資料庫尚未套用 save_raid_records_bulk，請先執行 supabase/migrations 內的 SQL 後重新整理');
+        Logger.error({
+          source: 'raid_manager',
+          action: 'auto_save_member_records',
+          message: '自動儲存失敗：save_raid_records_bulk 不存在（migration 未套用）',
+          details: { seasonId: selectedSeasonId, count: changed.length },
+        });
+        return;
+      }
+
+      retryCountRef.current += 1;
+      if (retryCountRef.current <= MAX_SAVE_RETRIES) {
+        // 放回佇列並保留草稿，下一輪自動重試（不讓資料默默消失）
+        changed.forEach(c => dirtyRef.current.set(c.memberId, c.guildId));
+      } else {
+        setError(err?.message
+          ? `自動儲存失敗（已重試 ${MAX_SAVE_RETRIES} 次）：${err.message}`
+          : `自動儲存失敗（已重試 ${MAX_SAVE_RETRIES} 次）`);
+      }
+
+      Logger.error({
+        source: 'raid_manager',
+        action: 'auto_save_member_records',
+        message: '自動儲存成員戰記失敗',
+        details: {
+          seasonId: selectedSeasonId,
+          count: changed.length,
+          attempt: retryCountRef.current,
+          error: err?.message,
+        },
+      });
     } finally {
       setSaving(false);
+      if (dirtyRef.current.size > 0) scheduleFlush();
     }
-  }, [updateMember, updateGuildMedian]); // draftRecordsRef/recordsRef/dbMembersRef are stable refs
+  }, [selectedSeasonId, setDb, setGuildRaidRecords, setRecords]);
+
+  const scheduleFlush = useCallback(() => {
+    if (flushTimerRef.current) return;
+    flushTimerRef.current = setTimeout(() => {
+      flushTimerRef.current = null;
+      void flushDirty();
+    }, FLUSH_DELAY_MS);
+  }, [flushDirty]);
+
+  // 讓卸載時的 cleanup 能呼叫到最新版的 flushDirty
+  flushRef.current = flushDirty;
 
   /**
    * Write the same score to many members at once.
@@ -184,16 +356,11 @@ export function useRaidRecordEditor({
   ): Promise<boolean> => {
     if (!selectedSeasonId || memberIds.length === 0) return false;
 
-    const clamped = Math.min(Math.max(Number(score) || 0, 0), 10000);
+    const clamped = clampScore(score);
 
-    // Cancel pending per-member auto-saves for these members, otherwise a debounced
-    // write armed just before the bulk fill can land afterwards and revert the score.
-    memberIds.forEach(id => {
-      if (saveTimersRef.current[id]) {
-        clearTimeout(saveTimersRef.current[id]);
-        delete saveTimersRef.current[id];
-      }
-    });
+    // 先把等待中的編輯寫下去，避免它們在批次填入後才落地、把分數蓋回去。
+    await flushDirty();
+    memberIds.forEach(id => { dirtyRef.current.delete(id); });
 
     setSaving(true);
     try {
@@ -226,14 +393,17 @@ export function useRaidRecordEditor({
         };
       });
 
-      const { error } = await supabase
-        .from('member_raid_records')
-        .upsert(payloads, { onConflict: 'season_id, member_id' });
+      const { error: upsertError } = await writeQuery(() =>
+        supabase
+          .from('member_raid_records')
+          .upsert(payloads, { onConflict: 'season_id, member_id' })
+      );
 
-      if (error) throw error;
+      if (upsertError) throw upsertError;
 
-      for (const { id, note } of pendingNotes) {
-        await updateMember(id, { note });
+      // 批次寫入備註（單一請求，取代原本逐人 updateMember 的 N 次請求）
+      if (pendingNotes.length > 0) {
+        await updateMembersNotes(pendingNotes);
       }
 
       // Merge onto the existing record so the row's `id` (absent from the payload) survives.
@@ -266,7 +436,7 @@ export function useRaidRecordEditor({
     } finally {
       setSaving(false);
     }
-  }, [selectedSeasonId, updateGuildMedian, updateMember]); // recordsRef/draftRecordsRef/dbMembersRef are stable refs
+  }, [selectedSeasonId, updateGuildMedian, updateMembersNotes, flushDirty]); // recordsRef/draftRecordsRef/dbMembersRef are stable refs
 
   const handleClearAllPrevGuildTags = useCallback(async (
     entries: { id: string; note: string }[],
@@ -277,12 +447,7 @@ export function useRaidRecordEditor({
     const ids = entries.map(e => e.id);
 
     // 取消這些成員既有的延遲自動儲存，避免其在批次寫入後又落地覆蓋。
-    ids.forEach(id => {
-      if (saveTimersRef.current[id]) {
-        clearTimeout(saveTimersRef.current[id]);
-        delete saveTimersRef.current[id];
-      }
-    });
+    ids.forEach(id => { dirtyRef.current.delete(id); });
 
     setSaving(true);
     try {
@@ -307,13 +472,11 @@ export function useRaidRecordEditor({
     }
   }, [updateMembersNotes]); // recordsRef/draftRecordsRef/saveTimersRef are stable refs
 
+  /** 標記某位成員需要寫入；實際寫入由 600ms 後的批次 flush 完成。 */
   const handleAutoSave = useCallback((memberId: string, guildId: string) => {
-    clearTimeout(saveTimersRef.current[memberId]);
-    saveTimersRef.current[memberId] = setTimeout(() => {
-      delete saveTimersRef.current[memberId];
-      doAutoSave(memberId, guildId);
-    }, 300);
-  }, [doAutoSave]);
+    dirtyRef.current.set(memberId, guildId);
+    scheduleFlush();
+  }, [scheduleFlush]);
 
   const handleGuildNoteChange = useCallback(async (guildId: string, note: string) => {
     if (!selectedSeasonId) return;

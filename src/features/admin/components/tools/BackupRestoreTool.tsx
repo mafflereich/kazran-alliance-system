@@ -7,6 +7,16 @@ import { Logger } from '@/shared/utils/logger';
 import { useRestoreDiff } from '../../hooks/useRestoreDiff';
 import RestorePreviewModal from '../RestorePreviewModal';
 
+/**
+ * 每張備份表的「穩定排序鍵」。
+ * 沒有 ORDER BY 的 range 分頁，在並行寫入時會跳列 / 重複列，
+ * 備份檔就會在無聲無息中少資料。member_notes / ghost_records 的主鍵是 uid（沒有 id 欄位）。
+ */
+const BACKUP_ORDER_COLUMN: Record<string, string> = {
+  member_notes: 'uid',
+  ghost_records: 'uid',
+};
+
 export default function BackupRestoreTool({
   isProcessing,
   setIsProcessing,
@@ -31,10 +41,16 @@ export default function BackupRestoreTool({
   const fetchAllRows = async (tableName: string, filter?: { column: string; value: any }) => {
     const allData: any[] = [];
     let from = 0;
-    const limit = 1000;
+    const limit = 500;
+    const orderColumn = BACKUP_ORDER_COLUMN[tableName] ?? 'id';
 
     while (true) {
-      let query = supabase.from(tableName).select('*').range(from, from + limit - 1);
+      let query = supabase
+        .from(tableName)
+        .select('*')
+        // 明確排序 → 分頁結果穩定，不會跳列 / 重複
+        .order(orderColumn, { ascending: true, nullsFirst: true })
+        .range(from, from + limit - 1);
       if (filter) query = query.eq(filter.column, filter.value);
 
       const { data, error } = await query;
@@ -62,7 +78,11 @@ export default function BackupRestoreTool({
   const createBackup = async (tables: string[], filename: string) => {
     setIsProcessing(true);
     try {
-      const results = await Promise.all(tables.map(table => fetchAllRows(table)));
+      // 逐表備份：原本 9 張表同時全表掃描，會把連線池打滿並出現 statement timeout
+      const results: any[][] = [];
+      for (const table of tables) {
+        results.push(await fetchAllRows(table));
+      }
       const backupData = Object.fromEntries(tables.map((table, i) => [table, results[i]]));
       triggerJsonDownload(backupData, filename);
       Logger.info({ source: 'data_management', action: 'create_backup', message: '建立備份', details: { filename, tables: tables.map(t => ({ table: t, rows: results[tables.indexOf(t)].length })) } });

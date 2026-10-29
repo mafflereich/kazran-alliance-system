@@ -17,17 +17,25 @@
 
 ---
 
-## 2. 資料存取：Supabase 輔助函式 + camelCase 轉換
+## 2. 資料存取：統一存取層 + camelCase 轉換
 
-- **位置**：`src/shared/api/supabase.ts`
-- **核心函式**：`supabaseInsert<T>()`（行 39）、`supabaseUpdate<T>()`（行 59）、`supabaseUpsert<T>()`（行 85）
-- **轉換**：`toCamel()`（行 25）將 DB 回應轉為 camelCase；`toSnake()`（行 32）將本地物件轉為 snake_case
-- **錯誤處理**：所有資料操作使用 try-catch + Toast 通知
+- **位置**：`src/shared/api/supabase.ts`、`src/shared/api/http.ts`
+- **核心函式**：
+  - `readQuery()` / `writeQuery()`（`http.ts`）— 所有請求的統一入口，附 **timeout**（讀 15s / 寫 30s）與 **指數退避重試**（讀取預設 2 次、寫入預設 0 次）
+  - `supabaseInsert<T>()`、`supabaseUpdate<T>()`、`supabaseUpsert<T>()` — 已全部改用上面的包裝；`returning` 參數會被尊重（`'minimal'` 可省下回傳整列的成本）
+  - `fetchAllPaginated()` — **keyset 分頁**（`ORDER BY <key> ... WHERE <key> > cursor`），必用於「整表」查詢；錯誤一律 throw，不可吞掉
+- **轉換**：`toCamel()` 將 DB 回應轉為 camelCase；`toSnake()` 將本地物件轉為 snake_case
+- **錯誤處理**：所有資料操作使用 try-catch + Toast 通知；批次讀取若只有部分失敗，必須用 `loadMemberSecrets()` 的回報欄位提示使用者（不可靜默略過）
 
 **使用範例**：
 - `src/store/index.tsx` — AppContext 的 CRUD 方法
-- `src/features/raid/pages/GuildRaidManager.tsx` — 戰記管理
+- `src/features/raid/hooks/useRaidRecordEditor.ts` — 戰記自動存檔（批次 flush → 單一 `save_raid_records_bulk` RPC）
 - `src/features/toolbox/components/FiendHunterBoard.tsx:72` — 工具箱資料
+
+**原則**：
+1. 不要直接 `await supabase.from(...)` 而不包 timeout；長查詢會讓使用者卡在轉圈圈。
+2. 一次使用者操作不要產生多個循序寫入；優先用 RPC 在單一 transaction 完成（見 `supabase/migrations/`）。
+3. 任何「整表」讀取都要分頁，且必須有穩定排序，否則會靜默少資料。
 
 ---
 

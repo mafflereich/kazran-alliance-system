@@ -6,7 +6,7 @@ import { fetchMemberEquipmentCounts } from '@/shared/api/memberEquipmentCounts';
 import { extractMemberEquipmentCounts, type MemberEquipmentCounts } from '@/shared/lib/equipmentShowcase';
 import { Logger } from '@/shared/utils/logger';
 import { setNoteSegment, removeNoteSegment, PREV_GUILD_TAG } from '@/shared/lib/noteUtils';
-import type { MemberBoardStore, MemberMovePayload, MemberMovePayloadItem } from './types';
+import type { MemberBoardStore, MemberMoveGroup, MemberMovePayloadItem } from './types';
 
 const MEMBER_BOARD_STORAGE_KEY = 'memberBoardDraft';
 
@@ -137,12 +137,13 @@ const persistDraft = (state: any) => {
     }
 };
 
-const makeApiPayload = (
+/** 依來源公會彙整「被移動 / 被踢出」的成員，供儲存後的紀錄與通知使用。 */
+const makeMoveGroups = (
     localMembers: Member[],
     deletedMembers: Member[],
     localGuilds: Guild[],
     initialMemberStates: Record<string, { guildId: string; note?: string; role?: Role; color?: string }>
-): MemberMovePayload[] => {
+): MemberMoveGroup[] => {
     const movedItems: MemberMovePayloadItem[] = localMembers
         .filter(m => m.id && initialMemberStates[m.id!]?.guildId !== m.guildId)
         .map(m => {
@@ -185,7 +186,6 @@ const makeApiPayload = (
 
 const sendApiAndNotify = (
     set: (partial: any) => void,
-    apiPayload: MemberMovePayload[],
     memberCount: number,
     onSuccess?: () => void
 ) => {
@@ -310,7 +310,7 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
 
     buildApiPayload: () => {
         const state = get();
-        return makeApiPayload(state.localMembers, state.deletedMembers, state.localGuilds, state.initialMemberStates);
+        return makeMoveGroups(state.localMembers, state.deletedMembers, state.localGuilds, state.initialMemberStates);
     },
 
     openArchiveModal: (members) => set({
@@ -358,15 +358,15 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
             Logger.info({ source: 'member_management', action: 'archive_members', message: '批次歸檔成員', details: { count: archivePayload.length, reasons: archiveReasons } });
         }
 
-        const apiPayload = makeApiPayload(localMembers, membersToArchive, localGuilds, initialMemberStates);
+        const moveGroups = makeMoveGroups(localMembers, membersToArchive, localGuilds, initialMemberStates);
 
         const closeModal = () => set({
             archiveModal: { isOpen: false, members: [] },
             deletedMembers: membersToArchive.length > 0 ? [] : deletedMembers
         });
 
-        sendApiAndNotify(set, apiPayload, localMembers.length, closeModal);
-        Logger.info({ source: 'member_management', action: 'save_member_board', message: '儲存成員看板變更', details: { memberCount: localMembers.length, moves: apiPayload.length } });
+        sendApiAndNotify(set, localMembers.length, closeModal);
+        Logger.info({ source: 'member_management', action: 'save_member_board', message: '儲存成員看板變更', details: { memberCount: localMembers.length, moves: moveGroups.length } });
     },
 
     init: (members, guilds) => {
@@ -856,8 +856,7 @@ export const useMemberBoardStore = create<MemberBoardStore>((set, get) => ({
                 return;
             }
 
-            const apiPayload = makeApiPayload(localMembers, deletedMembers, localGuilds, initialMemberStates);
-            sendApiAndNotify(set, apiPayload, changedMembers.length + membersWithChangedNotes.length + deletedMembers.length);
+            sendApiAndNotify(set, changedMembers.length + membersWithChangedNotes.length + deletedMembers.length);
             Logger.info({ source: 'member_management', action: 'save_member_board', message: '儲存成員看板變更', details: { changedMembers: changedMembers.length, changedNotes: membersWithChangedNotes.length, deletedMembers: deletedMembers.length } });
         } catch (err: unknown) {
             Logger.error({ source: 'member_management', action: 'save_member_board', message: '儲存成員看板變更失敗', details: { error: err instanceof Error ? err.message : String(err) } });

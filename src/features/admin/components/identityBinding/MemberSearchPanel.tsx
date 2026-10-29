@@ -14,22 +14,25 @@ interface Props {
   mode: 'single' | 'multi';
   stagedIds: string[];
   allProfiles: Profile[];
+  /** member_id → 已綁定的 profile（O(1) 查找，避免每列都掃全部 profiles） */
+  profileByMemberId: Map<string, Profile>;
   onBindClick: (member: Member) => void;
   guilds: Record<string, Guild>;
 }
 
 export default function MemberSearchPanel({
   isSearchActive, selectedProfile, searchQuery, onSearch, searchResults,
-  isBinding, mode, stagedIds, allProfiles, onBindClick, guilds,
+  isBinding, mode, stagedIds, allProfiles, profileByMemberId, onBindClick, guilds,
 }: Props) {
   const { t } = useTranslation('admin');
 
   const renderBindAction = (member: Member) => {
     const isStaged = mode === 'multi' && stagedIds.includes(member.id!);
-    const boundToOther = allProfiles.find(p =>
-      p.id?.split(',').map(id => id.trim()).filter(Boolean).includes(member.id!) &&
-      p.discord_id !== selectedProfile?.discord_id
-    );
+    const boundProfile = member.id ? profileByMemberId.get(member.id) : undefined;
+    const boundToOther =
+      boundProfile && boundProfile.discord_id !== selectedProfile?.discord_id
+        ? boundProfile
+        : undefined;
 
     if (isStaged) {
       return (

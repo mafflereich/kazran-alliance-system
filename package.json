@@ -19,6 +19,7 @@
     "db:diff": "supabase db diff",
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --linked > src/entities/database.types.ts",
+    "db:apply": "node scripts/apply-sql.mjs",
     "db:backup": "bash scripts/backup-db.sh"
   },
   "dependencies": {

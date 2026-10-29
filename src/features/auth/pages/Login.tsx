@@ -13,7 +13,7 @@ import { logEvent } from '@/analytics';
 export default function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { db, isRoleLoading, userRole } = useAppContext();
+  const { db, isRoleLoading, userRole, userGuildRoles, showToast } = useAppContext();
   const [error, setError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -52,8 +52,24 @@ export default function Login() {
     return () => { cancelled = true; };
   }, [userRole, isRoleLoading]);
 
+  /**
+   * 一般成員只能進入「自己所屬公會」；creator / admin / manager 不受限。
+   * 來源是 profiles.user_guilds（公會名稱逗號清單），與 DB 端 RLS
+   * （my_guild_ids）使用同一套歸屬關係。
+   */
+  const canViewGuild = React.useCallback((guildId: string) => {
+    if (userRole === 'creator' || userRole === 'admin' || userRole === 'manager') return true;
+    const target = String(db.guilds[guildId]?.name ?? '').trim().toLowerCase();
+    if (!target) return false;
+    return userGuildRoles.some(name => String(name).trim().toLowerCase() === target);
+  }, [userRole, db.guilds, userGuildRoles]);
+
   const handleGuildSelect = async (guildId: string) => {
     if (userRole) {
+      if (!canViewGuild(guildId)) {
+        showToast(t('dashboard.no_permission'), 'error');
+        return;
+      }
       navigate(`/guild/${guildId}`);
       return;
     }
@@ -184,6 +200,7 @@ export default function Login() {
                         )}
                         {tierGuilds.map(([id, guild]: [string, any]) => {
                           const stats = guildStats[id] || { traces: 0, filled: 0, lastUpdate: 0 };
+                          const canOpen = !isLoggedIn || canViewGuild(id);
 
                           let buttonClasses = "w-full flex items-center justify-between p-4 bg-white dark:bg-stone-800 border rounded-xl transition-all group overflow-hidden relative disabled:opacity-50";
                           let textClasses = `font-medium transition-colors ${getTierTextHoverClass(tier)}`;
@@ -203,7 +220,8 @@ export default function Login() {
                               key={id}
                               onClick={() => handleGuildSelect(id)}
                               disabled={isVerifying}
-                              className={`${buttonClasses} group/btn`}
+                              title={canOpen ? undefined : t('dashboard.no_permission')}
+                              className={`${buttonClasses} group/btn${canOpen ? '' : ' opacity-60'}`}
                             >
                               <div className="relative z-10 flex flex-col items-start min-w-0">
                                 <span className={`${textClasses} truncate w-full`}>{guild.name}</span>
@@ -223,7 +241,9 @@ export default function Login() {
                               </div>
 
                               <div className="relative z-10 flex items-center gap-2 shrink-0">
-                                <ChevronRight className={iconClasses} />
+                                {canOpen
+                                  ? <ChevronRight className={iconClasses} />
+                                  : <Lock className={`${iconClasses} opacity-70`} />}
                               </div>
                             </button>
                           );

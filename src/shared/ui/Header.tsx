@@ -10,6 +10,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/app/providers/ThemeContext';
 import { logEvent } from '@/analytics';
+import MyAccountsModal from '@features/auth/components/MyAccountsModal';
 import { motion, AnimatePresence } from 'motion/react';
 import { canUserAccessGuildPage } from '@/shared/lib/access';
 
@@ -25,6 +26,7 @@ export default function Header() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAccountsOpen, setIsAccountsOpen] = useState(false);
   const { preference, cycleTheme } = useTheme();
   const volumeContainerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -244,6 +246,16 @@ export default function Header() {
                           </div>
                         </div>
                         <button
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            setIsAccountsOpen(true);
+                          }}
+                          className="w-full flex items-center justify-center gap-2 mb-2 py-2.5 bg-stone-800 hover:bg-stone-700 hover:text-amber-400 text-stone-200 rounded-lg transition-all text-sm font-medium"
+                        >
+                          <Gamepad2 className="w-4 h-4" />
+                          {t('header.my_accounts', '我的遊戲帳號')}
+                        </button>
+                        <button
                           onClick={handleLogout}
                           className="w-full flex items-center justify-center gap-2 py-2.5 bg-stone-800 hover:bg-red-900/20 hover:text-red-400 text-stone-300 rounded-lg transition-all text-sm font-medium"
                         >
@@ -327,6 +339,8 @@ export default function Header() {
           <LoginModal onClose={() => setIsLoginModalOpen(false)} />
         )}
       </AnimatePresence>
+
+      <MyAccountsModal isOpen={isAccountsOpen} onClose={() => setIsAccountsOpen(false)} />
     </>
   );
 }

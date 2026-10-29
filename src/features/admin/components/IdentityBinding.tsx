@@ -5,6 +5,7 @@ import { useIdentityBinding } from './identityBinding/useIdentityBinding';
 import SingleMatchPanel from './identityBinding/SingleMatchPanel';
 import MultiMatchPanel from './identityBinding/MultiMatchPanel';
 import MemberSearchPanel from './identityBinding/MemberSearchPanel';
+import PendingClaimsPanel from './identityBinding/PendingClaimsPanel';
 
 export default function IdentityBinding() {
   const { t } = useTranslation('admin');
@@ -12,6 +13,8 @@ export default function IdentityBinding() {
 
   return (
     <div className="space-y-6">
+      <PendingClaimsPanel />
+
       <div className="flex items-center justify-between">
         <div className="flex bg-stone-100 dark:bg-stone-800 p-1 rounded-lg">
           <button
@@ -95,6 +98,7 @@ export default function IdentityBinding() {
           mode={binding.mode}
           stagedIds={binding.stagedIds}
           allProfiles={binding.allProfiles}
+          profileByMemberId={binding.profileByMemberId}
           onBindClick={binding.handleBindClick}
           guilds={binding.db.guilds}
         />
