@@ -153,9 +153,17 @@ export async function fetchAllPaginated<T = any>(
         all.push(...page);
         if (page.length < pageSize) break;
 
-        cursor = (page[page.length - 1] as any)?.[orderBy];
-        // 排序鍵為 null 時 keyset 無法繼續（例如未設 primary key 的舊資料），避免無窮迴圈
-        if (cursor === undefined || cursor === null) break;
+        // 排序鍵必須出現在 selectQuery 內，否則拿不到游標。
+        // 這裡一定要 throw，不能 break —— break 只會「靜默」回傳第一頁，
+        // 呼叫端會誤以為查詢成功但實際少了大半資料（例：公會成員數）。
+        const nextCursor = (page[page.length - 1] as any)?.[orderBy];
+        if (nextCursor === undefined || nextCursor === null) {
+            throw new Error(
+                `fetchAllPaginated("${table}"): 分頁鍵 "${orderBy}" 不在 select 結果中，無法繼續分頁。` +
+                `請把 ${orderBy} 加入 selectQuery（目前為 "${selectQuery}"）。`,
+            );
+        }
+        cursor = nextCursor;
     }
 
     return all;

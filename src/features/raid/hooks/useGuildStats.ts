@@ -2,6 +2,13 @@ import { useMemo, useState, useEffect } from 'react';
 import { supabase, fetchAllPaginated } from '@/shared/api/supabase';
 import { useAppContext } from '@/store';
 
+/**
+ * fetchAllPaginated 用 orderBy（預設 `id`）做 keyset 分頁，select 一定要包含
+ * 該欄位才拿得到下一頁的游標。若只 select `guild_id`，第一頁之後就無法翻頁，
+ * 成員數會被截斷（例：滿編 30 人的公會只算到 13 人 → 缺少人數顯示 17）。
+ */
+const MEMBER_COUNT_SELECT = 'id, guild_id';
+
 export function useGuildStats(canManage: boolean, targetTier: number, allowedGuildIds?: string[]) {
   const { db } = useAppContext();
   const [guildMemberCounts, setGuildMemberCounts] = useState<Record<string, number>>({});
@@ -9,7 +16,11 @@ export function useGuildStats(canManage: boolean, targetTier: number, allowedGui
   useEffect(() => {
     (async () => {
       try {
-        const data = await fetchAllPaginated<{ guild_id: string }>('members', 'guild_id', q => q.eq('status', 'active'));
+        const data = await fetchAllPaginated<{ id: string; guild_id: string }>(
+          'members',
+          MEMBER_COUNT_SELECT,
+          q => q.eq('status', 'active'),
+        );
         const counts: Record<string, number> = {};
         data.forEach((row: { guild_id: string }) => {
           if (row.guild_id) counts[row.guild_id] = (counts[row.guild_id] || 0) + 1;

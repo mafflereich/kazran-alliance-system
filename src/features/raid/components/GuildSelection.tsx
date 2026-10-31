@@ -28,7 +28,12 @@ const GuildSelection: React.FC<GuildSelectionProps> = ({
   const [copied, setCopied] = useState(false);
   const { t } = useTranslation(['raid', 'translation']);
 
+  // 成員數尚未載入（或載入失敗）時不要顯示缺少人數，
+  // 否則所有公會都會先閃一下「(30)」，看起來像資料壞掉。
+  const countsLoaded = Object.keys(guildMemberCounts).length > 0;
+
   const handleCopy = () => {
+    if (!countsLoaded) return;
     const lines: string[] = [];
     Object.entries(guildsByTier)
       .sort(([a], [b]) => Number(a) - Number(b))
@@ -62,9 +67,9 @@ const GuildSelection: React.FC<GuildSelectionProps> = ({
           </div>
           <button
             onClick={handleCopy}
-            disabled={disabled}
+            disabled={disabled || !countsLoaded}
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors
-              ${disabled
+              ${disabled || !countsLoaded
                 ? 'opacity-50 cursor-not-allowed border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400'
                 : copied
                 ? 'border-emerald-500/40 text-emerald-500 bg-transparent'
@@ -132,7 +137,7 @@ const GuildSelection: React.FC<GuildSelectionProps> = ({
                           />
                         )}
                         {guild.name}
-                        {missing > 0 && <span className="ml-1 text-[10px] opacity-80">({missing})</span>}
+                        {countsLoaded && missing > 0 && <span className="ml-1 text-[10px] opacity-80">({missing})</span>}
                       </button>
                     );
                   })}

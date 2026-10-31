@@ -201,16 +201,16 @@ interface GuildRaidRecord {
 
 ---
 
-### `useGuildStats(canManage, targetTier)`
+### `useGuildStats(canManage, targetTier, allowedGuildIds?)`
 `src/features/raid/hooks/useGuildStats.ts`
 
-純衍生資料，無 side effect。直接呼叫 `useAppContext()` 取得 `db`。
+掛載時查詢一次 `members`（`status = 'active'`）計算各公會成員數，其餘為 `useMemo` 衍生資料。直接呼叫 `useAppContext()` 取得 `db`。
 
 | 返回值 | 說明 |
 |--------|------|
 | `availableGuilds` | 過濾後排序的公會列表（canManage 看全部，否則只看同 tier） |
 | `guildsByTier` | 依 tier 分組的公會 |
-| `guildMemberCounts` | 各公會非 archived 成員數 |
+| `guildMemberCounts` | 各公會 active 成員數（`fetchAllPaginated` 的 select 必須包含 `id`，否則 keyset 分頁拿不到游標、只會回傳第一頁 → 缺少人數算錯） |
 
 ---
 
