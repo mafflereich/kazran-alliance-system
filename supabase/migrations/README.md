@@ -20,8 +20,10 @@ Supabase Dashboard → SQL Editor（散落在 `docs/sql/*.sql`），因此無法
 | `20261029097000_pending_claims_rpc.sql` | `list_pending_claims()`：待審清單一次回傳成員 / 公會 / 角色 / 申請者 Discord 資料 / 申請時間（管理者看全部、幹部只看自己公會） |
 | `20261029098000_multi_account_claim.sql` | **多重綁定**：移除「每人只能一筆待審」限制（上限 5 筆）；`my_claims()` / `my_bound_members()`；核准時支援「已綁在自己名下」不重複寫入 |
 | `20261102090000_seed_bd2db_catalog.sql` | **BD2DB 圖鑑補齊（僅 5 星）**：新增缺少的 3 位 5 星角色與 5 件服裝（可重複執行，不覆蓋既有資料） |
+| `20261102100000_equipment_guild_min_privacy_and_resource_privacy.sql` | **裝備表隱私 v4**：最低可見度改為「本公會正副會長」（舊 `public` 全部升級為 `guild_manager`）；新增 `members.resource_visibility` 與 `mask_equipment_resources()`，重要資源可逐項設定隱私；`mask_equipment` 補齊分拆後的單件 key |
+| `20261102110000_equipment_guild_leader_always_visible.sql` | **裝備表隱私 v5（設計初衷）**：本公會正／副會長與 creator/admin 一律可看到完整裝備與全部重要資源；部位／資源覆蓋不能排除他們；`admin` 級別併入 `guild_manager`，可選級別只剩 `guild_manager` / `all_manager` |
 
-十二支都可**重複執行**，且不刪改任何資料。
+十四支都可**重複執行**，且不刪改任何資料。
 
 ## 套用方式（擇一）
 

@@ -1,9 +1,9 @@
 import React from 'react';
-import { User, EyeOff, Lock, ArrowDownNarrowWide, ArrowDownWideNarrow, BellRing, AlertTriangle, Gem } from 'lucide-react';
+import { User, EyeOff, ArrowDownNarrowWide, ArrowDownWideNarrow, BellRing, AlertTriangle, Gem } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAppContext } from '@/store';
 import { EQUIPMENT_CATEGORIES, EQUIPMENT_RESOURCES, PLAY_MODE_OPTIONS } from '@/entities/member/types';
-import { normalizeEquipment, normalizePlayPreferences, normalizeEquipmentVisibility, canViewCategoryForUI, isManagerRole, isEquipmentOutdated, getEquipmentUpdatedAt } from '@/shared/lib/equipment';
+import { normalizeEquipment, normalizePlayPreferences, canViewEquipmentForUI, canViewCategoryForUI, canViewResourceForUI, isManagerRole, isEquipmentOutdated, getEquipmentUpdatedAt } from '@/shared/lib/equipment';
 
 interface EquipmentTableProps {
   members: [string, any][];
@@ -80,8 +80,12 @@ export default function EquipmentTable({
     return ids;
   }, [members, userProfileId]);
 
-  const isRestricted = (member: any) =>
-    normalizeEquipmentVisibility(member.equipmentVisibility, member.isEquipmentHidden) !== 'public';
+  // 公會正副會長（viewerManagedGuildIds）與管理者才看得到「重要資源」欄位
+  const managedGuildIdList = React.useMemo(() => [...viewerManagedGuildIds], [viewerManagedGuildIds]);
+  const canSeeResourcesColumn = React.useMemo(
+    () => isManagerRole(userRole) || viewerManagedGuildIds.size > 0,
+    [userRole, viewerManagedGuildIds],
+  );
 
   return (
     <div className="bg-white dark:bg-stone-800 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-700 overflow-hidden relative">
@@ -146,7 +150,7 @@ export default function EquipmentTable({
                   )}
                 </div>
               </th>
-              {isManagerRole(userRole) && (
+              {canSeeResourcesColumn && (
                 <th className="p-3 font-semibold text-center text-xs border-r border-b-2 border-stone-200 dark:border-stone-600 sticky top-0 bg-stone-50 dark:bg-stone-700 z-20">
                   <span className="inline-flex items-center gap-1">
                     <Gem className="w-3.5 h-3.5 text-amber-500" />
@@ -218,11 +222,9 @@ export default function EquipmentTable({
                       >
                         {getTruncatedName(member.name, member.role)}
                       </span>
-                      {isRestricted(member) ? (
-                        normalizeEquipmentVisibility(member.equipmentVisibility, member.isEquipmentHidden) === 'admin'
-                          ? <Lock className="w-3.5 h-3.5 text-red-400 dark:text-red-500" />
-                          : <EyeOff className="w-3.5 h-3.5 text-stone-300 dark:text-stone-500" />
-                      ) : null}
+                      {!canViewEquipmentForUI(userRole, member, managedGuildIdList, isCurrentUser) && (
+                        <EyeOff className="w-3.5 h-3.5 text-stone-300 dark:text-stone-500" />
+                      )}
                       {isOutdated && (
                         <span
                           className="px-1.5 py-0.5 rounded bg-red-600 text-white text-[9px] font-bold whitespace-nowrap"
@@ -241,11 +243,12 @@ export default function EquipmentTable({
                     )}
                   </div>
                 </td>
-                {isManagerRole(userRole) && (
+                {canSeeResourcesColumn && (
                   <td className="p-2 text-center border-r border-stone-100 dark:border-stone-700 align-middle">
                     <div className="flex flex-col gap-0.5 min-w-[148px]">
                       {EQUIPMENT_RESOURCES.map(res => {
                         const value = member.resources?.[res.key] ?? 0;
+                        const canSeeResource = canViewResourceForUI(userRole, member, res.key, managedGuildIdList, isCurrentUser);
                         return (
                           <div
                             key={res.key}
@@ -265,8 +268,12 @@ export default function EquipmentTable({
                                 {t(`equipment.resources_opt.${res.key}`, res.key)}
                               </span>
                             </span>
-                            <span className={`text-[11px] font-bold tabular-nums ${value > 0 ? 'text-stone-700 dark:text-stone-200' : 'text-stone-300 dark:text-stone-600'}`}>
-                              {value > 0 ? value.toLocaleString() : '-'}
+                            <span className={`text-[11px] font-bold tabular-nums ${canSeeResource
+                              ? (value > 0 ? 'text-stone-700 dark:text-stone-200' : 'text-stone-300 dark:text-stone-600')
+                              : 'text-stone-300 dark:text-stone-500'}`}>
+                              {canSeeResource
+                                ? (value > 0 ? value.toLocaleString() : '-')
+                                : <EyeOff className="w-3 h-3 inline-block" />}
                             </span>
                           </div>
                         );
@@ -349,7 +356,7 @@ export default function EquipmentTable({
             })}
             {visibleMembers.length === 0 && (
               <tr>
-                <td colSpan={EQUIPMENT_CATEGORIES.length + 3 + (isManagerRole(userRole) ? 1 : 0)} className="p-8 text-center text-stone-500 dark:text-stone-400">
+                <td colSpan={EQUIPMENT_CATEGORIES.length + 3 + (canSeeResourcesColumn ? 1 : 0)} className="p-8 text-center text-stone-500 dark:text-stone-400">
                   {t('dashboard.no_members')}
                 </td>
               </tr>

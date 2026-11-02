@@ -231,13 +231,24 @@ export interface EquipmentItem {
 export type Equipment = Record<string, EquipmentItem>;
 
 // 裝備表隱私級別
+//   設計原則：本公會的正/副會長（以及 creator/admin）**一律**可看到
+//   完整裝備表與全部重要資源，任何隱私設定都不能把他們排除。
+//   因此級別只剩兩種，用來決定「是否再開放給其他管理者」：
+//     guild_manager（預設）→ 只有本公會正副會長 + 總長
+//     all_manager          → 上述人員 + 所有 creator/admin/manager
+//   舊資料可能仍有 'public' / 'admin'：'public' 併入 guild_manager，
+//   'admin' 也併入 guild_manager（因為正副會長一律可見）。
 export const EQUIPMENT_VISIBILITY_OPTIONS = [
-  'public',
-  'all_manager',
   'guild_manager',
-  'admin',
+  'all_manager',
 ] as const;
 export type EquipmentVisibility = typeof EQUIPMENT_VISIBILITY_OPTIONS[number];
+
+// 舊版值（'public' / 'admin' 已停用，僅用於讀取舊資料 / 向後相容）
+export type LegacyEquipmentVisibility = EquipmentVisibility | 'public' | 'admin';
+
+// 未設定時的預設級別（＝最低可見度：本公會正副會長）
+export const DEFAULT_EQUIPMENT_VISIBILITY: EquipmentVisibility = 'guild_manager';
 
 // 每個部位的隱私設定（23C/24C 可獨立覆蓋）
 export interface CategoryVisibilityItem {
@@ -248,6 +259,10 @@ export interface CategoryVisibilityItem {
 
 // 全域 → 部位 → C值 的層級隱私 map（key = EQUIPMENT_CATEGORIES 的 key）
 export type CategoryVisibility = Record<string, CategoryVisibilityItem>;
+
+// 重要資源個別隱私（key = EQUIPMENT_RESOURCES 的 key）
+//   未設定的資源沿用 equipmentVisibility（全域預設）。
+export type ResourceVisibility = Partial<Record<EquipmentResourceKey, EquipmentVisibility>>;
 
 export interface Member {
   id?: string;
@@ -262,6 +277,7 @@ export interface Member {
   equipmentNote?: string;
   equipmentVisibility?: EquipmentVisibility;
   categoryVisibility?: CategoryVisibility; // 每部位獨立隱私（覆蓋 equipmentVisibility）
+  resourceVisibility?: ResourceVisibility; // 重要資源個別隱私（覆蓋 equipmentVisibility）
   isEquipmentHidden?: boolean; // 舊版布林（僅向後相容用）
   refiningTraces?: number; // 煉製之痕數量
   equipmentUpdatedAt?: number; // 整張裝備表最近更新（epoch ms）

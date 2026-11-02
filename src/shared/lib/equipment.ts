@@ -1,4 +1,4 @@
-import { EQUIPMENT_CATEGORIES, Equipment, PlayPreferences, DEDICATION_OPTIONS, Dedication, PlayMode, PLAY_MODE_OPTIONS, EquipmentVisibility, CategoryVisibility, EQUIPMENT_RESOURCES, EquipmentResources } from '@/entities/member/types';
+import { EQUIPMENT_CATEGORIES, Equipment, PlayPreferences, DEDICATION_OPTIONS, Dedication, PlayMode, PLAY_MODE_OPTIONS, EquipmentVisibility, LegacyEquipmentVisibility, CategoryVisibility, ResourceVisibility, EquipmentResourceKey, EQUIPMENT_RESOURCES, EQUIPMENT_VISIBILITY_OPTIONS, DEFAULT_EQUIPMENT_VISIBILITY, EquipmentResources } from '@/entities/member/types';
 
 export const getEmptyEquipment = (): Equipment => {
   const e: Equipment = {};
@@ -91,21 +91,47 @@ export const isEquipmentOutdated = (
   return getEquipmentUpdatedAt(member) < cutoff;
 };
 
-// 統一取得隱私級別（向後相容舊布林 isEquipmentHidden）
+// 統一取得隱私級別（向後相容舊布林 isEquipmentHidden 與已停用的 'public' / 'admin'）
+//   裝備表最低可見度＝本公會正副會長（guild_manager）：
+//     舊資料的 'public' / 'admin' / 未設定 / 未知值 → 'guild_manager'
+//     舊版布林 is_equipment_hidden = true（僅管理者可見）→ 'all_manager'
 export const normalizeEquipmentVisibility = (
-  visibility?: EquipmentVisibility,
+  visibility?: LegacyEquipmentVisibility | null,
   legacyHidden?: boolean,
 ): EquipmentVisibility => {
-  if (visibility == null) {
-    // 舊版布林 → 只有全部管理者可看（原本「隱藏」= 僅管理者）
-    return legacyHidden ? 'all_manager' : 'public';
+  if (visibility === 'public' || visibility === 'admin' || visibility == null) {
+    return legacyHidden ? 'all_manager' : DEFAULT_EQUIPMENT_VISIBILITY;
   }
-  return visibility;
+  return (EQUIPMENT_VISIBILITY_OPTIONS as readonly string[]).includes(visibility)
+    ? (visibility as EquipmentVisibility)
+    : DEFAULT_EQUIPMENT_VISIBILITY;
+};
+
+// 單一隱私級別的權限判定（前端鏡像 DB 的 mask_category_can）
+//   viewerManagedGuilds：目前使用者「身為正/副會長」的公會 id 清單（由外部帶入）
+//   設計原則：本公會正副會長與總長一律可見 —— 先無條件放行，
+//   再依級別決定是否額外開放給其他管理者。部位/資源覆蓋也套用同一規則。
+const canViewWithVisibility = (
+  visibility: EquipmentVisibility,
+  viewerRole: string | null,
+  member: { guildId?: string },
+  viewerManagedGuilds: string[],
+): boolean => {
+  if (isAdminRole(viewerRole)) return true;
+  if (!!member.guildId && viewerManagedGuilds.includes(member.guildId)) return true;
+
+  switch (visibility) {
+    case 'all_manager':
+      return isManagerRole(viewerRole);
+    case 'guild_manager':
+    default:
+      return false;
+  }
 };
 
 // 前端鏡像 DB 的 can_view_equipment 政策，用於 UI 顯示
 //   viewerRole: 目前使用者角色
-//   viewerGuildIds: 目前使用者可管理的公會 id 清單（GUI 由外部帶入）
+//   viewerManagedGuilds: 目前使用者可管理的公會 id 清單（GUI 由外部帶入）
 //   member: 目標成員
 export const canViewEquipmentForUI = (
   viewerRole: string | null,
@@ -115,19 +141,7 @@ export const canViewEquipmentForUI = (
 ): boolean => {
   if (isCurrentUser) return true;
   const vis = normalizeEquipmentVisibility(member.equipmentVisibility, member.isEquipmentHidden);
-  switch (vis) {
-    case 'public':
-      return true;
-    case 'all_manager':
-      return isManagerRole(viewerRole);
-    case 'guild_manager':
-      return isManagerRole(viewerRole)
-        && (isAdminRole(viewerRole) || (!!member.guildId && viewerManagedGuilds.includes(member.guildId)));
-    case 'admin':
-      return isAdminRole(viewerRole);
-    default:
-      return false;
-  }
+  return canViewWithVisibility(vis, viewerRole, member, viewerManagedGuilds);
 };
 
 // 取得某部位某 C 值的最終隱私級別（全域 → 部位 → C值 層級解析）
@@ -139,8 +153,8 @@ export const resolveCategoryVisibility = (
   const catVis = member.categoryVisibility?.[categoryKey];
   if (catVis) {
     const cOverride = cField === 'c23' ? catVis.c23 : catVis.c24;
-    if (cOverride) return cOverride;
-    if (catVis.visibility) return catVis.visibility;
+    if (cOverride) return normalizeEquipmentVisibility(cOverride);
+    if (catVis.visibility) return normalizeEquipmentVisibility(catVis.visibility);
   }
   return normalizeEquipmentVisibility(member.equipmentVisibility, member.isEquipmentHidden);
 };
@@ -156,20 +170,31 @@ export const canViewCategoryForUI = (
 ): boolean => {
   if (isCurrentUser) return true;
   const vis = resolveCategoryVisibility(member, categoryKey, cField);
-  switch (vis) {
-    case 'public':
-      return true;
-    case 'all_manager':
-      return isManagerRole(viewerRole);
-    case 'guild_manager':
-      return isManagerRole(viewerRole)
-        && (isAdminRole(viewerRole) || (!!member.guildId && viewerManagedGuilds.includes(member.guildId)));
-    case 'admin':
-      return isAdminRole(viewerRole);
-    default:
-      return false;
-  }
+  return canViewWithVisibility(vis, viewerRole, member, viewerManagedGuilds);
+};
+
+// 取得某項重要資源的最終隱私級別（資源覆蓋 > 全域）
+export const resolveResourceVisibility = (
+  member: { equipmentVisibility?: EquipmentVisibility; resourceVisibility?: ResourceVisibility; isEquipmentHidden?: boolean },
+  resourceKey: EquipmentResourceKey,
+): EquipmentVisibility => {
+  const override = member.resourceVisibility?.[resourceKey];
+  if (override) return normalizeEquipmentVisibility(override);
+  return normalizeEquipmentVisibility(member.equipmentVisibility, member.isEquipmentHidden);
+};
+
+// 判斷觀看者能否看到某項重要資源
+export const canViewResourceForUI = (
+  viewerRole: string | null,
+  member: { equipmentVisibility?: EquipmentVisibility; resourceVisibility?: ResourceVisibility; isEquipmentHidden?: boolean; guildId?: string },
+  resourceKey: EquipmentResourceKey,
+  viewerManagedGuilds: string[],
+  isCurrentUser: boolean,
+): boolean => {
+  if (isCurrentUser) return true;
+  const vis = resolveResourceVisibility(member, resourceKey);
+  return canViewWithVisibility(vis, viewerRole, member, viewerManagedGuilds);
 };
 
 export { DEDICATION_OPTIONS, PLAY_MODE_OPTIONS };
-export type { Dedication, PlayMode, EquipmentVisibility, CategoryVisibility };
+export type { Dedication, PlayMode, EquipmentVisibility, LegacyEquipmentVisibility, CategoryVisibility, ResourceVisibility, EquipmentResourceKey };

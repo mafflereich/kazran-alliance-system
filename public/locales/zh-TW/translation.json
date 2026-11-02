@@ -433,18 +433,16 @@
     "note": "備註",
     "note_placeholder": "寫下你的備註...",
     "visibility": "裝備表隱私級別",
-    "visibility_desc": "隱藏時，一般成員仍可看到你的遊玩傾向與備註，僅裝備欄位依級別隱藏。",
+    "visibility_desc": "本公會正副會長與總長一律可看到完整裝備與重要資源；級別只決定是否再開放給其他管理者。",
     "visibility_opt": {
-      "public": "公開",
       "all_manager": "所有管理者",
-      "guild_manager": "本公會管理者",
-      "admin": "僅總長"
+      "guild_manager": "本公會正副會長"
     },
     "refining_traces": "煉製之痕",
-    "refining_traces_desc": "你的煉製之痕總數（僅管理者可見）。",
+    "refining_traces_desc": "你的煉製之痕總數（依裝備表隱私級別顯示）。",
     "resources": "重要資源",
     "resources_short": "重要資源",
-    "resources_desc": "古代水晶、煉製水晶、女神的眼淚、煉製之痕、暴走火種（僅管理者可見）",
+    "resources_desc": "古代水晶、煉製水晶、女神的眼淚、煉製之痕、暴走火種（可個別設定隱私）",
     "resources_opt": {
       "ancientCrystal": "古代水晶",
       "refiningCrystal": "煉製水晶",
@@ -460,8 +458,11 @@
       "burstFlame": "爆發技能升級用"
     },
     "category_visibility": "部位個別隱私設定",
-    "category_visibility_desc": "每個部位與 C 值可獨立覆蓋全域隱私級別；未設定的欄位會沿用全域預設。",
+    "category_visibility_desc": "每個部位與 C 值可獨立覆蓋全域隱私級別；未設定的欄位會沿用全域預設。本公會正副會長一律可見，不受此處設定影響。",
     "category_visibility_hint": "點選「跟隨全域」可清除覆蓋；清除部位/23C/24C 的覆蓋即回到上一層級。",
+    "resource_visibility": "重要資源個別隱私設定",
+    "resource_visibility_desc": "每項重要資源可獨立設定可見級別；未設定者沿用全域預設。本公會正副會長一律可見。",
+    "resource_visibility_hint": "本公會正副會長與總長一律看得到全部資源；個別設定只影響「其他管理者」是否可見（例如把古代水晶設為本公會正副會長＝不再開放給其他管理者）。",
     "category_level": "部位層級",
     "has_override": "已覆蓋",
     "follow_default": "跟隨全域",

@@ -433,18 +433,16 @@
     "note": "Note",
     "note_placeholder": "Write your note...",
     "visibility": "Equipment Visibility",
-    "visibility_desc": "When restricted, regular members still see your play preference and note; only equipment columns are hidden by level.",
+    "visibility_desc": "Guild Leader & Co-leaders and ZoarS can always see your full equipment and key resources; the level only controls whether other managers can see it too.",
     "visibility_opt": {
-      "public": "Public",
       "all_manager": "All Managers",
-      "guild_manager": "Guild Managers",
-      "admin": "ZoarS Only"
+      "guild_manager": "Guild Leader & Co-leaders"
     },
     "refining_traces": "Refining Traces",
-    "refining_traces_desc": "Your total refining traces (visible to managers only).",
+    "refining_traces_desc": "Your total refining traces (shown according to your equipment visibility).",
     "resources": "Key Resources",
     "resources_short": "Key Resources",
-    "resources_desc": "Ancient Crystal, Refining Crystal, Tear of Goddess, Refinement Remnant and Spark of Rampage (managers only)",
+    "resources_desc": "Ancient Crystal, Refining Crystal, Tear of Goddess, Refinement Remnant and Spark of Rampage (privacy configurable per resource)",
     "resources_opt": {
       "ancientCrystal": "Ancient Crystal",
       "refiningCrystal": "Refining Crystal",
@@ -460,8 +458,11 @@
       "burstFlame": "Used to upgrade costume burst skills"
     },
     "category_visibility": "Per-Category Visibility",
-    "category_visibility_desc": "Each equipment slot and C value can override the global visibility; unset fields inherit the global default.",
+    "category_visibility_desc": "Each equipment slot and C value can override the global visibility; unset fields inherit the global default. Guild Leader & Co-leaders always see everything regardless of this setting.",
     "category_visibility_hint": "Click \"Follow Global\" to clear an override; clearing the slot/23C/24C override reverts to the layer above.",
+    "resource_visibility": "Per-Resource Visibility",
+    "resource_visibility_desc": "Each key resource can have its own visibility level; unset resources inherit the global default. Guild Leader & Co-leaders always see everything.",
+    "resource_visibility_hint": "Guild Leader & Co-leaders and ZoarS always see every resource; per-resource settings only decide whether other managers can see it (e.g. set Ancient Crystal to Guild Leader & Co-leaders to hide it from other managers).",
     "category_level": "Slot Level",
     "has_override": "Overridden",
     "follow_default": "Follow Global",

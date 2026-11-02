@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Database, Guild, Member, Costume, Role, User, Character, ArchivedMember, ArchiveHistory, Toast, ToastType, Setting, ApplyMail, AccessControl, Equipment, PlayPreferences, EquipmentVisibility, CostumeRecord, CategoryVisibility, EquipmentResources } from '@/entities/member/types';
+import { Database, Guild, Member, Costume, Role, User, Character, ArchivedMember, ArchiveHistory, Toast, ToastType, Setting, ApplyMail, AccessControl, Equipment, PlayPreferences, EquipmentVisibility, CostumeRecord, CategoryVisibility, ResourceVisibility, EquipmentResources } from '@/entities/member/types';
 import { supabase, supabaseInsert, supabaseKey, supabaseUpdate, supabaseUpsert, toCamel, toSnake, fetchAllPaginated } from '@/shared/api/supabase';
 import { loadMemberSecrets, applySecretsToMembers } from '@/shared/api/memberSecrets';
 import { getLatestSeasonId } from '@/shared/api/latestSeason';
@@ -67,7 +67,7 @@ interface AppContextType {
   unarchiveMember: (memberId: string, targetGuildId: string) => Promise<void>;
   updateMemberCostumeLevel: (memberId: string, costumeId: string, level: number) => Promise<void>;
   updateMemberExclusiveWeapon: (memberId: string, characterId: string, hasWeapon: boolean) => Promise<void>;
-  updateMemberProfile: (memberId: string, data: { equipment?: Equipment; playPreferences?: PlayPreferences; equipmentNote?: string; equipmentVisibility?: EquipmentVisibility; categoryVisibility?: CategoryVisibility; refiningTraces?: number; resources?: EquipmentResources }) => Promise<void>;
+  updateMemberProfile: (memberId: string, data: { equipment?: Equipment; playPreferences?: PlayPreferences; equipmentNote?: string; equipmentVisibility?: EquipmentVisibility; categoryVisibility?: CategoryVisibility; resourceVisibility?: ResourceVisibility; refiningTraces?: number; resources?: EquipmentResources }) => Promise<void>;
 
   // Guild functions
   addGuild: (name: string) => Promise<string | null>;
@@ -625,7 +625,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userProfileId]);
   // Function to fetch members for a specific guild
-  const fetchMembers = async (guildId: string, columns: string = 'id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark), member_raid_records(id, season_id, score, season_note, overkill)', force: boolean = false): Promise<boolean> => {
+  const fetchMembers = async (guildId: string, columns: string = 'id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, resource_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark), member_raid_records(id, season_id, score, season_note, overkill)', force: boolean = false): Promise<boolean> => {
     if (isOffline && !force) return false;
     if (force) setIsOffline(false);
 
@@ -762,7 +762,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         allMembersData = await fetchAllPaginated<any>(
           'members',
-          'id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark)',
+          'id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, resource_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark)',
           undefined,
           { pageSize: 500 },
         );
@@ -784,7 +784,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 app_metadata: session.user.app_metadata,
                 user_metadata: session.user.user_metadata
               } : null,
-              query: "select('id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark)')"
+              query: "select('id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, resource_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark)')"
             }, null, 2));
           });
         });
@@ -857,7 +857,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     try {
       setIsMembersLoading(true);
-      const selectQuery = 'id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status';
+      const selectQuery = 'id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, resource_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status';
       const data = await fetchAllPaginated<Member>('members', selectQuery, q => q.in('id', uniqueIds));
 
       const newMembers: Record<string, Member> = data.reduce((acc, m) => ({ ...acc, [m.id!]: toCamel<Member>(m) }), {});
@@ -888,7 +888,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     let queryBuilder = supabase
       .from('members')
-      .select('id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark), member_raid_records(score, season_note, overkill)', { count: 'exact' })
+      .select('id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, resource_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark), member_raid_records(score, season_note, overkill)', { count: 'exact' })
       .ilike('name', `%${query}%`)
       .order('status', { ascending: true }) // active comes before archived
       .order('name', { ascending: true })
@@ -925,7 +925,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               app_metadata: session.user.app_metadata,
               user_metadata: session.user.user_metadata
             } : null,
-            query: "select('id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark), member_raid_records(score, season_note)')",
+            query: "select('id, name, guild_id, role, play_preferences, equipment_note, is_equipment_hidden, equipment_visibility, category_visibility, resource_visibility, equipment_updated_at, costumes_updated_at, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark), member_raid_records(score, season_note)')",
             searchQuery: query
           }, null, 2));
         });
@@ -1414,6 +1414,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       equipmentNote?: string;
       equipmentVisibility?: EquipmentVisibility;
       categoryVisibility?: CategoryVisibility;
+      resourceVisibility?: ResourceVisibility;
       refiningTraces?: number;
       resources?: EquipmentResources;
     }

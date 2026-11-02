@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useAppContext } from '@/store';
-import { X, Save, CheckCircle2, EyeOff, Eye, Lock, ShieldCheck, Users, Hash, ChevronDown, ChevronRight, RotateCcw, Gem } from 'lucide-react';
+import { X, Save, CheckCircle2, EyeOff, ShieldCheck, Users, Hash, ChevronDown, ChevronRight, RotateCcw, Gem } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { logEvent } from '@/analytics';
 import { EQUIPMENT_CATEGORIES, EQUIPMENT_RESOURCES, PLAY_MODE_OPTIONS, DEDICATION_OPTIONS, EQUIPMENT_VISIBILITY_OPTIONS } from '@/entities/member/types';
-import type { EquipmentVisibility, CategoryVisibility, EquipmentResources } from '@/entities/member/types';
+import type { EquipmentVisibility, CategoryVisibility, ResourceVisibility, EquipmentResourceKey, EquipmentResources } from '@/entities/member/types';
 import { normalizeEquipment, normalizePlayPreferences, normalizeEquipmentVisibility, getEquipmentResources } from '@/shared/lib/equipment';
 import CollapsibleSection from './CollapsibleSection';
 
@@ -27,6 +27,7 @@ export default function MemberEquipmentModal({ memberId, onClose }: { memberId: 
     () => member.resources ?? getEquipmentResources(member.equipment, member.refiningTraces)
   );
   const [categoryVisibility, setCategoryVisibility] = useState<CategoryVisibility>(member.categoryVisibility ?? {});
+  const [resourceVisibility, setResourceVisibility] = useState<ResourceVisibility>(member.resourceVisibility ?? {});
   const [expandedCat, setExpandedCat] = useState<string | null>(null);
 
   const toggleMode = (mode: any) => {
@@ -49,6 +50,7 @@ export default function MemberEquipmentModal({ memberId, onClose }: { memberId: 
         equipmentNote: note,
         equipmentVisibility: visibility,
         categoryVisibility,
+        resourceVisibility,
         resources,
       });
       setTimeout(() => {
@@ -88,8 +90,21 @@ export default function MemberEquipmentModal({ memberId, onClose }: { memberId: 
     });
   };
 
+  const setResVisibility = (key: EquipmentResourceKey, value: EquipmentVisibility | undefined) => {
+    setResourceVisibility(prev => {
+      const next = { ...prev };
+      if (value === undefined) {
+        delete next[key];
+      } else {
+        next[key] = value;
+      }
+      return next;
+    });
+  };
+
+  // 隱私級別圖示：本公會正副會長＝Users、所有管理者＝ShieldCheck
   const visibilityIcon = (v: EquipmentVisibility) =>
-    v === 'public' ? null : v === 'admin' ? <Lock className="w-4 h-4" /> : v === 'guild_manager' ? <Hash className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />;
+    v === 'guild_manager' ? <Users className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />;
 
   return (
     <div className="fixed inset-0 z-[110] flex items-start justify-center p-4 bg-stone-900/60 dark:bg-black/70 backdrop-blur-sm pt-[80px]">
@@ -278,7 +293,7 @@ export default function MemberEquipmentModal({ memberId, onClose }: { memberId: 
           <CollapsibleSection
             title={t('equipment.visibility')}
             description={t('equipment.visibility_desc')}
-            icon={visibilityIcon(visibility) ?? <Eye className="w-5 h-5" />}
+            icon={visibilityIcon(visibility)}
           >
             <div className="p-5">
               <div className="flex flex-wrap gap-2">
@@ -296,6 +311,76 @@ export default function MemberEquipmentModal({ memberId, onClose }: { memberId: 
                       {visibilityIcon(v)}
                       {t(`equipment.visibility_opt.${v}`)}
                     </button>
+                  );
+                })}
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* 重要資源個別隱私設定（折疊式，可覆蓋全域預設） */}
+          <CollapsibleSection
+            title={t('equipment.resource_visibility')}
+            description={t('equipment.resource_visibility_desc')}
+            icon={<Gem className="w-5 h-5" />}
+          >
+            <div className="p-5 space-y-4">
+              <p className="text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                {t('equipment.resource_visibility_hint')}
+              </p>
+              <div className="divide-y divide-stone-100 dark:divide-stone-700 rounded-xl overflow-hidden border border-stone-100 dark:border-stone-700">
+                {EQUIPMENT_RESOURCES.map(res => {
+                  const override = resourceVisibility[res.key];
+                  return (
+                    <div key={res.key} className="bg-stone-50/50 dark:bg-stone-800/50 px-4 py-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <img
+                            src={res.icon}
+                            alt=""
+                            className="w-5 h-5 object-contain shrink-0"
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                          <span className="text-sm font-semibold text-stone-700 dark:text-stone-200 truncate">
+                            {t(`equipment.resources_opt.${res.key}`, res.key)}
+                          </span>
+                        </div>
+                        <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${override
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                          : 'bg-stone-200/70 text-stone-500 dark:bg-stone-700 dark:text-stone-400'}`}>
+                          {override ? t(`equipment.visibility_opt.${override}`) : t('equipment.follow_default')}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setResVisibility(res.key, undefined)}
+                          className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-colors ${!override
+                            ? 'bg-amber-500 text-white border-amber-500'
+                            : 'bg-stone-100 dark:bg-stone-700 text-stone-500 dark:text-stone-300 border-stone-200 dark:border-stone-600'}`}
+                        >
+                          <RotateCcw className="w-3 h-3 inline-block mr-1" />
+                          {t('equipment.follow_default')}
+                        </button>
+                        {EQUIPMENT_VISIBILITY_OPTIONS.map(v => {
+                          const active = override === v;
+                          return (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => setResVisibility(res.key, active ? undefined : v)}
+                              className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-colors ${active
+                                ? 'bg-amber-500 text-white border-amber-500'
+                                : 'bg-stone-50 dark:bg-stone-700 text-stone-600 dark:text-stone-300 border-stone-200 dark:border-stone-600 hover:bg-stone-100 dark:hover:bg-stone-600'}`}
+                            >
+                              {visibilityIcon(v)}
+                              {t(`equipment.visibility_opt.${v}`)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   );
                 })}
               </div>
