@@ -1,4 +1,4 @@
-import { EQUIPMENT_CATEGORIES, Equipment, PlayPreferences, DEDICATION_OPTIONS, Dedication, PlayMode, PLAY_MODE_OPTIONS, EquipmentVisibility, CategoryVisibility } from '@/entities/member/types';
+import { EQUIPMENT_CATEGORIES, Equipment, PlayPreferences, DEDICATION_OPTIONS, Dedication, PlayMode, PLAY_MODE_OPTIONS, EquipmentVisibility, CategoryVisibility, EQUIPMENT_RESOURCES, EquipmentResources } from '@/entities/member/types';
 
 export const getEmptyEquipment = (): Equipment => {
   const e: Equipment = {};
@@ -6,9 +6,45 @@ export const getEmptyEquipment = (): Equipment => {
   return e;
 };
 
+// 重要資源：全部初始化為 0，缺欄位 / 非數字一律視為 0
+export const getEmptyEquipmentResources = (): EquipmentResources => {
+  const resources = {} as EquipmentResources;
+  EQUIPMENT_RESOURCES.forEach(({ key }) => { resources[key] = 0; });
+  return resources;
+};
+
+export const normalizeEquipmentResources = (
+  raw?: Partial<Record<string, unknown>> | null,
+  fallbackRefiningTrace?: number | null,
+): EquipmentResources => {
+  const resources = getEmptyEquipmentResources();
+  if (raw && typeof raw === 'object') {
+    EQUIPMENT_RESOURCES.forEach(({ key }) => {
+      const value = Number(raw[key]);
+      resources[key] = Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
+    });
+  }
+  // 向後相容：舊資料只存在 members.refining_traces
+  const fallback = Number(fallbackRefiningTrace);
+  if (resources.refiningTrace === 0 && Number.isFinite(fallback) && fallback > 0) {
+    resources.refiningTrace = Math.floor(fallback);
+  }
+  return resources;
+};
+
+// 從 equipment.__resources 取出重要資源（沒有資料時回傳全 0）
+export const getEquipmentResources = (
+  equipment?: Equipment | null,
+  fallbackRefiningTrace?: number | null,
+): EquipmentResources =>
+  normalizeEquipmentResources((equipment as any)?.__resources, fallbackRefiningTrace);
+
 export const normalizeEquipment = (equipment?: Equipment): Equipment => {
   const e = getEmptyEquipment();
-  if (!equipment) return e;
+  if (!equipment) {
+    (e as any).__resources = getEmptyEquipmentResources();
+    return e;
+  }
   EQUIPMENT_CATEGORIES.forEach(c => {
     e[c.key] = {
       c23: Number(equipment[c.key]?.c23) || 0,
@@ -16,8 +52,11 @@ export const normalizeEquipment = (equipment?: Equipment): Equipment => {
       updatedAt: equipment[c.key]?.updatedAt,
     };
   });
+  // 保留重要資源，避免存檔時被 normalize 清掉
+  (e as any).__resources = normalizeEquipmentResources((equipment as any).__resources);
   return e;
 };
+
 
 export const emptyPlayPreferences = (): PlayPreferences => ({ modes: [] });
 

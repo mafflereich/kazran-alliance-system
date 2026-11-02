@@ -1,8 +1,8 @@
 import React from 'react';
-import { User, EyeOff, Lock, ArrowDownNarrowWide, ArrowDownWideNarrow, BellRing, AlertTriangle } from 'lucide-react';
+import { User, EyeOff, Lock, ArrowDownNarrowWide, ArrowDownWideNarrow, BellRing, AlertTriangle, Gem } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAppContext } from '@/store';
-import { EQUIPMENT_CATEGORIES, PLAY_MODE_OPTIONS } from '@/entities/member/types';
+import { EQUIPMENT_CATEGORIES, EQUIPMENT_RESOURCES, PLAY_MODE_OPTIONS } from '@/entities/member/types';
 import { normalizeEquipment, normalizePlayPreferences, normalizeEquipmentVisibility, canViewCategoryForUI, isManagerRole, isEquipmentOutdated, getEquipmentUpdatedAt } from '@/shared/lib/equipment';
 
 interface EquipmentTableProps {
@@ -146,6 +146,14 @@ export default function EquipmentTable({
                   )}
                 </div>
               </th>
+              {isManagerRole(userRole) && (
+                <th className="p-3 font-semibold text-center text-xs border-r border-b-2 border-stone-200 dark:border-stone-600 sticky top-0 bg-stone-50 dark:bg-stone-700 z-20">
+                  <span className="inline-flex items-center gap-1">
+                    <Gem className="w-3.5 h-3.5 text-amber-500" />
+                    {t('equipment.resources_short', '重要資源')}
+                  </span>
+                </th>
+              )}
               <th className="p-3 font-semibold text-center text-xs border-r border-b-2 border-stone-200 dark:border-stone-600 sticky top-0 bg-stone-50 dark:bg-stone-700 z-20">
                 {t('equipment.play_preference')}
               </th>
@@ -224,22 +232,48 @@ export default function EquipmentTable({
                         </span>
                       )}
                     </div>
-                    {(getEquipmentUpdatedAt(member) > 0 || (isManagerRole(userRole) && member.refiningTraces != null)) && (
+                    {getEquipmentUpdatedAt(member) > 0 && (
                       <div className="flex items-center gap-2 mt-0.5">
-                        {isManagerRole(userRole) && member.refiningTraces != null && member.refiningTraces > 0 && (
-                          <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400" title={t('equipment.refining_traces')}>
-                            ✦ {member.refiningTraces}
-                          </span>
-                        )}
-                        {getEquipmentUpdatedAt(member) > 0 && (
-                          <span className={`text-[10px] ${isOutdated ? 'text-red-500 dark:text-red-400 font-bold' : 'text-stone-400'}`}>
-                            {t('equipment.last_updated', '更新')}: {formatDate(getEquipmentUpdatedAt(member))}
-                          </span>
-                        )}
+                        <span className={`text-[10px] ${isOutdated ? 'text-red-500 dark:text-red-400 font-bold' : 'text-stone-400'}`}>
+                          {t('equipment.last_updated', '更新')}: {formatDate(getEquipmentUpdatedAt(member))}
+                        </span>
                       </div>
                     )}
                   </div>
                 </td>
+                {isManagerRole(userRole) && (
+                  <td className="p-2 text-center border-r border-stone-100 dark:border-stone-700 align-middle">
+                    <div className="flex flex-col gap-0.5 min-w-[148px]">
+                      {EQUIPMENT_RESOURCES.map(res => {
+                        const value = member.resources?.[res.key] ?? 0;
+                        return (
+                          <div
+                            key={res.key}
+                            className="flex items-center justify-between gap-2 px-1"
+                            title={t(`equipment.resources_opt.${res.key}`, res.key)}
+                          >
+                            <span className="flex items-center gap-1.5 min-w-0">
+                              <img
+                                src={res.icon}
+                                alt=""
+                                className="w-4 h-4 object-contain shrink-0"
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                                onError={(e) => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }}
+                              />
+                              <span className="text-[10px] text-stone-500 dark:text-stone-400 truncate">
+                                {t(`equipment.resources_opt.${res.key}`, res.key)}
+                              </span>
+                            </span>
+                            <span className={`text-[11px] font-bold tabular-nums ${value > 0 ? 'text-stone-700 dark:text-stone-200' : 'text-stone-300 dark:text-stone-600'}`}>
+                              {value > 0 ? value.toLocaleString() : '-'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </td>
+                )}
                 <td className="p-3 text-center border-r border-stone-100 dark:border-stone-700 align-top">
                   <div className="flex flex-col items-center gap-1.5">
                     {playPrefs.modes.length > 0 && (
@@ -315,7 +349,7 @@ export default function EquipmentTable({
             })}
             {visibleMembers.length === 0 && (
               <tr>
-                <td colSpan={EQUIPMENT_CATEGORIES.length + 3} className="p-8 text-center text-stone-500 dark:text-stone-400">
+                <td colSpan={EQUIPMENT_CATEGORIES.length + 3 + (isManagerRole(userRole) ? 1 : 0)} className="p-8 text-center text-stone-500 dark:text-stone-400">
                   {t('dashboard.no_members')}
                 </td>
               </tr>

@@ -1,5 +1,7 @@
 import { supabase } from './supabase';
 import { readQuery } from './http';
+import { normalizeEquipmentResources } from '@/shared/lib/equipment';
+import type { EquipmentResources } from '@/entities/member/types';
 
 /**
  * 敏感欄位（equipment / records / exclusive_weapons / refining_traces）
@@ -87,6 +89,7 @@ interface SecretableMember {
   records?: any;
   exclusiveWeapons?: any;
   refiningTraces?: number | null;
+  resources?: EquipmentResources;
 }
 
 /** 將 RPC 回傳的敏感資料合併進 member 物件（只覆寫有回傳列的成員）。 */
@@ -98,12 +101,19 @@ export function applySecretsToMembers<T extends SecretableMember>(
     if (!m?.id) return m;
     const secret = secrets[String(m.id)];
     if (!secret) return m;
+    // 重要資源存在 equipment.__resources（沿用裝備的可見度遮蔽）；
+    // 舊資料只有 refining_traces 欄位時，會 fallback 成煉製之痕數量。
+    const hasEquipment = secret.equipment != null;
+    const resources = hasEquipment
+      ? normalizeEquipmentResources(secret.equipment?.__resources, secret.refiningTraces)
+      : m.resources;
     return {
       ...m,
       equipment: secret.equipment ?? m.equipment,
       records: secret.records ?? m.records,
       exclusiveWeapons: secret.exclusiveWeapons ?? m.exclusiveWeapons,
       refiningTraces: secret.refiningTraces ?? m.refiningTraces,
+      resources,
     };
   });
 }

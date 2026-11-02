@@ -442,6 +442,23 @@
     },
     "refining_traces": "煉製之痕",
     "refining_traces_desc": "你的煉製之痕總數（僅管理者可見）。",
+    "resources": "重要資源",
+    "resources_short": "重要資源",
+    "resources_desc": "古代水晶、煉製水晶、女神的眼淚、煉製之痕、暴走火種（僅管理者可見）",
+    "resources_opt": {
+      "ancientCrystal": "古代水晶",
+      "refiningCrystal": "煉製水晶",
+      "goddessTears": "女神的眼淚",
+      "refiningTrace": "煉製之痕",
+      "burstFlame": "暴走火種"
+    },
+    "resources_desc_opt": {
+      "ancientCrystal": "製作 UR 裝備用",
+      "refiningCrystal": "裝備詞條煉製用",
+      "goddessTears": "服裝潛力解放用",
+      "refiningTrace": "煉製之痕商店兌換用",
+      "burstFlame": "爆發技能升級用"
+    },
     "category_visibility": "部位個別隱私設定",
     "category_visibility_desc": "每個部位與 C 值可獨立覆蓋全域隱私級別；未設定的欄位會沿用全域預設。",
     "category_visibility_hint": "點選「跟隨全域」可清除覆蓋；清除部位/23C/24C 的覆蓋即回到上一層級。",

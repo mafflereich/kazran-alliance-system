@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Database, Guild, Member, Costume, Role, User, Character, ArchivedMember, ArchiveHistory, Toast, ToastType, Setting, ApplyMail, AccessControl, Equipment, PlayPreferences, EquipmentVisibility, CostumeRecord, CategoryVisibility } from '@/entities/member/types';
+import { Database, Guild, Member, Costume, Role, User, Character, ArchivedMember, ArchiveHistory, Toast, ToastType, Setting, ApplyMail, AccessControl, Equipment, PlayPreferences, EquipmentVisibility, CostumeRecord, CategoryVisibility, EquipmentResources } from '@/entities/member/types';
 import { supabase, supabaseInsert, supabaseKey, supabaseUpdate, supabaseUpsert, toCamel, toSnake, fetchAllPaginated } from '@/shared/api/supabase';
 import { loadMemberSecrets, applySecretsToMembers } from '@/shared/api/memberSecrets';
 import { getLatestSeasonId } from '@/shared/api/latestSeason';
@@ -9,6 +9,7 @@ import { Logger } from '@/shared/utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 import { useTranslation } from 'react-i18next';
 import { formatDate } from '@/shared/lib/utils';
+import { getEmptyEquipment, getEquipmentResources } from '@/shared/lib/equipment';
 
 const defaultData: Database = {
   guilds: {},
@@ -66,7 +67,7 @@ interface AppContextType {
   unarchiveMember: (memberId: string, targetGuildId: string) => Promise<void>;
   updateMemberCostumeLevel: (memberId: string, costumeId: string, level: number) => Promise<void>;
   updateMemberExclusiveWeapon: (memberId: string, characterId: string, hasWeapon: boolean) => Promise<void>;
-  updateMemberProfile: (memberId: string, data: { equipment?: Equipment; playPreferences?: PlayPreferences; equipmentNote?: string; equipmentVisibility?: EquipmentVisibility; categoryVisibility?: CategoryVisibility; refiningTraces?: number }) => Promise<void>;
+  updateMemberProfile: (memberId: string, data: { equipment?: Equipment; playPreferences?: PlayPreferences; equipmentNote?: string; equipmentVisibility?: EquipmentVisibility; categoryVisibility?: CategoryVisibility; refiningTraces?: number; resources?: EquipmentResources }) => Promise<void>;
 
   // Guild functions
   addGuild: (name: string) => Promise<string | null>;
@@ -1414,17 +1415,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       equipmentVisibility?: EquipmentVisibility;
       categoryVisibility?: CategoryVisibility;
       refiningTraces?: number;
+      resources?: EquipmentResources;
     }
   ) => {
     const now = Date.now();
-    const payload: Record<string, any> = toSnake({ ...data, updatedAt: now });
+    const current = db.members[memberId];
 
-    // 依變更的欄位記下對應的更新日期
-    if (data.equipment !== undefined) {
+    // 重要資源與裝備共用同一個 jsonb（equipment.__resources），
+    // 這樣不需要額外資料表欄位，也能沿用 get_member_equipment 的隱私遮蔽。
+    const nextResources: EquipmentResources | undefined = data.resources
+      ?? (data.refiningTraces !== undefined
+        ? { ...getEquipmentResources(current?.equipment, current?.refiningTraces), refiningTrace: Math.max(0, Math.floor(Number(data.refiningTraces) || 0)) }
+        : undefined);
+
+    const equipmentWithResources = (nextResources
+      ? { ...(data.equipment ?? current?.equipment ?? getEmptyEquipment()), __resources: nextResources }
+      : data.equipment) as Equipment | undefined;
+
+    // resources 不是資料表欄位，寫入前要移除。
+    const { resources: _resources, ...dataForPayload } = data;
+    const payload: Record<string, any> = toSnake({ ...dataForPayload, updatedAt: now });
+    if (equipmentWithResources !== undefined) {
+      payload.equipment = equipmentWithResources;
+    }
+    if (nextResources) {
+      // 同步舊欄位，讓仍在讀 refining_traces 的程式（例如通知/統計）維持正常。
+      payload.refining_traces = nextResources.refiningTrace;
+      payload.equipment_updated_at = now;
+    } else if (data.equipment !== undefined) {
       payload.equipment_updated_at = now;
     }
-    // 服裝/專武更新日期由 updateMemberCostumeLevel/ExclusiveWeapon 負責；
-    // 這裡不覆蓋（保留較精確的每服裝時間）。
 
     // 注意：updateMemberProfile 會寫入敏感欄位（equipment / refining_traces），
     // 這些欄位刻意未授權給 anon/authenticated 做 SELECT（只能走
@@ -1443,10 +1463,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     Logger.info({ source: 'member_management', action: 'update_member_profile', message: '更新成員個人資料', details: { memberId, data } });
-    setDbState(prev => ({
-      ...prev,
-      members: { ...prev.members, [memberId]: { ...prev.members[memberId], ...data, updatedAt: now, equipmentUpdatedAt: data.equipment !== undefined ? now : prev.members[memberId]?.equipmentUpdatedAt } }
-    }));
+    setDbState(prev => {
+      const prevMember = prev.members[memberId];
+      return {
+        ...prev,
+        members: {
+          ...prev.members,
+          [memberId]: {
+            ...prevMember,
+            ...data,
+            resources: nextResources ?? prevMember?.resources,
+            refiningTraces: nextResources?.refiningTrace ?? prevMember?.refiningTraces,
+            equipment: equipmentWithResources ?? prevMember?.equipment,
+            updatedAt: now,
+            equipmentUpdatedAt: (equipmentWithResources !== undefined || nextResources) ? now : prevMember?.equipmentUpdatedAt
+          }
+        }
+      };
+    });
   };
 
   const addCharacter = async (name: string, order: number, nameE: string = '') => {

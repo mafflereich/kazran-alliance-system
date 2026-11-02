@@ -19,8 +19,9 @@ Supabase Dashboard → SQL Editor（散落在 `docs/sql/*.sql`），因此無法
 | `20261029096000_member_claim.sql` | **身分認領**：`profiles` 本人可新增（`id` 必須 NULL、`user_role` 只能 member）；`member_claim_requests`；`search_claimable_members` / `request_member_claim` / `my_pending_claim` / `approve_member_claim` / `reject_member_claim` |
 | `20261029097000_pending_claims_rpc.sql` | `list_pending_claims()`：待審清單一次回傳成員 / 公會 / 角色 / 申請者 Discord 資料 / 申請時間（管理者看全部、幹部只看自己公會） |
 | `20261029098000_multi_account_claim.sql` | **多重綁定**：移除「每人只能一筆待審」限制（上限 5 筆）；`my_claims()` / `my_bound_members()`；核准時支援「已綁在自己名下」不重複寫入 |
+| `20261102090000_seed_bd2db_catalog.sql` | **BD2DB 圖鑑補齊（僅 5 星）**：新增缺少的 3 位 5 星角色與 5 件服裝（可重複執行，不覆蓋既有資料） |
 
-十一支都可**重複執行**，且不刪改任何資料。
+十二支都可**重複執行**，且不刪改任何資料。
 
 ## 套用方式（擇一）
 

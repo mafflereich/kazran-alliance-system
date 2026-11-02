@@ -60,6 +60,39 @@ export interface EquipmentCategoryDef {
   icons?: { thumb: string; name: string }[];
 }
 
+// ------------------------------------------------------------
+// 重要資源（裝備表）
+//   - 圖片來源：BD2DB（image-bd2db）／BD2 Wiki
+//   - 儲存在 members.equipment.__resources（與裝備同一個 jsonb）
+//     → 不需要新增資料表欄位，且沿用 get_member_equipment 的隱私遮蔽
+// ------------------------------------------------------------
+export const EQUIPMENT_RESOURCES = [
+  {
+    key: 'ancientCrystal',
+    icon: 'https://image-bd2db.souseha.com/new_items/icon_resource603_76.webp',
+  },
+  {
+    key: 'refiningCrystal',
+    icon: 'https://image-bd2db.souseha.com/new_items/icon_resource126_26.webp',
+  },
+  {
+    key: 'goddessTears',
+    icon: 'https://image-bd2db.souseha.com/new_items/icon_resource20005_156.webp',
+  },
+  {
+    key: 'refiningTrace',
+    icon: 'https://static.wikitide.net/browndust2wiki/c/c1/Refinement_Remnant_icon.png',
+  },
+  {
+    key: 'burstFlame',
+    icon: 'https://static.wikitide.net/browndust2wiki/4/43/Spark_of_Rampage_icon.png',
+  },
+] as const;
+
+export type EquipmentResourceKey = typeof EQUIPMENT_RESOURCES[number]['key'];
+export type EquipmentResources = Record<EquipmentResourceKey, number>;
+
+
 const WEAPONS_THUMB = (id: string) => `https://image-bd2db.souseha.com/weapons_new/thumbs/${id}_thumb.webp`;
 
 const LEGACY_EQUIPMENT_GROUPS: LegacyEquipmentGroupDef[] = [
@@ -224,6 +257,7 @@ export interface Member {
   records: Record<string, CostumeRecord>;
   exclusiveWeapons?: Record<string, boolean>; // characterId: boolean
   equipment?: Equipment;
+  resources?: EquipmentResources; // 重要資源（古代水晶／煉製水晶／女神的眼淚／煉製之痕／暴走火種）
   playPreferences?: PlayPreferences;
   equipmentNote?: string;
   equipmentVisibility?: EquipmentVisibility;

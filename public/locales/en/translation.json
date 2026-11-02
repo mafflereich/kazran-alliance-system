@@ -442,6 +442,23 @@
     },
     "refining_traces": "Refining Traces",
     "refining_traces_desc": "Your total refining traces (visible to managers only).",
+    "resources": "Key Resources",
+    "resources_short": "Key Resources",
+    "resources_desc": "Ancient Crystal, Refining Crystal, Tear of Goddess, Refinement Remnant and Spark of Rampage (managers only)",
+    "resources_opt": {
+      "ancientCrystal": "Ancient Crystal",
+      "refiningCrystal": "Refining Crystal",
+      "goddessTears": "Tear of Goddess",
+      "refiningTrace": "Refinement Remnant",
+      "burstFlame": "Spark of Rampage"
+    },
+    "resources_desc_opt": {
+      "ancientCrystal": "Used to craft UR gear",
+      "refiningCrystal": "Used for gear option refinement",
+      "goddessTears": "Used for costume potential",
+      "refiningTrace": "Currency for the Refinement Remnant shop",
+      "burstFlame": "Used to upgrade costume burst skills"
+    },
     "category_visibility": "Per-Category Visibility",
     "category_visibility_desc": "Each equipment slot and C value can override the global visibility; unset fields inherit the global default.",
     "category_visibility_hint": "Click \"Follow Global\" to clear an override; clearing the slot/23C/24C override reverts to the layer above.",
