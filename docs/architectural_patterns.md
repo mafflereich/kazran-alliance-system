@@ -96,8 +96,9 @@ src/features/{feature}/
 - **翻譯檔**：`public/locales/{lang}/{namespace}.json`
 - **命名空間**：`translation`、`admin`、`arcade`、`mailbox`、`common`、`toolbox`、`raid`
 - **語言**：zh-TW（預設）、en
-- **強制導向**：所有 `zh-*` 變體導向 `zh-TW`（行 43-47）
+- **強制導向**：所有 `zh-*` 變體導向 `zh-TW`
 - **使用**：`const { t } = useTranslation()` → `t('key')`
+- **快取破除**：翻譯檔名固定，載入時一律帶 `?v=<版本>`（dev 每次載入換版本、build 用 `vite.config.ts` 注入的 build 版本），避免瀏覽器 / CDN 快取舊檔造成「新增的 key 顯示成原始 key」
 
 ---
 

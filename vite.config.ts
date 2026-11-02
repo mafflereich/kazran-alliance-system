@@ -6,8 +6,16 @@ import path from 'node:path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// 語系檔（public/locales/**）檔名固定，瀏覽器與 CDN 會快取舊版本，
+// 造成部署後「新增的 i18n key 仍顯示原始 key」。用 build 時間當版本參數，
+// 讓 i18next 每次都抓到最新翻譯檔。
+const LOCALE_VERSION = Date.now().toString();
+
 export default defineConfig({
   base: './',
+  define: {
+    __LOCALE_VERSION__: JSON.stringify(LOCALE_VERSION),
+  },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
