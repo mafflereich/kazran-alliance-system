@@ -24,6 +24,7 @@ Supabase Dashboard → SQL Editor（散落在 `docs/sql/*.sql`），因此無法
 | `20261102110000_equipment_guild_leader_always_visible.sql` | **裝備表隱私 v5（設計初衷）**：本公會正／副會長與 creator/admin 一律可看到完整裝備與全部重要資源；部位／資源覆蓋不能排除他們；`admin` 級別併入 `guild_manager`，可選級別只剩 `guild_manager` / `all_manager` |
 | `20261102130000_permission_catalog_v2_foundation.sql` | **權限 v2 Phase 1（零行為變更）**：新增 `permissions` / `role_grants` / `user_grants` / `permission_meta`；`my_roles()` / `has_permission()` / `my_permissions()` / `get_my_access()`；把 `access_control` 等價搬成 `role_grants`（parity 驗證 0 差異）；`set_page_roles()` 供舊「存取控制」UI 雙寫 |
 | `20261102120000_member_board_admin_only_and_rls_alignment.sql` | **Team Assign Board 僅 admin/creator + 前後端對齊**：`members` 寫入限制為 admin/creator 或本人；`archive_members_bulk()` 加 admin 檢查；`save_raid_records_bulk()` / `can_edit_raid_record()` 移除 manager；trigger 禁止非 admin 修改成員身分欄位；賽季／封存歷史／申請信箱 policy 對齊 |
+| `20261103120000_discord_member_snapshot.sql` | **Discord 名單 DB 快取**：新增 `discord_member_snapshot`（單列 `id=1`，jsonb payload + `fetched_at`），供 GSD_Bella 的 `GET /api/discordMembers` 在多實例／重啟後仍能沿用快取，避免重複打 Discord API 撞 rate limit；僅 `service_role` 可讀寫 |
 
 十五支都可**重複執行**，且不刪改任何資料。
 

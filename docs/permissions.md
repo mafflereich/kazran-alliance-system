@@ -113,7 +113,11 @@
   ①殘留綁定（`profiles.id` 指向已刪除成員）②綁到已封存成員 ③未綁定成員 ④從未登入（`auth_id` 為空）。
   同步流程是「**抓一次名單 → 本機比對 → 套用差異**」：
   1. 按「抓取 Discord 名單」呼叫貝拉（`GSD_Bella`）的 `GET /api/discordMembers`，
-     一次取回整個伺服器的成員與角色（bot 端快取 10 分鐘，前端只發 1 次請求）；
+     一次取回**有 profile 的成員**與其角色（伺服器 9000+ 人裡只回幾百筆，避免 2–3 MB 的巨型 JSON）；
+     bot 端有 **DB 快照（`discord_member_snapshot`，單列）＋記憶體** 兩層快取（TTL 10 分鐘），
+     強制刷新（`?refresh=1`）最短間隔 2 分鐘，超限會回快取並標 `throttled`；
+     Discord 掛掉時回舊快照並標 `stale`。體量與取捨見
+     [plans/2026-11-03-discord-member-snapshot.md](plans/2026-11-03-discord-member-snapshot.md)；
   2. 前端用 `discordMembersShared.ts` 把角色 id 換成 `manager` / `member`、
      把「`公會名稱-公會成員 (棕色2)`」身分組換成公會名稱，再與 `profiles` 比對；
   3. 只有在按下「套用差異」時才寫入 `profiles.user_role` / `user_guilds`（每批 10 筆並行），
@@ -121,13 +125,16 @@
      `trg_profiles_sync_members_delete` 自動清），成功後再清該帳號的 `user_grants`
      （此表沒有 FK，不主動清會留下永遠不會被套用的孤兒授權）。
      `creator` / `admin` 一律保留（即使已離開伺服器），避免把管理員鎖在門外；刪除前會列出名單並要求確認。
-  列表的篩選分兩層，可疊加：**關鍵字搜尋**（帳號、Discord 名稱、成員名稱、公會、auth/discord UUID）
-  ＋**欄位篩選**（角色／公會／Discord 狀態，使用 `src/shared/ui/FilterSelect.tsx`）
+  列表的篩選分三層，可疊加：**關鍵字搜尋**（帳號、Discord 名稱、成員名稱、公會、auth/discord UUID）
+  ＋**欄位篩選**（角色、Discord 狀態用 `FilterSelect`；**公會用可橫向捲動的 chips（帶筆數）**，
+  表格內公會名稱也可點擊直接篩選，因為公會有幾十個，下拉很難掃）
   ＋**健檢 chips**（需處理、待同步、殘留綁定、已封存、未綁定、從未登入）。
   「解除殘留綁定」只從 `profiles.id` 移除不存在的 id（DB trigger 會同步 `profile_members`）。
   **刻意不提供刪除 profile**：`user_grants` 綁的是 `auth_id`，誤刪會連授權與稽核一起失去意義。
 - **`GET /api/discordMembers`（GSD_Bella）**：唯讀端點，回傳
-  `{ guildId, fetchedAt, cached, memberCount, members: [{ id, username, displayName, roleIds, roleNames, … }] }`；
+  `{ guildId, fetchedAt, cached, stale, throttled, cacheTtlSeconds, cacheAgeSeconds, memberCount, serverMemberCount,
+  members: [{ id, username, displayName, roleIds, roleNames, … }] }`；
+  `memberCount` 是「有 profile 的成員數」、`serverMemberCount` 是伺服器人類成員總數（用來檢查過濾比例）。
   需要 admin / creator 的 Supabase access token。程式在 `GSD_Bella/routes/discordMembers.ts`
   （可用 `DISCORD_MEMBERS_REQUIRE_AUTH=false` 暫時關閉驗證）。
   這支取代了原本「每個帳號打一次 `sync-discord-roles`」的做法（300 個帳號 = 600 次 Discord API）。

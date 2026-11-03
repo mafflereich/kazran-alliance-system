@@ -31,6 +31,8 @@ interface HealthRow {
   danglingIds: string[];
   archivedMembers: MemberLite[];
   activeMembers: MemberLite[];
+  /** 這個帳號涉及的公會 id（成員所屬 ∪ profiles.user_guilds 對到的公會） */
+  guildIds: string[];
   guildNames: string[];
   issues: IssueKind[];
   key: string;
@@ -146,9 +148,20 @@ export default function AccountHealthTab() {
       const danglingIds = boundIds.filter(memberId => !members[memberId]);
       const archivedMembers = knownMembers.filter(member => member.status === 'archived');
       const activeMembers = knownMembers.filter(member => member.status !== 'archived' && !!member.guild_id);
-      const guildNames = Array.from(
-        new Set(activeMembers.map(member => db.guilds[member.guild_id!]?.name ?? member.guild_id!)),
-      );
+
+      // 公會來源有兩個：成員實際所屬 + profiles.user_guilds（Discord 身分組字串）。
+      // 兩邊都保留，才找得到「成員沒載入／已封存但 Discord 還在某公會」的帳號。
+      const memberGuildIds = activeMembers.map(member => member.guild_id!).filter(Boolean);
+      const userGuildNames = (profile.user_guilds ?? '')
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean);
+      const userGuildIds = userGuildNames
+        .map(name => Object.entries(db.guilds).find(([, guild]) => guild.name === name)?.[0])
+        .filter((id): id is string => !!id);
+
+      const guildIds = Array.from(new Set([...memberGuildIds, ...userGuildIds]));
+      const guildNames = guildIds.map(id => db.guilds[id]?.name ?? id);
 
       const issues: IssueKind[] = [];
       if (!profile.auth_id) issues.push('never_synced');
@@ -163,6 +176,7 @@ export default function AccountHealthTab() {
         danglingIds,
         archivedMembers,
         activeMembers,
+        guildIds,
         guildNames,
         issues,
         key: profile.auth_id || `discord:${profile.discord_id ?? profile.display_name ?? ''}`,
@@ -259,25 +273,34 @@ export default function AccountHealthTab() {
     [profiles, isZh],
   );
 
-  /** 公會選項（依 Tier / 排序） */
-  const guildOptions = useMemo(
-    () =>
-      Object.entries(db.guilds)
-        .sort((a, b) => {
-          const tierA = a[1].tier ?? 99;
-          const tierB = b[1].tier ?? 99;
-          if (tierA !== tierB) return tierA - tierB;
-          const orderA = a[1].orderNum ?? 99;
-          const orderB = b[1].orderNum ?? 99;
-          if (orderA !== orderB) return orderA - orderB;
-          return a[1].name.localeCompare(b[1].name);
-        })
-        .map(([id, guild]) => ({
-          value: id,
-          label: guild.tier ? `${guild.name}（T${guild.tier}）` : guild.name,
-        })),
-    [db.guilds],
-  );
+  /**
+   * 公會 chip 列：只列「目前清單裡真的有帳號」的公會並帶數量。
+   * 公會數量多時直式下拉很難掃，改成可橫向捲動的 chips（點表格內公會名稱也能篩選）。
+   */
+  const guildChips = useMemo(() => {
+    const counts = new Map<string, number>();
+    healthRows.forEach(row => {
+      row.guildIds.forEach(id => counts.set(id, (counts.get(id) ?? 0) + 1));
+    });
+
+    return Object.entries(db.guilds)
+      .filter(([id]) => (counts.get(id) ?? 0) > 0)
+      .sort((a, b) => {
+        const tierA = a[1].tier ?? 99;
+        const tierB = b[1].tier ?? 99;
+        if (tierA !== tierB) return tierA - tierB;
+        const orderA = a[1].orderNum ?? 99;
+        const orderB = b[1].orderNum ?? 99;
+        if (orderA !== orderB) return orderA - orderB;
+        return a[1].name.localeCompare(b[1].name);
+      })
+      .map(([id, guild]) => ({
+        id,
+        name: guild.name,
+        tier: guild.tier ?? null,
+        count: counts.get(id) ?? 0,
+      }));
+  }, [healthRows, db.guilds]);
 
   /** Discord 狀態選項 */
   const discordStatusOptions = useMemo(
@@ -294,7 +317,6 @@ export default function AccountHealthTab() {
   /** 關鍵字 + 欄位篩選（角色 / 公會 / Discord 狀態） */
   const searchedRows = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    const guildName = guildFilter ? (db.guilds[guildFilter]?.name ?? '') : '';
 
     return healthRows.filter(row => {
       const { profile } = row;
@@ -321,12 +343,7 @@ export default function AccountHealthTab() {
 
       if (roleFilter && (profile.user_role ?? '') !== roleFilter) return false;
 
-      if (guildName) {
-        const profileGuilds = (profile.user_guilds ?? '')
-          .split(',')
-          .map(value => value.trim());
-        if (!row.guildNames.includes(guildName) && !profileGuilds.includes(guildName)) return false;
-      }
+      if (guildFilter && !row.guildIds.includes(guildFilter)) return false;
 
       if (discordFilter) {
         const diff = diffByKey[row.key];
@@ -374,20 +391,35 @@ export default function AccountHealthTab() {
   }, [healthRows, pendingRows, updateRows, deleteRows, diffByKey]);
 
 
-  /** 抓一次 Discord 成員名單（1 次請求，bot 端 10 分鐘快取） */
-  const loadSnapshot = async () => {
+  /** 抓一次 Discord 成員名單（bot 端有 DB + 記憶體快取） */
+  const loadSnapshot = async (force = false) => {
     setFetchingSnapshot(true);
     setSnapshotError(null);
     try {
-      const data = await fetchDiscordMembers();
+      const data = await fetchDiscordMembers({ refresh: force });
       setSnapshot(data);
       setApplied({});
-      showToast(
-        isZh
-          ? `已取得 ${data.memberCount} 位 Discord 成員（${new Date(data.fetchedAt).toLocaleString()}）`
-          : `Fetched ${data.memberCount} Discord members`,
-        'success',
-      );
+
+      if (data.throttled) {
+        showToast(
+          isZh
+            ? `名單才剛更新（${data.cacheAgeSeconds ?? 0} 秒前），已沿用快取以避免觸發 Discord rate limit`
+            : `Snapshot is ${data.cacheAgeSeconds ?? 0}s old; reused cache to avoid Discord rate limits`,
+          'info',
+        );
+      } else if (data.stale) {
+        showToast(
+          isZh ? 'Discord 暫時無法更新，目前顯示上次的名單' : 'Discord is unavailable; showing the last snapshot',
+          'warning',
+        );
+      } else {
+        showToast(
+          isZh
+            ? `已取得 ${data.memberCount} 位有 profile 的成員（${new Date(data.fetchedAt).toLocaleString()}）`
+            : `Fetched ${data.memberCount} members with profiles`,
+          'success',
+        );
+      }
     } catch (error: any) {
       const message = error?.message || String(error);
       console.error('Failed to fetch Discord members:', error);
@@ -551,12 +583,25 @@ export default function AccountHealthTab() {
     </button>
   );
 
+  const guildChipClass = (active: boolean) =>
+    `shrink-0 whitespace-nowrap px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors ${
+      active
+        ? 'border-amber-500 bg-amber-50 text-amber-700 dark:border-amber-600 dark:bg-amber-900/30 dark:text-amber-200'
+        : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50 dark:border-stone-600 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700'
+    }`;
+
+  const cacheAgeText = (seconds?: number | null) => {
+    if (seconds === null || seconds === undefined) return '';
+    if (seconds < 120) return isZh ? ` ${Math.max(1, Math.round(seconds))} 秒前` : ` ${Math.max(1, Math.round(seconds))}s ago`;
+    return isZh ? ` ${Math.round(seconds / 60)} 分前` : ` ${Math.round(seconds / 60)}m ago`;
+  };
+
   return (
     <div className="space-y-4">
       <p className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
         {isZh
-          ? '流程：①按「抓取 Discord 名單」呼叫貝拉（GSD_Bella）的 /api/discordMembers，一次拿回整個伺服器的成員與角色（bot 端快取 10 分鐘）→ ②在本機比對角色與公會身分組 → ③按「套用差異」寫回有變動的 profiles，並刪除已離開伺服器的帳號（會先清掉該帳號的例外授權；creator / admin 一律保留）。殘留綁定＝profiles.id 指向已刪除成員；綁到已封存＝該成員 status 是 archived；從未登入＝profile 存在但 auth_id 為空。'
-          : 'Flow: (1) fetch the Discord member snapshot from Bella\u2019s /api/discordMembers (one request, 10-min cache on the bot) (2) diff roles/guilds locally (3) apply real differences and delete accounts that left the server (their overrides are removed first; creator/admin are always kept).'}
+          ? '流程：①按「抓取 Discord 名單」呼叫貝拉（GSD_Bella）的 /api/discordMembers：名單只包含系統裡有 profile 的人（伺服器其他幾千位成員不回傳），bot 端有 DB + 記憶體快取（10 分鐘），強制刷新最短間隔 2 分鐘 → ②在本機比對角色與公會身分組 → ③按「套用差異」寫回有變動的 profiles，並刪除已離開伺服器的帳號（會先清掉該帳號的例外授權；creator / admin 一律保留）。殘留綁定＝profiles.id 指向已刪除成員；綁到已封存＝該成員 status 是 archived；從未登入＝profile 存在但 auth_id 為空。'
+          : "Flow: (1) fetch the snapshot from Bella's /api/discordMembers — it only returns members that already have a profile (the rest of the server is not sent); cached in the bot DB + memory for 10 min, forced refresh at most every 2 min (2) diff roles/guilds locally (3) apply real differences and delete accounts that left the server (their overrides are removed first; creator/admin are always kept)."}
       </p>
 
       {counts.dangling > 0 && (
@@ -612,20 +657,6 @@ export default function AccountHealthTab() {
 
         <FilterSelect
           filter={{
-            id: 'guild',
-            label: isZh ? '全部公會' : 'All guilds',
-            shortLabel: isZh ? '公會' : 'Guild',
-            options: guildOptions,
-          }}
-          value={guildFilter}
-          isOpen={openFilterId === 'guild'}
-          onToggle={() => setOpenFilterId(current => (current === 'guild' ? null : 'guild'))}
-          onClose={closeFilter}
-          onChange={setGuildFilter}
-        />
-
-        <FilterSelect
-          filter={{
             id: 'discord',
             label: isZh ? '全部 Discord 狀態' : 'All Discord states',
             shortLabel: isZh ? 'Discord' : 'Discord',
@@ -650,6 +681,34 @@ export default function AccountHealthTab() {
         )}
       </div>
 
+      {guildChips.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="shrink-0 text-xs font-bold text-stone-500 dark:text-stone-400">
+            {isZh ? '公會' : 'Guild'}
+          </span>
+          <div className="flex-1 overflow-x-auto">
+            <div className="flex w-max items-center gap-1.5 pb-1">
+              <button type="button" onClick={() => setGuildFilter('')} className={guildChipClass(!guildFilter)}>
+                {isZh ? '全部公會' : 'All guilds'} {healthRows.length}
+              </button>
+              {guildChips.map(guild => (
+                <button
+                  key={guild.id}
+                  type="button"
+                  onClick={() => setGuildFilter(current => (current === guild.id ? '' : guild.id))}
+                  title={guild.name}
+                  className={guildChipClass(guildFilter === guild.id)}
+                >
+                  {guild.name}
+                  {guild.tier ? ` T${guild.tier}` : ''}
+                  <span className="ml-1 opacity-60">{guild.count}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         {chip('all', `${isZh ? '全部' : 'All'} ${counts.total}`, 'bg-stone-100 text-stone-600 dark:bg-stone-700 dark:text-stone-300')}
         {chip('issues', `${isZh ? '需處理' : 'Needs attention'} ${counts.issues}`, 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300')}
@@ -673,12 +732,17 @@ export default function AccountHealthTab() {
 
         <button
           type="button"
-          onClick={() => void loadSnapshot()}
+          onClick={() => void loadSnapshot(!!snapshot)}
           disabled={fetchingSnapshot || applying}
+          title={
+            isZh
+              ? '向貝拉取得名單；名單快取 10 分鐘，強制刷新最短間隔 2 分鐘'
+              : 'Fetch the snapshot from Bella; cached 10 min, forced refresh at most every 2 min'
+          }
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
         >
           {fetchingSnapshot ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-          {snapshot ? (isZh ? '重新抓取名單' : 'Refetch snapshot') : isZh ? '抓取 Discord 名單' : 'Fetch Discord snapshot'}
+          {snapshot ? (isZh ? '重新抓取名單' : 'Refresh snapshot') : isZh ? '抓取 Discord 名單' : 'Fetch Discord snapshot'}
         </button>
 
         <button
@@ -692,10 +756,24 @@ export default function AccountHealthTab() {
         </button>
 
         {snapshot && (
-          <span className="text-xs text-stone-500 dark:text-stone-400">
+          <span
+            className={`text-xs ${
+              snapshot.stale ? 'font-bold text-red-600 dark:text-red-400' : 'text-stone-500 dark:text-stone-400'
+            }`}
+          >
             {isZh
-              ? `名單：${snapshot.memberCount} 位 · ${new Date(snapshot.fetchedAt).toLocaleString()}${snapshot.cached ? '（bot 快取）' : ''}`
-              : `${snapshot.memberCount} members · ${new Date(snapshot.fetchedAt).toLocaleString()}${snapshot.cached ? ' (bot cache)' : ''}`}
+              ? `名單：${snapshot.memberCount} 位有 profile${
+                  snapshot.serverMemberCount ? `（伺服器 ${snapshot.serverMemberCount} 位）` : ''
+                } · ${new Date(snapshot.fetchedAt).toLocaleString()}${
+                  snapshot.cached
+                    ? `（快取${cacheAgeText(snapshot.cacheAgeSeconds)}）`
+                    : '（剛更新）'
+                }${snapshot.stale ? ' · Discord 更新失敗，顯示舊名單' : ''}`
+              : `Snapshot: ${snapshot.memberCount} with profiles${
+                  snapshot.serverMemberCount ? ` (server ${snapshot.serverMemberCount})` : ''
+                } · ${new Date(snapshot.fetchedAt).toLocaleString()}${
+                  snapshot.cached ? ` (cached ${cacheAgeText(snapshot.cacheAgeSeconds)})` : ' (fresh)'
+                }${snapshot.stale ? ' · Discord refresh failed, showing stale snapshot' : ''}`}
           </span>
         )}
 
@@ -771,8 +849,26 @@ export default function AccountHealthTab() {
                     )}
                   </td>
                   <td className="px-3 py-2 text-xs text-stone-600 dark:text-stone-300">
-                    {row.guildNames.length > 0 ? row.guildNames.join(isZh ? '、' : ', ') : '—'}
-                    {profile.user_guilds && !row.guildNames.length && (
+                    {row.guildIds.length > 0 ? (
+                      <div className="flex flex-wrap gap-x-1 gap-y-0.5">
+                        {row.guildIds.map(guildId => (
+                          <button
+                            key={guildId}
+                            type="button"
+                            onClick={() => setGuildFilter(current => (current === guildId ? '' : guildId))}
+                            title={isZh ? '點擊以此公會篩選' : 'Filter by this guild'}
+                            className={`underline decoration-dotted hover:text-amber-600 dark:hover:text-amber-400 ${
+                              guildFilter === guildId ? 'font-bold text-amber-600 dark:text-amber-400' : ''
+                            }`}
+                          >
+                            {db.guilds[guildId]?.name ?? guildId}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-stone-400 dark:text-stone-500">—</span>
+                    )}
+                    {profile.user_guilds && !row.guildIds.length && (
                       <div className="text-[11px] text-stone-400 dark:text-stone-500">
                         {isZh ? 'profiles.user_guilds：' : 'profiles.user_guilds: '}
                         {profile.user_guilds}

@@ -21,8 +21,20 @@ export interface DiscordMemberSnapshot {
   guildId: string;
   /** 名單取得時間（bot 端快取時間） */
   fetchedAt: string;
+  /** 這份名單是不是從快取來的（沒有重新打 Discord） */
   cached: boolean;
+  /** Discord 更新失敗，回傳的是舊快照 */
+  stale?: boolean;
+  /** 要求強制刷新但快取還太新，被節流 */
+  throttled?: boolean;
+  /** 快取年齡（秒） */
+  cacheAgeSeconds?: number | null;
+  /** 快取有效期（秒） */
+  cacheTtlSeconds?: number | null;
+  /** 過濾後（有 profile 的）成員數 */
   memberCount: number;
+  /** 伺服器上的人類成員總數（不含 bot） */
+  serverMemberCount?: number;
   members: DiscordMemberEntry[];
 }
 

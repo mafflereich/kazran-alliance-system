@@ -22,15 +22,21 @@ export type { DiscordMemberEntry, DiscordMemberSnapshot } from './discordMembers
  */
 export const BELLA_API_BASE = 'https://chaosop.duckdns.org';
 
-/** 一次抓回整個伺服器的成員名單 */
-export async function fetchDiscordMembers(): Promise<DiscordMemberSnapshot> {
+/**
+ * 一次抓回整個伺服器的成員名單（bot 端只回傳「有 profile 的人」，避免 9000+ 成員的巨型 JSON）。
+ *
+ * @param options.refresh 要求強制刷新；bot 端仍受最小間隔（預設 2 分鐘）節流
+ */
+export async function fetchDiscordMembers(options: { refresh?: boolean } = {}): Promise<DiscordMemberSnapshot> {
   if (!supabase) throw new Error('Supabase 未初始化');
 
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData.session?.access_token;
   if (!token) throw new Error('缺少登入憑證，請重新登入');
 
-  const response = await fetch(`${BELLA_API_BASE}/api/discordMembers`, {
+  const url = `${BELLA_API_BASE}/api/discordMembers${options.refresh ? '?refresh=1' : ''}`;
+
+  const response = await fetch(url, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -58,7 +64,13 @@ export async function fetchDiscordMembers(): Promise<DiscordMemberSnapshot> {
     guildId: String(payload.guildId ?? ''),
     fetchedAt: String(payload.fetchedAt ?? new Date().toISOString()),
     cached: !!payload.cached,
+    stale: !!payload.stale,
+    throttled: !!payload.throttled,
+    cacheAgeSeconds: typeof payload.cacheAgeSeconds === 'number' ? payload.cacheAgeSeconds : null,
+    cacheTtlSeconds: typeof payload.cacheTtlSeconds === 'number' ? payload.cacheTtlSeconds : null,
     memberCount: Number(payload.memberCount ?? payload.members.length),
+    serverMemberCount:
+      typeof payload.serverMemberCount === 'number' ? payload.serverMemberCount : undefined,
     members: payload.members,
   };
 }
