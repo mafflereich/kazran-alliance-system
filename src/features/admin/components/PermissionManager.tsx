@@ -31,12 +31,12 @@ export default function PermissionManager() {
     <div className="space-y-5">
       <div>
         <h3 className="text-lg font-bold text-stone-800 dark:text-stone-100">
-          {t('permissions.title', '權限（v2）')}
+          {t('permissions.title', '權限設定')}
         </h3>
         <p className="text-sm text-stone-500 dark:text-stone-400">
           {t(
             'permissions.subtitle',
-            '角色 × 權限是唯一真相；頁面與 API 都讀同一張 role_grants。admin 一律放行。',
+            '先用角色設定預設權限，再用例外授權單獨開放或關閉某個人的權限；頁面與 API 都讀同一套設定，admin 一律放行。',
           )}
         </p>
       </div>

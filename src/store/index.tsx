@@ -1032,7 +1032,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Legacy（Phase 2 前）：舊「存取控制」UI 已移除，這裡保留給回滾與 set_page_roles 雙寫；
-  // 新流程請用 role_grants（/admin → 權限（v2））。
+  // 新流程請用 role_grants（/admin → 權限設定）。
   const updateAccessControl = async (page: string, roles: AccessControl['roles']) => {
     const existing = db.accessControl[page];
     let error;

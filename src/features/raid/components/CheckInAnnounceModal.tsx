@@ -1,11 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Check, ClipboardCheck, Copy, Loader2, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, AtSign, Check, ClipboardCheck, Copy, Loader2, RefreshCw, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getCheckInMarks, type CheckInMark } from '@/shared/lib/noteUtils';
 import { supabase } from '@/shared/api/supabase';
+import { formatDate } from '@/shared/lib/utils';
+import {
+  buildCheckinTagCacheKey,
+  readCheckinTagCache,
+  writeCheckinTagCache,
+  type CheckinTagResolution,
+} from '../utils/checkinTagCache';
 
 /** 貝拉（Discord bot）API 伺服器 */
 const BELLA_API_BASE = 'https://chaosop.duckdns.org';
+/** 貝拉沒回傳 Retry-After 時採用的冷卻秒數（避免連續點擊再次觸發 429） */
+const DEFAULT_RATE_LIMIT_COOLDOWN_SEC = 60;
+/** 冷卻上限，避免異常 header 讓按鈕長時間鎖住 */
+const MAX_RATE_LIMIT_COOLDOWN_SEC = 600;
 
 export interface CheckInAnnounceMember {
   id: string;
@@ -37,14 +48,22 @@ const TARGET_REQUIRED_ROUNDS: Record<AnnounceTarget, CheckInMark[]> = {
   dead: [1, 2, 3],
 };
 
+type ResolveState =
+  | { status: 'idle' }
+  | { status: 'loading'; key: string }
+  | { status: 'error'; key: string; message: string; rateLimited: boolean }
+  | { status: 'done'; key: string; entry: CheckinTagResolution; fromCache: boolean };
+
 export default function CheckInAnnounceModal({ guildId, guildName, members, onClose }: CheckInAnnounceModalProps) {
   const { t } = useTranslation(['raid', 'translation']);
   const [target, setTarget] = useState<AnnounceTarget>('round2');
   const [copied, setCopied] = useState(false);
-  const [bellaMessage, setBellaMessage] = useState('');
-  const [bellaNotFound, setBellaNotFound] = useState<string[]>([]);
-  const [isResolving, setIsResolving] = useState(false);
-  const [resolveError, setResolveError] = useState('');
+  const [resolveState, setResolveState] = useState<ResolveState>({ status: 'idle' });
+  /** 429 後的冷卻截止時間（epoch ms），0 表示沒有冷卻 */
+  const [retryAt, setRetryAt] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  /** 寫入快取後遞增，讓 cachedResolution 重新讀取 localStorage */
+  const [cacheVersion, setCacheVersion] = useState(0);
   const requestSeqRef = useRef(0);
 
   const targets = useMemo(() => {
@@ -76,68 +95,128 @@ export default function CheckInAnnounceModal({ guildId, guildName, members, onCl
     return `${header}\n${targets.map(member => `@${member.name}`).join('\n')}`;
   }, [guildName, targetLabel, targets, t]);
 
-  // 向貝拉解析真正的 Discord <@id> 標記；失敗時退回 @名稱。
+  /**
+   * 快取 key：公會 + 名單回合 + 成員集合。
+   * 名單一變（換回合、有人補簽）就會得到新 key，不會誤用舊名單的解析結果。
+   */
+  const cacheKey = useMemo(
+    () => buildCheckinTagCacheKey({
+      guildId,
+      guildName,
+      target,
+      memberIds: targets.map(member => member.id),
+    }),
+    [guildId, guildName, target, targets],
+  );
+
+  // 只讀 localStorage，不會發出任何 request
+  const cachedResolution = useMemo(() => readCheckinTagCache(cacheKey), [cacheKey, cacheVersion]);
+
+  const activeResolution: { entry: CheckinTagResolution; fromCache: boolean } | null =
+    resolveState.status === 'done' && resolveState.key === cacheKey
+      ? { entry: resolveState.entry, fromCache: resolveState.fromCache }
+      : cachedResolution
+        ? { entry: cachedResolution, fromCache: true }
+        : null;
+
+  const isResolving = resolveState.status === 'loading' && resolveState.key === cacheKey;
+  const resolveError = resolveState.status === 'error' && resolveState.key === cacheKey ? resolveState : null;
+  const bellaNotFound = activeResolution?.entry.notFound ?? [];
+  const message = activeResolution?.entry.message ? activeResolution.entry.message : localMessage;
+
+  // 名單切換時取消還在飛的 request，避免結果寫到別的名單
   useEffect(() => {
-    if (targets.length === 0) {
-      requestSeqRef.current += 1;
-      setBellaMessage('');
-      setBellaNotFound([]);
-      setResolveError('');
-      setIsResolving(false);
-      return;
+    requestSeqRef.current += 1;
+  }, [cacheKey]);
+
+  // 429 冷卻倒數（每秒更新一次 now，讓按鈕文字跟著跳）
+  useEffect(() => {
+    if (retryAt <= now) return;
+    const timer = window.setTimeout(() => setNow(Date.now()), 1000);
+    return () => window.clearTimeout(timer);
+  }, [retryAt, now]);
+
+  const cooldownSeconds = Math.max(0, Math.ceil((retryAt - now) / 1000));
+
+  /**
+   * 手動觸發：只有按下「解析 Discord 標記／重新解析」才會打貝拉的 /api/checkinTags。
+   * 一般情況先看快取；force = true 才會真的重新查詢（並在使用者面前顯示結果）。
+   */
+  const handleResolve = useCallback(async (force: boolean) => {
+    if (targets.length === 0 || isResolving || Date.now() < retryAt) return;
+
+    if (!force) {
+      const cached = readCheckinTagCache(cacheKey);
+      if (cached) {
+        setResolveState({ status: 'done', key: cacheKey, entry: cached, fromCache: true });
+        return;
+      }
     }
 
     const seq = ++requestSeqRef.current;
+    setResolveState({ status: 'loading', key: cacheKey });
 
-    const resolveTags = async () => {
-      setIsResolving(true);
-      setResolveError('');
-      setBellaMessage('');
-      setBellaNotFound([]);
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+    try {
+      // 附上 Supabase 登入憑證，貝拉端會再次驗證呼叫者權限
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
 
-        const response = await fetch(`${BELLA_API_BASE}/api/checkinTags`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            guildId,
-            guildName,
-            title: targetLabel,
-            target,
-            members: targets.map(member => ({ id: member.id, name: member.name })),
-          }),
+      const response = await fetch(`${BELLA_API_BASE}/api/checkinTags`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          guildId,
+          guildName,
+          title: targetLabel,
+          target,
+          members: targets.map(member => ({ id: member.id, name: member.name })),
+        }),
+      });
+      const data: BellaCheckinTagsResponse = await response.json().catch(() => ({}));
+      if (seq !== requestSeqRef.current) return;
+
+      if (response.status === 429) {
+        const retryAfter = Number(response.headers.get('Retry-After'));
+        const cooldown = Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(Math.ceil(retryAfter), MAX_RATE_LIMIT_COOLDOWN_SEC)
+          : DEFAULT_RATE_LIMIT_COOLDOWN_SEC;
+        const blockedUntil = Date.now() + cooldown * 1000;
+        setNow(Date.now());
+        setRetryAt(blockedUntil);
+        setResolveState({
+          status: 'error',
+          key: cacheKey,
+          message: t(
+            'raid.checkin_bella_rate_limited',
+            '貝拉 API 暫時達到呼叫上限，請稍後再試；目前先顯示快取或 @名稱',
+          ),
+          rateLimited: true,
         });
-        const data: BellaCheckinTagsResponse = await response.json().catch(() => ({}));
-        if (seq !== requestSeqRef.current) return;
-
-        if (!response.ok) {
-          throw new Error(data?.error || `HTTP ${response.status}`);
-        }
-
-        setBellaMessage(typeof data.message === 'string' ? data.message : '');
-        setBellaNotFound(Array.isArray(data.notFound) ? data.notFound : []);
-      } catch (error: any) {
-        if (seq !== requestSeqRef.current) return;
-        console.error('Failed to resolve check-in Discord tags:', error);
-        setBellaMessage('');
-        setBellaNotFound([]);
-        setResolveError(error?.message || String(error));
-      } finally {
-        if (seq === requestSeqRef.current) setIsResolving(false);
+        return;
       }
-    };
 
-    void resolveTags();
+      if (!response.ok) {
+        throw new Error(data?.error || `HTTP ${response.status}`);
+      }
 
-    return () => {
-      requestSeqRef.current += 1;
-    };
-  }, [guildId, guildName, target, targetLabel, targets]);
-
-  const message = bellaMessage || localMessage;
+      const entry = writeCheckinTagCache(cacheKey, {
+        message: typeof data.message === 'string' ? data.message : '',
+        notFound: Array.isArray(data.notFound) ? data.notFound : [],
+      });
+      setCacheVersion(version => version + 1);
+      setResolveState({ status: 'done', key: cacheKey, entry, fromCache: false });
+    } catch (error: any) {
+      if (seq !== requestSeqRef.current) return;
+      console.error('Failed to resolve check-in Discord tags:', error);
+      setResolveState({
+        status: 'error',
+        key: cacheKey,
+        message: error?.message || String(error),
+        rateLimited: false,
+      });
+    }
+  }, [cacheKey, guildId, guildName, isResolving, retryAt, t, target, targetLabel, targets]);
 
   const handleCopy = async () => {
     try {
@@ -193,13 +272,41 @@ export default function CheckInAnnounceModal({ guildId, guildName, members, onCl
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-4">
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-stone-600 dark:text-stone-400">
               {t('raid.checkin_count', { count: targets.length, defaultValue: '{{count}} 位成員' })}
             </p>
-            <p className="text-xs text-stone-400 dark:text-stone-500">
-              {t('raid.checkin_announce_hint', '已標記為「死」的成員不會列入名單')}
-            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs text-stone-400 dark:text-stone-500">
+                {t('raid.checkin_announce_hint', '已標記為「死」的成員不會列入名單')}
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleResolve(Boolean(activeResolution))}
+                disabled={targets.length === 0 || isResolving || cooldownSeconds > 0}
+                title={t(
+                  'raid.checkin_bella_manual_hint',
+                  '只有按下這個按鈕才會向貝拉發出解析 request（避免 rate limit）',
+                )}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-indigo-700/50 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
+              >
+                {isResolving
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : activeResolution
+                    ? <RefreshCw className="h-3.5 w-3.5" />
+                    : <AtSign className="h-3.5 w-3.5" />}
+                {isResolving
+                  ? t('raid.checkin_bella_loading_short', '解析中…')
+                  : cooldownSeconds > 0
+                    ? t('raid.checkin_bella_cooldown', {
+                      seconds: cooldownSeconds,
+                      defaultValue: '請稍等 {{seconds}} 秒',
+                    })
+                    : activeResolution
+                      ? t('raid.checkin_bella_reresolve', '重新解析')
+                      : t('raid.checkin_bella_resolve', '解析 Discord 標記')}
+              </button>
+            </div>
           </div>
 
           <div className="mb-3 min-h-[18px] text-xs">
@@ -211,12 +318,17 @@ export default function CheckInAnnounceModal({ guildId, guildName, members, onCl
             ) : resolveError ? (
               <span
                 className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400"
-                title={resolveError}
+                title={resolveError.message}
               >
                 <AlertCircle className="h-3.5 w-3.5" />
-                {t('raid.checkin_bella_failed', '無法向貝拉解析標記，已改用 @名稱')}
+                {resolveError.rateLimited
+                  ? t(
+                    'raid.checkin_bella_rate_limited',
+                    '貝拉 API 暫時達到呼叫上限，請稍後再試；目前先顯示快取或 @名稱',
+                  )
+                  : t('raid.checkin_bella_failed', '無法向貝拉解析標記，已改用 @名稱')}
               </span>
-            ) : targets.length > 0 && bellaNotFound.length > 0 ? (
+            ) : bellaNotFound.length > 0 ? (
               <span className="inline-flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
                 <AlertCircle className="h-3.5 w-3.5" />
                 {t('raid.checkin_bella_not_found', {
@@ -224,10 +336,23 @@ export default function CheckInAnnounceModal({ guildId, guildName, members, onCl
                   defaultValue: '{{count}} 位成員尚未綁定 Discord，將以名稱代替',
                 })}
               </span>
-            ) : targets.length > 0 ? (
+            ) : activeResolution?.fromCache ? (
+              <span className="inline-flex items-center gap-1.5 text-stone-500 dark:text-stone-400">
+                <Check className="h-3.5 w-3.5" />
+                {t('raid.checkin_bella_cached', {
+                  time: formatDate(new Date(activeResolution.entry.resolvedAt).toISOString()),
+                  defaultValue: '已使用快取（{{time}}），不會再呼叫貝拉',
+                })}
+              </span>
+            ) : activeResolution ? (
               <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
                 <Check className="h-3.5 w-3.5" />
                 {t('raid.checkin_bella_resolved', '已由貝拉解析為真正的 Discord 標記')}
+              </span>
+            ) : targets.length > 0 ? (
+              <span className="inline-flex items-center gap-1.5 text-stone-500 dark:text-stone-400">
+                <AtSign className="h-3.5 w-3.5" />
+                {t('raid.checkin_bella_idle', '尚未解析；目前以 @名稱顯示，按上方按鈕才會向貝拉查詢')}
               </span>
             ) : null}
           </div>

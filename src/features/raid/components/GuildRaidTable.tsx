@@ -349,7 +349,9 @@ function GuildRaidTable({
                 <col style={{ width: '80px' }} />
                 <col style={{ width: '150px' }} />
                 {showOverkill && scoreThreshold != null && !forceHideOverkill && <col style={{ width: '92px' }} />}
-                <col style={{ width: '108px' }} />
+                {/* 簽到欄：4 顆 24px 按鈕 + 3 個 2px 間距 + 14px 骷髏頭保留位 + 左右各 8px padding = 132px，
+                    留一點餘裕避免瀏覽器四捨五入又壓縮按鈕 */}
+                <col style={{ width: '136px' }} />
                 <col />
                 <col />
               </colgroup>

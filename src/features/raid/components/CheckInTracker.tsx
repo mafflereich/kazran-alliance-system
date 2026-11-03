@@ -11,7 +11,7 @@ interface CheckInTrackerProps {
 }
 
 const ROUND_BUTTON_BASE =
-  'inline-flex h-6 w-6 items-center justify-center rounded border text-[11px] font-bold leading-none transition-colors';
+  'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded border text-[11px] font-bold leading-none transition-colors';
 const ROUND_BUTTON_INACTIVE =
   'border-stone-300 bg-stone-100 text-stone-400 dark:border-stone-600 dark:bg-stone-700 dark:text-stone-500';
 const ROUND_BUTTON_ACTIVE =
@@ -40,9 +40,12 @@ export default function CheckInTracker({ note, disabled = false, onChange }: Che
           : ROUND_BUTTON_ACTIVE;
         const hoverClass = disabled || !onChange
           ? ''
-          : isDeadMark
-            ? 'hover:border-red-400 hover:text-red-500'
-            : 'hover:border-emerald-400 hover:text-emerald-600';
+          : active
+            // 已選取的按鈕只提亮背景，不可改文字顏色（否則紅字壓紅底／綠字壓綠底會看不清楚）
+            ? 'hover:brightness-110'
+            : isDeadMark
+              ? 'hover:border-red-400 hover:text-red-500'
+              : 'hover:border-emerald-400 hover:text-emerald-600';
 
         return (
           <button
@@ -60,7 +63,11 @@ export default function CheckInTracker({ note, disabled = false, onChange }: Che
           </button>
         );
       })}
-      {isDead && <Skull className="ml-0.5 h-3 w-3 shrink-0 text-red-500" aria-hidden="true" />}
+      {/* 骷髏頭的位置永遠保留（固定 14px），按下 4 才顯示圖示；
+          否則圖示一出現就會把前面 4 顆按鈕擠扁（flex 預設會壓縮）。 */}
+      <span className="ml-0.5 inline-flex h-3 w-3 shrink-0 items-center justify-center" aria-hidden="true">
+        {isDead && <Skull className="h-3 w-3 text-red-500" />}
+      </span>
     </div>
   );
 }

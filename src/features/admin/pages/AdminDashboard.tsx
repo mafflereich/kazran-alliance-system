@@ -51,7 +51,7 @@ export default function AdminDashboard() {
               <span className="text-xs text-stone-400 dark:text-stone-500 shrink-0">{t('nav.group_system', '系統設定：')}</span>
               <div className="flex gap-1">
                 <TabButton active={activeTab === 'tools'} onClick={() => handleTabChange('tools')} icon={<Wand2 />} label={t('nav.tools')} />
-                <TabButton active={activeTab === 'permissions'} onClick={() => handleTabChange('permissions')} icon={<KeyRound />} label={t('nav.permissions', '權限（v2）')} />
+                <TabButton active={activeTab === 'permissions'} onClick={() => handleTabChange('permissions')} icon={<KeyRound />} label={t('nav.permissions', '權限設定')} />
                 <TabButton active={activeTab === 'system_logs'} onClick={() => handleTabChange('system_logs')} icon={<Activity />} label={t('nav.system_logs', '系統日誌')} />
                 <TabButton active={activeTab === 'settings'} onClick={() => handleTabChange('settings')} icon={<Settings />} label={t('nav.settings')} />
               </div>

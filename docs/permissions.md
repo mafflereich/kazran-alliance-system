@@ -97,11 +97,13 @@
 
 ## 5. 後台管理介面
 
-`/admin` → 系統設定 → **權限（v2）**（舊「存取控制」分頁已於 2026-11-02 移除）：
+`/admin` → 系統設定 → **權限設定**（舊「存取控制」分頁已於 2026-11-02 移除）：
 
 - **角色權限**：30 個權限 × member / manager / officer / admin 的矩陣，點擊即時寫入 `role_grants`；
   連續點擊會合併成一次 bulk upsert / delete（500ms 佇列），admin 欄固定鎖定。
-- **例外授權**：使用者 × 權限 × allow/deny × 公會 × 到期時間（`user_grants`）。
+- **例外授權**：使用者 × 權限 × allow/deny × 公會 × 到期時間 × 原因（`user_grants`）。
+  使用者、權限、公會都是**可搜尋／可篩選的 modal 選擇器**（上千成員、上百帳號也不會卡），
+  權限顯示中文名稱＋白話說明；公會用名稱挑選，不需要貼 guild id。
 - **預覽視角**：`preview_access(auth_id)`，顯示該使用者實際的 roles / 公會 / 權限。
 - **稽核**：`system_logs`（`source='permissions'`）最近 50 筆，含 before/after JSON。
 
@@ -156,4 +158,4 @@
 | D1 | `manager` 可以進 `/raid-manager`，但**只看自己公會**（成員綁定的 `my_guild_ids()`）且完全唯讀 | `get_my_access().memberGuildIds`；`GuildRaidManager` 用 `can('page.raid_manage.view')` 進入、`can('raid.score.write')` 編輯、`can('raid.checkin.write')` 簽到；`GuildRaidTable` 新增 `readOnly` |
 | D2 | **任何人都不能編輯他人裝備／服裝**（含 admin） | `equipment.write.managed` 已從權限目錄移除；`members_equipment_guard` 擋下非本人寫入；備份還原改走 `restore_members_snapshot()` |
 | 額外 | `guilds` / `costumes` 寫入收回 admin-only | policy 改用 `has_permission('admin.guild.manage')` / `admin.costume.manage` |
-| 後台 | `/admin → 權限（v2）`：矩陣、例外授權、預覽、稽核 | `PermissionManager` + `preview_access()` + `role_grants`/`user_grants` 稽核 trigger |
+| 後台 | `/admin → 權限設定`：矩陣、例外授權、預覽、稽核 | `PermissionManager` + `preview_access()` + `role_grants`/`user_grants` 稽核 trigger |

@@ -4,7 +4,7 @@ import { Check, Loader2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/shared/api/supabase';
 import { useAppContext } from '@/store';
 import { ACCESS_ROLES_V2, PERMISSIONS, type AccessRoleV2 } from '@/shared/lib/permissions';
-import { DOMAIN_LABELS, permissionLabel, type GrantMap } from './shared';
+import { DOMAIN_LABELS, permissionLabel, roleLabel, type GrantMap } from './shared';
 
 export default function PermissionMatrixTab() {
   const { t, i18n } = useTranslation(['admin', 'translation']);
@@ -166,7 +166,8 @@ export default function PermissionMatrixTab() {
                 <th className="text-left px-4 py-2 font-medium">{t('permissions.col_permission', '權限')}</th>
                 {ACCESS_ROLES_V2.map(role => (
                   <th key={role} className="px-3 py-2 font-medium w-24">
-                    {role}
+                    {roleLabel(role, isZh)}
+                    <span className="block text-[10px] font-mono font-normal opacity-70">{role}</span>
                     {role === 'officer' && (
                       <span className="block text-[10px] font-normal opacity-70">
                         {t('permissions.officer_scope', '僅自己公會')}
