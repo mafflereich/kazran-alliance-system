@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useAppContext } from '@/store';
-import { Shield, Sword, Wand2, Archive, Settings, Lock, Activity, Users } from 'lucide-react';
+import { Shield, Sword, Wand2, Archive, Settings, Activity, Users, KeyRound } from 'lucide-react';
 import { TabButton } from '../components/TabButton';
 import ArchivedMembersManager from '../components/ArchivedMembersManager';
-import AccessControlManager from '../components/AccessControlManager';
+import PermissionManager from '../components/PermissionManager';
 import GuildsManager from '../components/GuildsManager';
 import CostumesManager from '../components/CostumesManager';
 import ToolsManager from '../components/ToolsManager';
@@ -12,13 +12,15 @@ import ProfilesManager from '../components/ProfilesManager';
 import SystemLogsManager from '../components/SystemLogsManager';
 import { useTranslation } from 'react-i18next';
 import { logEvent } from '@/analytics';
+import { usePermissions } from '@/shared/lib/usePermissions';
 
 export default function AdminDashboard() {
   const { t } = useTranslation(['admin', 'translation']);
-  const { db, userRole } = useAppContext();
-  const [activeTab, setActiveTab] = useState<'guilds' | 'costumes' | 'tools' | 'archived' | 'settings' | 'access' | 'profiles' | 'system_logs'>('guilds');
+  const { db } = useAppContext();
+  const { isGlobalAdmin } = usePermissions();
+  const [activeTab, setActiveTab] = useState<'guilds' | 'costumes' | 'tools' | 'archived' | 'settings' | 'permissions' | 'profiles' | 'system_logs'>('guilds');
 
-  const handleTabChange = (tab: 'guilds' | 'costumes' | 'tools' | 'archived' | 'settings' | 'access' | 'profiles' | 'system_logs') => {
+  const handleTabChange = (tab: 'guilds' | 'costumes' | 'tools' | 'archived' | 'settings' | 'permissions' | 'profiles' | 'system_logs') => {
     logEvent('AdminDashboard', 'Switch Tab', tab);
     setActiveTab(tab);
   };
@@ -38,18 +40,18 @@ export default function AdminDashboard() {
             <div className="flex gap-1">
               <TabButton active={activeTab === 'guilds'} onClick={() => handleTabChange('guilds')} icon={<Shield />} label={t('nav.guild_management')} />
               <TabButton active={activeTab === 'costumes'} onClick={() => handleTabChange('costumes')} icon={<Sword />} label={t('nav.costume_database')} />
-              {userRole !== 'manager' && (
+              {isGlobalAdmin && (
                 <TabButton active={activeTab === 'profiles'} onClick={() => handleTabChange('profiles')} icon={<Users />} label={t('nav.identity_binding')} />
               )}
               <TabButton active={activeTab === 'archived'} onClick={() => handleTabChange('archived')} icon={<Archive />} label={t('nav.archived_members')} />
             </div>
           </div>
-          {userRole !== 'manager' && (
+          {isGlobalAdmin && (
             <div className="flex items-center gap-3 border-b border-stone-300 dark:border-stone-700 pb-1">
               <span className="text-xs text-stone-400 dark:text-stone-500 shrink-0">{t('nav.group_system', '系統設定：')}</span>
               <div className="flex gap-1">
                 <TabButton active={activeTab === 'tools'} onClick={() => handleTabChange('tools')} icon={<Wand2 />} label={t('nav.tools')} />
-                <TabButton active={activeTab === 'access'} onClick={() => handleTabChange('access')} icon={<Lock />} label={t('nav.access_control')} />
+                <TabButton active={activeTab === 'permissions'} onClick={() => handleTabChange('permissions')} icon={<KeyRound />} label={t('nav.permissions', '權限（v2）')} />
                 <TabButton active={activeTab === 'system_logs'} onClick={() => handleTabChange('system_logs')} icon={<Activity />} label={t('nav.system_logs', '系統日誌')} />
                 <TabButton active={activeTab === 'settings'} onClick={() => handleTabChange('settings')} icon={<Settings />} label={t('nav.settings')} />
               </div>
@@ -60,12 +62,12 @@ export default function AdminDashboard() {
         <div className="bg-white dark:bg-stone-800 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-700 p-6">
           {activeTab === 'guilds' && <GuildsManager />}
           {activeTab === 'costumes' && <CostumesManager />}
-          {activeTab === 'profiles' && userRole !== 'manager' && <ProfilesManager />}
+          {activeTab === 'profiles' && isGlobalAdmin && <ProfilesManager />}
           {activeTab === 'archived' && <ArchivedMembersManager />}
-          {activeTab === 'system_logs' && userRole !== 'manager' && <SystemLogsManager />}
-          {activeTab === 'tools' && userRole !== 'manager' && <ToolsManager />}
-          {activeTab === 'access' && userRole !== 'manager' && <AccessControlManager />}
-          {activeTab === 'settings' && userRole !== 'manager' && <SettingsManager />}
+          {activeTab === 'system_logs' && isGlobalAdmin && <SystemLogsManager />}
+          {activeTab === 'tools' && isGlobalAdmin && <ToolsManager />}
+          {activeTab === 'permissions' && isGlobalAdmin && <PermissionManager />}
+          {activeTab === 'settings' && isGlobalAdmin && <SettingsManager />}
         </div>
       </main>
     </div>

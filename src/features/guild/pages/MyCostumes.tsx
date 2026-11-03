@@ -3,7 +3,7 @@ import { useAppContext } from '@/store';
 import { useTranslation } from 'react-i18next';
 import { Swords, Shield, User, Search, FilterX, LayoutGrid, BookUser, RefreshCw, Loader2, Sparkles, X } from 'lucide-react';
 import { getImageUrl, getTierColor } from '@/shared/lib/utils';
-import { isManagerRole } from '@/shared/lib/equipment';
+import { canViewEquipmentForUI, isAdminRole, isManagerRole } from '@/shared/lib/equipment';
 import { getSortedCostumes, getSortedCharacters } from '../utils/sort';
 import CostumeMatrixTable from '../components/CostumeMatrixTable';
 
@@ -17,7 +17,7 @@ interface CostumeFilters {
 
 export default function MyCostumesPage() {
   const { t, i18n } = useTranslation();
-  const { db, userProfileId, updateMember, showToast, isRoleLoading, userRole, fetchMembers, loadMembersByIds, isMembersLoading } = useAppContext();
+  const { db, userProfileId, updateMember, showToast, isRoleLoading, userRole, fetchMembers, loadMembersByIds, isMembersLoading, managedGuildIds, canManageGuild } = useAppContext();
   const [saveState, setSaveState] = useState<Record<string, 'saving' | 'done'>>({});
   const [drafts, setDrafts] = useState<Record<string, { records: any; exclusiveWeapons: any }>>({});
   const [tagInput, setTagInput] = useState('');
@@ -29,8 +29,10 @@ export default function MyCostumesPage() {
   const [filters, setFilters] = useState<CostumeFilters>({});
   const [selectedGuildIds, setSelectedGuildIds] = useState<string[]>([]);
 
-  const isManager = isManagerRole(userRole);
-  const [view, setView] = useState<'matrix' | 'my'>(() => (isManagerRole(userRole) ? 'matrix' : 'my'));
+  // 全域管理者（manager / admin / creator）可看所有公會；公會正/副會長只看自己管理的公會
+  const isGlobalManager = isManagerRole(userRole);
+  const canUseMatrix = isGlobalManager || canManageGuild();
+  const [view, setView] = useState<'matrix' | 'my'>(() => (canUseMatrix ? 'matrix' : 'my'));
   const [loadingFailed, setLoadingFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -41,39 +43,46 @@ export default function MyCostumesPage() {
       .sort((a, b) => (a.tier ?? 99) - (b.tier ?? 99) || (a.orderNum ?? 99) - (b.orderNum ?? 99));
   }, [db.guilds]);
 
+  // 目前身分可切換的公會：全域管理者 = 全部；公會幹部 = 自己管理的公會
+  const visibleGuilds = useMemo(() => {
+    if (isGlobalManager) return allGuilds;
+    const allowed = new Set(managedGuildIds);
+    return allGuilds.filter(g => g.id && allowed.has(g.id));
+  }, [allGuilds, isGlobalManager, managedGuildIds]);
+
   // 依梯次分組（公會篩選表用）
   const guildsByTier = useMemo(() => {
     const map = new Map<number, typeof allGuilds>();
-    allGuilds.forEach(g => {
+    visibleGuilds.forEach(g => {
       const tier = g.tier ?? 99;
       if (!map.has(tier)) map.set(tier, []);
       map.get(tier)!.push(g);
     });
     return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
-  }, [allGuilds]);
+  }, [visibleGuilds]);
 
   useEffect(() => {
     if (isRoleLoading) return;
-    if (!isManager) {
+    if (!canUseMatrix) {
       setView('my');
       return;
     }
     setView('matrix');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isManager, isRoleLoading]);
+  }, [canUseMatrix, isRoleLoading]);
 
-  // 預設以第一公會作為進入點
+  // 預設以第一個「可切換」的公會作為進入點（幹部只會是自己的公會）
   useEffect(() => {
-    if (isRoleLoading || !isManager) return;
+    if (isRoleLoading || !canUseMatrix) return;
     if (selectedGuildIds.length > 0) return;
-    const firstId = allGuilds[0]?.id;
+    const firstId = visibleGuilds[0]?.id;
     if (firstId) setSelectedGuildIds([firstId]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isManager, isRoleLoading, allGuilds]);
+  }, [canUseMatrix, isRoleLoading, visibleGuilds]);
 
   // 為已選但尚未載入的公會抓取成員（點選公會時觸發）
   useEffect(() => {
-    if (!isManager || selectedGuildIds.length === 0) return;
+    if (!canUseMatrix || selectedGuildIds.length === 0) return;
     let failed = false;
     (async () => {
       for (const gid of selectedGuildIds) {
@@ -85,11 +94,11 @@ export default function MyCostumesPage() {
       setLoadingFailed(failed);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isManager, selectedGuildIds, reloadKey, db.members]);
+  }, [canUseMatrix, selectedGuildIds, reloadKey, db.members]);
 
   // 「重整成員」：強制重新載入目前選取的公會
   useEffect(() => {
-    if (!isManager || reloadKey === 0 || selectedGuildIds.length === 0) return;
+    if (!canUseMatrix || reloadKey === 0 || selectedGuildIds.length === 0) return;
     let failed = false;
     (async () => {
       for (const gid of selectedGuildIds) {
@@ -145,8 +154,16 @@ export default function MyCostumesPage() {
     }));
   };
 
+  // 目前身分可切換的公會 id（幹部不會因清除篩選就看到別的公會）
+  const visibleGuildIds = useMemo(
+    () => new Set(visibleGuilds.map(g => g.id).filter(Boolean) as string[]),
+    [visibleGuilds],
+  );
+
   const matrixMembers = useMemo(() => {
-    let list = Object.values(db.members).filter(m => m && m.status !== 'archived');
+    let list = Object.values(db.members).filter(
+      m => m && m.status !== 'archived' && visibleGuildIds.has(m.guildId),
+    );
     if (selectedGuildIds.length > 0) {
       list = list.filter(m => selectedGuildIds.includes(m.guildId));
     }
@@ -160,7 +177,23 @@ export default function MyCostumesPage() {
       if (ra !== rb) return ra - rb;
       return a.name.localeCompare(b.name);
     });
-  }, [db.members, db.guilds, selectedGuildIds]);
+  }, [db.members, db.guilds, selectedGuildIds, visibleGuildIds]);
+
+  // 矩陣中「目前身分無權查看」的成員：避免把遮蔽誤顯示成「沒有服裝」。
+  // 判斷邏輯與 DB 的 can_view_equipment() 一致（見 shared/lib/equipment.ts）。
+  const maskedMemberIds = useMemo(() => {
+    const masked = new Set<string>();
+    if (isAdminRole(userRole)) return masked;
+
+    const myIds = new Set(myMemberIds);
+    matrixMembers.forEach(member => {
+      if (myIds.has(member.id)) return;
+      if (!canViewEquipmentForUI(userRole, member, managedGuildIds, false)) {
+        masked.add(member.id);
+      }
+    });
+    return masked;
+  }, [matrixMembers, myMemberIds, userRole, managedGuildIds]);
 
   // 有效服裝集合：角色標籤展開為該角色所有服裝（∪），與服裝標籤取交集（∩）
   const effectiveCostumeIds = useMemo(() => {
@@ -256,7 +289,8 @@ export default function MyCostumesPage() {
 
   const resetFilters = () => {
     setFilters({});
-    setSelectedGuildIds([]);
+    // 矩陣預設回到第一個可切換的公會，避免清除篩選後一次抓全部公會
+    setSelectedGuildIds(visibleGuilds[0]?.id ? [visibleGuilds[0].id] : []);
     setSelectedCostumeIds([]);
     setSelectedCharacterIds([]);
     setTagInput('');
@@ -395,7 +429,7 @@ export default function MyCostumesPage() {
               <p className="text-stone-500 dark:text-stone-400 text-sm mt-1">{t('my_costumes.desc')}</p>
             </div>
             <div className="flex items-center gap-3">
-              {isManager && (
+              {canUseMatrix && (
                 <div className="flex bg-stone-100 dark:bg-stone-700 rounded-xl p-1">
                   <button
                     onClick={() => setView('matrix')}
@@ -519,14 +553,16 @@ export default function MyCostumesPage() {
             </div>
 
             {/* 公會篩選表（僅矩陣檢視）：依梯次/管理順序排列，可點按複選 */}
-            {view === 'matrix' && allGuilds.length > 0 && (
+            {view === 'matrix' && visibleGuilds.length > 0 && (
               <div className="bg-stone-50 dark:bg-stone-700/40 border border-stone-200 dark:border-stone-700 rounded-xl p-3">
                 <div className="flex items-center justify-between mb-2.5">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">
                     {t('my_costumes.filter_guild')}
                   </span>
                   <span className="text-[11px] text-stone-400 dark:text-stone-500">
-                    {t('my_costumes.selected_guilds', { count: selectedGuildIds.length })}
+                    {selectedGuildIds.length > 0
+                      ? t('my_costumes.selected_guilds', { count: selectedGuildIds.length })
+                      : t('my_costumes.all_guilds')}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -595,10 +631,20 @@ export default function MyCostumesPage() {
                   </button>
                 </div>
               )}
+              {maskedMemberIds.size > 0 && (
+                <div className="mt-3 bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700 rounded-xl px-4 py-2.5 flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
+                  <Shield className="w-4 h-4 shrink-0 text-amber-500" />
+                  {t('my_costumes.masked_summary', {
+                    count: maskedMemberIds.size,
+                    defaultValue: '{{count}} 位成員的服裝資料因權限不足已遮蔽',
+                  })}
+                </div>
+              )}
               <div className="mt-2">
                 <CostumeMatrixTable
                   members={matrixMembers}
                   costumes={matrixCostumes}
+                  maskedMemberIds={maskedMemberIds}
                 />
               </div>
             </>

@@ -9,7 +9,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "@/shared/ui/Tooltip";
-import { getPrevGuildName, getCustomNote } from '@/shared/lib/noteUtils';
+import { getPrevGuildName, getCustomNote, getCheckInMarks } from '@/shared/lib/noteUtils';
 import { MEMBER_CARD_EQUIPMENT_ITEMS } from '@/shared/lib/equipmentShowcase';
 
 type Props = {
@@ -72,6 +72,11 @@ function MemberCard({
     const isPasted = initialState && initialState.guildId === 'pasted';
 
     const isOverCapacity = index >= 30;
+
+    // 簽到記號：1~3 是簽到回合，4 = 死（永久失聯）
+    const checkInMarks = getCheckInMarks(member.note);
+    const isCheckInDead = checkInMarks.includes(4);
+    const checkInRoundMarks = checkInMarks.filter(mark => mark !== 4);
 
     const isHexColor = member.color?.startsWith('#');
     const baseBgClass = !isHexColor && member.color && COLOR_CLASSES[member.color]
@@ -184,6 +189,7 @@ function MemberCard({
           ${isSelected
                                 ? 'bg-indigo-800/70 border-indigo-500 ring-1 ring-indigo-400/50 shadow-md'
                                 : (!isHexColor && !isMoved && !isNew && !isPasted ? baseBgClass : '')}
+          ${isCheckInDead ? 'ring-2 ring-red-500/80 shadow-[0_0_12px_rgba(239,68,68,0.45)]' : ''}
         `}
                         onClick={(e) => {
                             if (member.isReserved) return;
@@ -266,10 +272,23 @@ function MemberCard({
                         )}
 
                         {/* 備註（名字下方） */}
-                        {(getPrevGuildName(member.note) || getCustomNote(member.note) || member.seasonNote || member.overkill != null) && (
+                        {(getPrevGuildName(member.note) || getCustomNote(member.note) || member.seasonNote || member.overkill != null || checkInMarks.length > 0) && (
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <div ref={noteRef} className="mt-1 text-xs text-gray-400 line-clamp-2 cursor-default select-none">
+                                        {checkInMarks.length > 0 && (
+                                            <span
+                                                className={`mr-1 font-bold ${isCheckInDead ? 'text-red-400' : 'text-emerald-400'}`}
+                                                title={t('member_board.checkin_marks', {
+                                                    marks: checkInMarks.join(' / '),
+                                                    defaultValue: '簽到記號：{{marks}}',
+                                                })}
+                                            >
+                                                {isCheckInDead
+                                                    ? `☠ ${t('member_board.checkin_dead_short', '死')}`
+                                                    : checkInRoundMarks.map(mark => `✓${mark}`).join(' ')}
+                                            </span>
+                                        )}
                                         {member.overkill != null && <span className="text-violet-400 mr-1">[{member.overkill.toLocaleString()}E]</span>}
                                         {member.seasonNote && <span className="text-blue-400 mr-1">[{member.seasonNote}]</span>}
                                         {getPrevGuildName(member.note) && <span className="text-amber-400 mr-1">↑{getPrevGuildName(member.note)}</span>}

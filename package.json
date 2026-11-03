@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
+    "check:permissions": "tsx scripts/check-permission-catalog.ts",
+    "audit:permissions": "node scripts/audit-permission-claims.mjs",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
     "test:e2e": "playwright test",
@@ -20,6 +22,9 @@
     "db:push": "supabase db push",
     "db:types": "supabase gen types typescript --linked > src/entities/database.types.ts",
     "db:apply": "node scripts/apply-sql.mjs",
+    "db:catalog": "tsx scripts/gen-permission-catalog.ts",
+    "db:catalog:write": "tsx scripts/gen-permission-catalog.ts --write",
+    "db:catalog:check": "tsx scripts/gen-permission-catalog.ts --check",
     "db:backup": "bash scripts/backup-db.sh"
   },
   "dependencies": {

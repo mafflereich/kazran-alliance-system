@@ -3,6 +3,7 @@ import { supabase } from '@/shared/api/supabase';
 import { writeQuery } from '@/shared/api/http';
 import { useAppContext } from '@/store';
 import { Logger } from '@/shared/utils/logger';
+import { setCheckInMarks } from '@/shared/lib/noteUtils';
 import type { MemberRaidRecord, GuildRaidRecord } from '../types';
 
 /** 同一次編輯動作的合併寫入窗口（毫秒） */
@@ -74,6 +75,78 @@ export function useRaidRecordEditor({
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** 自動儲存連續失敗次數（成功後歸零） */
   const retryCountRef = useRef(0);
+
+  /**
+   * 簽到記號直接寫入 member_notes.note。
+   * 若該成員已有未送出的草稿，必須同步草稿中的 note，
+   * 否則稍後的自動儲存會用舊 note 把簽到記號蓋掉。
+   */
+  const syncDraftNotes = useCallback((entries: { id: string; note: string }[]) => {
+    if (entries.length === 0) return;
+    const noteById = new Map(entries.map(entry => [entry.id, entry.note]));
+    let changed = false;
+    const nextDrafts = { ...draftRecordsRef.current };
+
+    noteById.forEach((note, id) => {
+      const draft = nextDrafts[id];
+      if (draft && draft.note !== note) {
+        nextDrafts[id] = { ...draft, note };
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      draftRecordsRef.current = nextDrafts;
+      setDraftRecords(nextDrafts);
+    }
+  }, []);
+
+  /**
+   * 簽到 RPC 會直接讀寫 member_notes；若畫面上還有未送出的成員備註草稿，
+   * 必須先落地，否則 RPC 回傳的 note 會蓋掉使用者剛打的文字。
+   * 回傳 false = 寫入失敗，呼叫端應中止簽到操作。
+   */
+  const persistDraftNotes = useCallback(async (memberIds?: string[]): Promise<boolean> => {
+    const ids = memberIds ?? Object.keys(draftRecordsRef.current);
+    const pending = ids
+      .map(id => {
+        const draft = draftRecordsRef.current[id];
+        if (!draft) return null;
+        const draftNote = draft.note ?? '';
+        const dbNote = dbMembersRef.current[id]?.note ?? '';
+        if (draftNote === dbNote) return null;
+        return { id, note: draftNote };
+      })
+      .filter((entry): entry is { id: string; note: string } => entry !== null);
+
+    if (pending.length === 0) return true;
+
+    const { error } = await supabase
+      .from('member_notes')
+      .upsert(
+        pending.map(({ id, note }) => ({ member_id: id, note })),
+        { onConflict: 'member_id' },
+      );
+
+    if (error) {
+      console.error('Persist pending member notes before check-in failed:', error);
+      setError(error.message);
+      return false;
+    }
+
+    const now = Date.now();
+    setDb(prev => {
+      const members = { ...prev.members };
+      pending.forEach(({ id, note }) => {
+        if (members[id]) {
+          members[id] = { ...members[id], note, updatedAt: now };
+        }
+      });
+      return { ...prev, members };
+    });
+
+    return true;
+  }, [setDb]);
 
   // Clear drafts when switching season or comparison mode
   useEffect(() => {
@@ -500,6 +573,137 @@ export function useRaidRecordEditor({
     }
   }, [selectedSeasonId]);
 
+  /** 切換單一成員的簽到記號（DB RPC 檢查 raid.checkin.write）。 */
+  const handleCheckInChange = useCallback(async (memberId: string, marks: number[]) => {
+    const previous = dbMembersRef.current[memberId];
+    const previousDraftNote = draftRecordsRef.current[memberId]?.note;
+    const baseNote = previousDraftNote ?? previous?.note ?? '';
+
+    setSaving(true);
+    try {
+      // RPC 讀的是 DB 的 note；先送出目前草稿，避免蓋掉未儲存的備註文字。
+      const persisted = await persistDraftNotes([memberId]);
+      if (!persisted) return;
+
+      const optimisticNote = setCheckInMarks(baseNote, marks);
+      syncDraftNotes([{ id: memberId, note: optimisticNote }]);
+
+      // 先樂觀更新畫面，點擊後立即亮起；RPC 失敗時還原。
+      setDb(prev => {
+        const member = prev.members[memberId];
+        if (!member) return prev;
+        return {
+          ...prev,
+          members: {
+            ...prev.members,
+            [memberId]: { ...member, note: optimisticNote, updatedAt: Date.now() },
+          },
+        };
+      });
+
+      const { data, error: rpcError } = await supabase.rpc('set_member_checkin_marks', {
+        p_member_id: memberId,
+        p_marks: marks,
+      });
+      if (rpcError) throw rpcError;
+
+      const savedNote = typeof data === 'string' ? data : optimisticNote;
+      syncDraftNotes([{ id: memberId, note: savedNote }]);
+      setDb(prev => {
+        const member = prev.members[memberId];
+        if (!member) return prev;
+        return {
+          ...prev,
+          members: {
+            ...prev.members,
+            [memberId]: { ...member, note: savedNote, updatedAt: Date.now() },
+          },
+        };
+      });
+
+      setError('');
+      Logger.info({
+        source: 'raid_manager',
+        action: 'update_checkin_marks',
+        message: '更新成員簽到記號',
+        details: { seasonId: selectedSeasonId, memberId, marks },
+      });
+    } catch (err: any) {
+      if (previous) {
+        setDb(prev => ({
+          ...prev,
+          members: {
+            ...prev.members,
+            [memberId]: {
+              ...prev.members[memberId],
+              note: baseNote,
+              updatedAt: previous.updatedAt,
+            },
+          },
+        }));
+      }
+      if (previousDraftNote !== undefined) {
+        syncDraftNotes([{ id: memberId, note: previousDraftNote }]);
+      }
+      console.error('Update check-in marks failed:', err);
+      setError(err?.message || '更新簽到記號失敗，請重試');
+    } finally {
+      setSaving(false);
+    }
+  }, [persistDraftNotes, selectedSeasonId, setDb, syncDraftNotes]);
+
+  /** 重置指定公會的簽到記號（DB RPC 檢查 raid.checkin.write）。 */
+  const handleResetCheckIns = useCallback(async (guildId: string, keepDead: boolean, memberIds: string[]) => {
+    setSaving(true);
+    try {
+      // 先落地未送出的備註草稿；RPC 會依 DB 的 note 重建內容。
+      const persisted = await persistDraftNotes(memberIds);
+      if (!persisted) return;
+
+      const { data, error: rpcError } = await supabase.rpc('reset_guild_checkin_marks', {
+        p_guild_id: guildId,
+        p_keep_dead: keepDead,
+      });
+      if (rpcError) throw rpcError;
+
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      const rows = Array.isArray(parsed) ? parsed : [];
+      const entries = rows
+        .map((row: any) => ({
+          id: String(row?.member_id ?? row?.memberId ?? ''),
+          note: String(row?.note ?? ''),
+        }))
+        .filter(entry => entry.id);
+
+      if (entries.length > 0) {
+        syncDraftNotes(entries);
+        const now = Date.now();
+        setDb(prev => {
+          const members = { ...prev.members };
+          entries.forEach(({ id, note }) => {
+            if (members[id]) {
+              members[id] = { ...members[id], note, updatedAt: now };
+            }
+          });
+          return { ...prev, members };
+        });
+      }
+
+      setError('');
+      Logger.info({
+        source: 'raid_manager',
+        action: 'reset_checkin_marks',
+        message: '重置公會簽到記號',
+        details: { seasonId: selectedSeasonId, guildId, keepDead, count: entries.length },
+      });
+    } catch (err: any) {
+      console.error('Reset check-in marks failed:', err);
+      setError(err?.message || '重置簽到記號失敗，請重試');
+    } finally {
+      setSaving(false);
+    }
+  }, [persistDraftNotes, selectedSeasonId, setDb, syncDraftNotes]);
+
   return {
     draftRecords,
     saving,
@@ -508,6 +712,8 @@ export function useRaidRecordEditor({
     handleAutoSave,
     handleBulkScoreFill,
     handleClearAllPrevGuildTags,
+    handleCheckInChange,
+    handleResetCheckIns,
     updateGuildMedian,
     handleGuildNoteChange,
   };

@@ -495,11 +495,13 @@
     "equipment_loading": "{{name}} 24C：讀取中",
     "equipment_loading_short": "24C 裝備讀取中",
     "equipment_load_failed": "24C 裝備數量讀取失敗",
-    "equipment_retry": "裝備讀取失敗，重試"
+    "equipment_retry": "裝備讀取失敗，重試",
+    "checkin_dead_short": "死",
+    "checkin_marks": "簽到記號：{{marks}}"
   },
   "my_costumes": {
     "title": "服裝表",
-    "desc": "填寫你的輸出服裝練度與 UR 專用武器；管理者可檢視全部成員的服裝狀態。",
+    "desc": "填寫你的輸出服裝練度與 UR 專用武器；管理者與公會正/副會長可切換服裝表矩陣。",
     "search_placeholder": "輸入角色或服裝名稱，選取作為標籤...",
     "no_matching_costume": "找不到相符的服裝。",
     "remove_tag": "移除標籤",
@@ -528,6 +530,8 @@
     "retry": "重新載入",
     "filter_guild": "公會篩選",
     "selected_guilds": "已選 {{count}} 個公會",
+    "masked_summary": "{{count}} 位成員的服裝資料因權限不足已遮蔽",
+    "masked_hint": "無權限查看此成員的服裝",
     "fill_all_5": "全部 +5",
     "fill_all_5_title": "將所有服裝練度設為 +5",
     "grant_all_weapons": "全部 UR 專",

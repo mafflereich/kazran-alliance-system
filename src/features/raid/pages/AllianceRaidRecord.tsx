@@ -4,6 +4,7 @@ import { Trophy, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toPng } from 'html-to-image';
 import { useAppContext } from '@/store';
+import { isManagerOrAboveRole } from '@/shared/lib/access';
 
 import AllianceRaidDownloadModal, { DownloadConfig } from '../components/AllianceRaidDownloadModal';
 import AllianceRaidDisplayOptionsModal from '../components/AllianceRaidDisplayOptionsModal';
@@ -16,7 +17,7 @@ import { useDragScroll } from '../hooks/useDragScroll';
 export default function AllianceRaidRecord() {
   const { t } = useTranslation(['raid', 'translation']);
   const navigate = useNavigate();
-  const { db, canManageGuild } = useAppContext();
+  const { db, canManageGuild, userRole, managedGuildIds } = useAppContext();
 
   const {
     seasons, loading, error,
@@ -41,16 +42,22 @@ export default function AllianceRaidRecord() {
   // 公會管理權限改按「正/副會長」判斷（creator/admin 亦為全域管理）
   const canManage = canManageGuild();
 
-  const sortedGuilds = useMemo(() =>
-    Object.values(db.guilds)
+  // 可見公會：manager 以上看全部（唯讀）；公會幹部只看自己管理的公會
+  const canSeeAllGuilds = isManagerOrAboveRole(userRole);
+
+  const sortedGuilds = useMemo(() => {
+    const all = Object.values(db.guilds)
       .filter(g => g.isDisplay !== false)
       .sort((a, b) => {
         const tierA = a.tier || 99, tierB = b.tier || 99;
         if (tierA !== tierB) return tierA - tierB;
         return (a.orderNum || 99) - (b.orderNum || 99);
-      }),
-    [db.guilds]
-  );
+      });
+
+    if (canSeeAllGuilds) return all;
+    const allowed = new Set(managedGuildIds);
+    return all.filter(g => g.id && allowed.has(g.id));
+  }, [db.guilds, canSeeAllGuilds, managedGuildIds]);
 
   const displayedGuilds = useMemo(() => {
     if (visibleGuildIds === null) return sortedGuilds;

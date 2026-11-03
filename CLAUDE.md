@@ -67,7 +67,9 @@ src/
 
 - `src/store/index.tsx` — 全域狀態（AppContext），包含所有 CRUD 操作
 - `src/shared/api/supabase.ts` — Supabase client、camelCase ↔ snake_case 轉換輔助
-- `src/shared/lib/access.ts` — RBAC 權限定義
+- `src/shared/lib/access.ts` — RBAC 權限目錄（頁面、預設角色、公會頁規則）
+- `src/shared/lib/usePermissions.ts` — 元件統一的權限入口
+- `docs/permissions.md` — 完整權限矩陣與管理方式
 - `src/app/routes.tsx` — 路由設定（lazy loading + ProtectedRoute）
 - `src/shared/i18n/index.ts` — i18next 設定
 - `public/locales/` — 翻譯檔（zh-TW、en）

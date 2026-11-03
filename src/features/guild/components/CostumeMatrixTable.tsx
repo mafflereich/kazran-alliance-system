@@ -1,5 +1,5 @@
 import React from 'react';
-import { Swords } from 'lucide-react';
+import { EyeOff, Lock, Swords } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAppContext } from '@/store';
 import { getImageUrl } from '@/shared/lib/utils';
@@ -7,6 +7,8 @@ import { getImageUrl } from '@/shared/lib/utils';
 interface CostumeMatrixTableProps {
   members: any[];
   costumes: any[];
+  /** 目前身分無權查看服裝資料的成員（顯示鎖頭，而不是假裝沒有服裝） */
+  maskedMemberIds?: Set<string>;
 }
 
 const roleOrder: Record<string, number> = { leader: 1, coleader: 2, member: 3 };
@@ -20,7 +22,7 @@ const levelColorClass = (level: number): string => {
   return 'bg-orange-400 text-stone-900';
 };
 
-export default function CostumeMatrixTable({ members, costumes }: CostumeMatrixTableProps) {
+export default function CostumeMatrixTable({ members, costumes, maskedMemberIds }: CostumeMatrixTableProps) {
   const { t, i18n } = useTranslation();
   const { db } = useAppContext();
   const [isDragging, setIsDragging] = React.useState(false);
@@ -97,41 +99,55 @@ export default function CostumeMatrixTable({ members, costumes }: CostumeMatrixT
             </tr>
           </thead>
           <tbody>
-            {sortedMembers.map(member => (
-              <tr key={member.id} className="border-b border-stone-100 dark:border-stone-700">
-                <td className="p-2.5 font-medium text-stone-800 dark:text-stone-200 sticky left-0 z-10 bg-white dark:bg-stone-800 border-r border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c] whitespace-nowrap">
-                  <span className={member.role === 'leader'
-                    ? 'px-1.5 py-0.5 rounded bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                    : member.role === 'coleader'
-                      ? 'px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
-                      : ''}>
-                    {member.name}
-                  </span>
-                </td>
-                {costumes.map(c => {
-                  const record = member.records?.[c.id];
-                  const hasCostume = record && record.level >= 0;
-                  const hasExclusiveWeapon = member.exclusiveWeapons?.[c.characterId] ?? false;
-                  return (
-                    <td key={c.id} className={`p-0 text-center border-r border-stone-100 dark:border-stone-700 last:border-r-0 h-full ${hasCostume ? levelColorClass(Number(record.level)) : ''}`}>
-                      <div className="flex flex-col items-center justify-center h-full min-h-[44px] py-1 gap-0.5">
-                        {hasCostume ? (
-                          <>
-                            <span className="font-bold text-sm leading-none">+{record.level}</span>
-                            {hasExclusiveWeapon && <Swords className="w-3.5 h-3.5 text-stone-700" />}
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-sm text-stone-300 dark:text-stone-600 leading-none">-</span>
-                            {hasExclusiveWeapon && <Swords className="w-3.5 h-3.5 text-amber-500/60" />}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+            {sortedMembers.map(member => {
+              const isMasked = maskedMemberIds?.has(member.id) ?? false;
+              return (
+                <tr key={member.id} className="border-b border-stone-100 dark:border-stone-700">
+                  <td className="p-2.5 font-medium text-stone-800 dark:text-stone-200 sticky left-0 z-10 bg-white dark:bg-stone-800 border-r border-stone-200 dark:border-stone-600 shadow-[1px_0_0_0_#e7e5e4] dark:shadow-[1px_0_0_0_#44403c] whitespace-nowrap">
+                    <span className={member.role === 'leader'
+                      ? 'px-1.5 py-0.5 rounded bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                      : member.role === 'coleader'
+                        ? 'px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                        : ''}>
+                      {member.name}
+                    </span>
+                    {isMasked && (
+                      <EyeOff
+                        className="inline-block w-3.5 h-3.5 ml-1 text-stone-400 dark:text-stone-500"
+                        aria-label={t('my_costumes.masked_hint', '無權限查看此成員的服裝')}
+                      />
+                    )}
+                  </td>
+                  {costumes.map(c => {
+                    const record = member.records?.[c.id];
+                    const hasCostume = !isMasked && record && record.level >= 0;
+                    const hasExclusiveWeapon = !isMasked && (member.exclusiveWeapons?.[c.characterId] ?? false);
+                    return (
+                      <td key={c.id} className={`p-0 text-center border-r border-stone-100 dark:border-stone-700 last:border-r-0 h-full ${hasCostume ? levelColorClass(Number(record.level)) : ''}`}>
+                        <div className="flex flex-col items-center justify-center h-full min-h-[44px] py-1 gap-0.5">
+                          {isMasked ? (
+                            <Lock
+                              className="w-3.5 h-3.5 text-stone-300 dark:text-stone-600"
+                              aria-label={t('my_costumes.masked_hint', '無權限查看此成員的服裝')}
+                            />
+                          ) : hasCostume ? (
+                            <>
+                              <span className="font-bold text-sm leading-none">+{record.level}</span>
+                              {hasExclusiveWeapon && <Swords className="w-3.5 h-3.5 text-stone-700" />}
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-sm text-stone-300 dark:text-stone-600 leading-none">-</span>
+                              {hasExclusiveWeapon && <Swords className="w-3.5 h-3.5 text-amber-500/60" />}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
             {sortedMembers.length === 0 && (
               <tr>
                 <td colSpan={costumes.length + 1} className="p-8 text-center text-stone-500 dark:text-stone-400">

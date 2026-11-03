@@ -11,6 +11,7 @@ import { logPageView } from '@/analytics';
 import { useVersionCheck } from '@/hooks/useVersionCheck';
 import { VersionUpdateToast } from '@/components/VersionUpdateToast';
 import { BindingErrorModal } from '@shared/ui/BindingErrorModal';
+import { isManagerOrAboveRole } from '@/shared/lib/access';
 
 function App() {
   return (
@@ -36,10 +37,8 @@ function AppContent() {
 
   const isBindingError = currentUser && 
     !isRoleLoading && 
-    userRole !== 'admin' && 
-    userRole !== 'creator' && 
-    userRole !== 'manager' && 
-    !userProfileId; // 以綁定身分（profile.id → member）判斷，不再依賴 DC 身分組
+    !isManagerOrAboveRole(userRole) &&
+    !userProfileId; // 以綁定身分判斷：非管理者且未綁定成員 → 要求認領
 
   useEffect(() => {
     if (isBindingError && location.pathname !== '/') {

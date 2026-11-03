@@ -12,7 +12,7 @@ import { useTheme } from '@/app/providers/ThemeContext';
 import { logEvent } from '@/analytics';
 import MyAccountsModal from '@features/auth/components/MyAccountsModal';
 import { motion, AnimatePresence } from 'motion/react';
-import { canUserAccessGuildPage } from '@/shared/lib/access';
+import { usePermissions } from '@/shared/lib/usePermissions';
 
 import { supabase } from '@/shared/api/supabase';
 
@@ -22,7 +22,8 @@ export default function Header() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { db, currentUser, currentAvatar, setCurrentUser, userVolume, setUserVolume, userRole, userGuildRoles, isRoleLoading, handleLogout, fetchSettings, canManageGuild, managedGuildIds } = useAppContext();
+  const { db, currentUser, currentAvatar, setCurrentUser, userVolume, setUserVolume, userRole, userGuildRoles, handleLogout, fetchSettings } = useAppContext();
+  const permissions = usePermissions();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -48,7 +49,7 @@ export default function Header() {
   }, []);
 
   // 公會管理權限改按「正/副會長」判斷（creator/admin 亦為全域管理）
-  const isPrivilegedRole = canManageGuild();
+  const isPrivilegedRole = permissions.canProcessApplications;
 
   // Close menu and refresh settings on route change
   useEffect(() => {
@@ -66,24 +67,17 @@ export default function Header() {
     return orderA - orderB;
   });
 
-  const canSeeAllGuilds = userRole === 'admin' || userRole === 'creator' || userRole === 'manager';
+  const canSeeAllGuilds = permissions.canViewAllGuilds;
 
   const canAccessPage = (pageId: string) => {
-    // 🔒 防護 1：只要系統還在載入，為了安全，所有的敏感按鈕一律先藏起來！
-    if (isRoleLoading) return false;
-
-    // 🔒 防護 2：如果規則表還沒抓回來，也一律當作沒權限 (避免函式預設放行)
-    if (!db.accessControl || Object.keys(db.accessControl).length === 0) {
-      return false;
-    }
-
-    return canUserAccessGuildPage(pageId, userRole || undefined, db.accessControl, canManageGuild);
+    // 規則表還沒載入時先全部隱藏，避免「還沒拿到權限就先放行」
+    return permissions.canAccessPage(pageId, { requireRulesLoaded: true });
   };
 
   const userGuilds = Object.entries(db.guilds);
   const userGuildId = userGuilds.length > 0 ? userGuilds[0][0] : null;
 
-  const topGuildId = canSeeAllGuilds ? (sortedGuilds.length > 0 ? sortedGuilds[0][0] : null) : (managedGuildIds[0] || userGuildId);
+  const topGuildId = canSeeAllGuilds ? (sortedGuilds.length > 0 ? sortedGuilds[0][0] : null) : (permissions.managedGuildIds[0] || userGuildId);
 
   const navItems = [
     { id: 'costume_list', icon: Users, label: t('header.equipment_list'), path: topGuildId ? `/guild/${topGuildId}` : null, active: location.pathname.startsWith('/guild') },

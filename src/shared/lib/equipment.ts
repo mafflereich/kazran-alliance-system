@@ -1,4 +1,5 @@
 import { EQUIPMENT_CATEGORIES, Equipment, PlayPreferences, DEDICATION_OPTIONS, Dedication, PlayMode, PLAY_MODE_OPTIONS, EquipmentVisibility, LegacyEquipmentVisibility, CategoryVisibility, ResourceVisibility, EquipmentResourceKey, EQUIPMENT_RESOURCES, EQUIPMENT_VISIBILITY_OPTIONS, DEFAULT_EQUIPMENT_VISIBILITY, EquipmentResources } from '@/entities/member/types';
+import { isGlobalAdminRole, isManagerOrAboveRole } from './access';
 
 export const getEmptyEquipment = (): Equipment => {
   const e: Equipment = {};
@@ -65,13 +66,11 @@ export const normalizePlayPreferences = (pp?: PlayPreferences): PlayPreferences 
   return { modes: pp.modes || [], dedication: pp.dedication };
 };
 
-// 是否為管理者（可看所有成員裝備表）
-export const isManagerRole = (role: string | null): boolean =>
-  role === 'manager' || role === 'admin' || role === 'creator';
+// 角色判斷統一由 shared/lib/access.ts 提供（單一來源）
+export const isManagerRole = (role: string | null): boolean => isManagerOrAboveRole(role);
 
 // 是否為頂層管理者（creator / admin）
-export const isAdminRole = (role: string | null): boolean =>
-  role === 'admin' || role === 'creator';
+export const isAdminRole = (role: string | null): boolean => isGlobalAdminRole(role);
 
 // 取得成員裝備表最近更新時間（epoch ms）
 //   以 equipmentUpdatedAt（整張裝備表）為準；從未更新過裝備表則為 0。

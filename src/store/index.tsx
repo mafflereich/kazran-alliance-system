@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Database, Guild, Member, Costume, Role, User, Character, ArchivedMember, ArchiveHistory, Toast, ToastType, Setting, ApplyMail, AccessControl, Equipment, PlayPreferences, EquipmentVisibility, CostumeRecord, CategoryVisibility, ResourceVisibility, EquipmentResources } from '@/entities/member/types';
+import { EMPTY_ACCESS, type MyAccess } from '@/shared/lib/permissions';
 import { supabase, supabaseInsert, supabaseKey, supabaseUpdate, supabaseUpsert, toCamel, toSnake, fetchAllPaginated } from '@/shared/api/supabase';
 import { loadMemberSecrets, applySecretsToMembers } from '@/shared/api/memberSecrets';
 import { getLatestSeasonId } from '@/shared/api/latestSeason';
@@ -10,6 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useTranslation } from 'react-i18next';
 import { formatDate } from '@/shared/lib/utils';
 import { getEmptyEquipment, getEquipmentResources } from '@/shared/lib/equipment';
+import { isGlobalAdminRole } from '@/shared/lib/access';
 
 const defaultData: Database = {
   guilds: {},
@@ -48,6 +50,11 @@ interface AppContextType {
   managedGuildIds: string[];
   // 是否可管理某公會（creator/admin 或該公會正/副會長）
   canManageGuild: (guildId?: string | null) => boolean;
+
+  // 權限快照（Phase 1：DB get_my_access()）。version = 0 表示尚未取得，
+  // usePermissions() 會回退到舊規則，因此不影響現有行為。
+  access: MyAccess;
+  refreshAccess: () => Promise<void>;
 
   loadDiscordRoles: () => Promise<void>;
 
@@ -158,6 +165,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [userRole, setUserRole] = useState<User['role'] | null>(null);
   const [userProfileId, setUserProfileId] = useState<string | null>(null);
 
+  // 權限快照：DB 的 get_my_access() 是唯一真相；version = 0 代表尚未取得
+  const [access, setAccess] = useState<MyAccess>(EMPTY_ACCESS);
+
   // 依綁定 member 的正/副會長身分，計算可管理的公會 id（不使用 DC 身分組）
   const managedGuildIds = useMemo(() => {
     if (!userProfileId) return [];
@@ -173,10 +183,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [db.members, userProfileId]);
 
   const canManageGuild = useCallback((guildId?: string | null) => {
-    if (userRole === 'creator' || userRole === 'admin') return true;
+    if (isGlobalAdminRole(userRole)) return true;
     if (guildId) return managedGuildIds.includes(guildId);
     return managedGuildIds.length > 0;
   }, [userRole, managedGuildIds]);
+
+  /**
+   * 重新抓取權限快照（Phase 1）。
+   * RPC 不存在（migration 未套用）或離線時保持 version = 0，
+   * 由 usePermissions() 回退到舊規則，不影響現有行為。
+   */
+  const refreshAccess = useCallback(async () => {
+    if (!supabase) return;
+    try {
+      const { data, error } = await supabase.rpc('get_my_access');
+      if (error || !data) return;
+      setAccess(data as MyAccess);
+    } catch (error) {
+      console.warn('refreshAccess failed, falling back to legacy rules:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setAccess(EMPTY_ACCESS);
+      return;
+    }
+    void refreshAccess();
+  }, [currentUser, userProfileId, refreshAccess]);
 
   const [isRoleLoading, setIsRoleLoading] = useState(false);
   const [isMembersLoading, setIsMembersLoading] = useState(false);
@@ -997,6 +1031,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDbState(value);
   };
 
+  // Legacy（Phase 2 前）：舊「存取控制」UI 已移除，這裡保留給回滾與 set_page_roles 雙寫；
+  // 新流程請用 role_grants（/admin → 權限（v2））。
   const updateAccessControl = async (page: string, roles: AccessControl['roles']) => {
     const existing = db.accessControl[page];
     let error;
@@ -1014,6 +1050,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       Logger.error({ source: 'access_control', action: 'update_access_control', message: '更新頁面存取權限失敗', details: { page, roles, error: error.message } });
       showToast(t('common.update_failed'), 'error');
     } else {
+      // Phase 1 雙寫：頁面判斷已改讀 role_grants，這裡同步一份，
+      // 否則管理員會「存了 access_control、頁面卻沒變」。
+      // migration 尚未套用（RPC 不存在）時只警告，不影響存檔。
+      if (supabase) {
+        const { error: syncError } = await supabase.rpc('set_page_roles', { p_page: page, p_roles: roles });
+        if (syncError) {
+          console.warn('set_page_roles failed（role_grants 未同步）:', syncError.message);
+        }
+      }
+
       setDbState(prev => ({
         ...prev,
         accessControl: {
@@ -1021,6 +1067,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           [page]: { page, roles }
         }
       }));
+      await refreshAccess();
       Logger.info({ source: 'access_control', action: 'update_access_control', message: '更新頁面存取權限', details: { page, roles } });
       showToast(t('common.update_success'), 'success');
     }
@@ -1137,13 +1184,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const now = Date.now();
     const { note, isReserved, ...memberData } = data;
 
+    // 服裝資料（records / exclusiveWeapons）一起更新時，同步更新 costumes_updated_at，
+    // 與 updateMemberCostumeLevel / updateMemberExclusiveWeapon 的行為保持一致。
+    const hasCostumeUpdate =
+      memberData.records !== undefined || memberData.exclusiveWeapons !== undefined;
+
     // 不做 RETURNING（不回傳整列）：members 的部分敏感欄位（records /
     // exclusive_weapons / equipment…）未授權給 anon/authenticated 做 SELECT，
     // 若 UPDATE 搭配 RETURNING * 會因需讀取未授權欄位而回傳
     // 「permission denied for table members」。此函式亦不依賴回傳值。
     const { error } = await supabase
       .from('members')
-      .update({ ...toSnake(memberData), updated_at: now })
+      .update({
+        ...toSnake(memberData),
+        updated_at: now,
+        ...(hasCostumeUpdate ? { costumes_updated_at: now } : {}),
+      })
       .eq('id', memberId);
 
     // Upsert member_notes fields if any changed. onConflict on member_id makes this
@@ -1168,7 +1224,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       Logger.info({ source: 'member_management', action: 'update_member', message: '更新成員資料', details: { memberId, data } });
       setDbState(prev => ({
         ...prev,
-        members: { ...prev.members, [memberId]: { ...prev.members[memberId], ...data, updatedAt: now } }
+        members: {
+          ...prev.members,
+          [memberId]: {
+            ...prev.members[memberId],
+            ...data,
+            updatedAt: now,
+            ...(hasCostumeUpdate ? { costumesUpdatedAt: now } : {}),
+          },
+        }
       }));
     }
   };
@@ -1812,7 +1876,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{
-      db, setDb, currentView, setCurrentView, currentUser, setCurrentUser, currentAvatar, userGuildRoles, setuserGuildRoles, userRole, userProfileId, managedGuildIds, canManageGuild,
+      db, setDb, currentView, setCurrentView, currentUser, setCurrentUser, currentAvatar, userGuildRoles, setuserGuildRoles, userRole, userProfileId, managedGuildIds, canManageGuild, access, refreshAccess,
       fetchMembers, fetchAllMembers, loadMembersByIds, searchMembers, addMember, updateMember, updateMembersNotes, deleteMember, archiveMember, unarchiveMember, updateMemberCostumeLevel, updateMemberExclusiveWeapon, updateMemberProfile,
       loadDiscordRoles,
       fetchInitialData,

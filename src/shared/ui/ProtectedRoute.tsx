@@ -1,16 +1,24 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '@/store';
-import { canUserAccessGuildPage } from '@/shared/lib/access';
+import { usePermissions } from '@/shared/lib/usePermissions';
+import { useCan } from '@/shared/lib/useCan';
+import type { PermissionKey } from '@/shared/lib/permissions';
+import UnauthorizedView from '@/shared/ui/UnauthorizedView';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  /** 舊介面：仍接受 pageId，內部走相容層（Phase 3 會移除） */
   allowedRoles?: string[];
   pageId?: string;
+  /** 新介面：直接指定權限 key（Phase 2 起 routes.tsx 使用這個） */
+  perm?: PermissionKey;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles, pageId }) => {
-  const { currentUser, db, isRoleLoading, userRole, canManageGuild } = useAppContext();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles, pageId, perm }) => {
+  const { currentUser, isRoleLoading } = useAppContext();
+  const permissions = usePermissions();
+  const { can } = useCan();
   const location = useLocation();
 
   if (isRoleLoading) {
@@ -30,30 +38,21 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles,
   }
 
   // Check static allowedRoles if provided
-  if (allowedRoles && (!userRole || !allowedRoles.includes(userRole))) {
+  if (allowedRoles && (!permissions.userRole || !allowedRoles.includes(permissions.userRole))) {
     return <UnauthorizedView />;
   }
 
-  // Check dynamic access control if pageId is provided
-  // 公會級管理頁面：以正/副會長判斷（取代 DC 身分組的 manager 角色）
-  if (pageId && !canUserAccessGuildPage(pageId, userRole || undefined, db.accessControl, canManageGuild)) {
+  // 新介面：權限 key（DB 的 role_grants）
+  if (perm && !can(perm)) {
+    return <UnauthorizedView />;
+  }
+
+  // 舊介面（相容層）：公會級頁面會走 canUserAccessGuildPage 的 fallback
+  if (!perm && pageId && !permissions.canAccessPage(pageId)) {
     return <UnauthorizedView />;
   }
 
   return <>{children}</>;
 };
-
-const UnauthorizedView = () => (
-  <div className="flex h-screen flex-col items-center justify-center bg-stone-900 text-white p-6 text-center">
-    <h1 className="text-4xl font-bold text-red-500 mb-4">權限不足</h1>
-    <p className="text-stone-400 mb-8">您沒有訪問此頁面的權限。</p>
-    <button
-      onClick={() => window.location.href = '#/'}
-      className="px-6 py-2 bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors"
-    >
-      返回首頁
-    </button>
-  </div>
-);
 
 export default ProtectedRoute;

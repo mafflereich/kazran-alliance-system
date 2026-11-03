@@ -16,6 +16,7 @@ import { useRaidRecordEditor } from '../hooks/useRaidRecordEditor';
 import { useSeasonManager } from '../hooks/useSeasonManager';
 import { useGuildStats } from '../hooks/useGuildStats';
 import { useTableLayout } from '../hooks/useTableLayout';
+import { useCan } from '@/shared/lib/useCan';
 import type { Member } from '@/entities/member/types';
 
 const RAID_MEMBER_COLUMNS = 'id, name, guild_id, role, color, total_score, updated_at, status, member_notes(note, is_reserved, archive_remark)';
@@ -23,22 +24,34 @@ const RAID_MEMBER_COLUMNS = 'id, name, guild_id, role, color, total_score, updat
 export default function GuildRaidManager() {
   const { t } = useTranslation(['raid', 'translation']);
   const navigate = useNavigate();
-  const { db, setDb, userRole, userGuildRoles, managedGuildIds, canManageGuild, fetchMembers } = useAppContext();
+  const { db, setDb, userGuildRoles, managedGuildIds, fetchMembers, access } = useAppContext();
+  const { can } = useCan();
 
-  // 公會管理權限改按「正/副會長」判斷（creator/admin 亦為全域管理）
-  // 不使用 DC 身分組的 manager 角色
-  const isGlobalAdmin = userRole === 'creator' || userRole === 'admin';
-  const canManage = canManageGuild();
+  // Phase 2：進入頁面（看）與編輯（寫）分開。
+  //   manager → 可以進、只能看自己公會
+  //   officer / admin → 可以編輯（officer 仍由 can('raid.score.write', guildId) 限縮到自己公會）
+  const canViewPage = can('page.raid_manage.view');
+  const canEdit = can('raid.score.write');
+  const canCheckIn = can('raid.checkin.write');
+  const isGlobalAdmin = access.isAdmin;
 
   const userGuilds = userGuildRoles.length > 0
     ? Object.entries(db.guilds).filter(([_, g]) => userGuildRoles.includes(g.username || '') || userGuildRoles.includes(g.name || ''))
     : [];
   const userGuildId = userGuilds.length > 0 ? userGuilds[0][0] : null;
-  // 非全域管理員時，只能看/管自己為正/副會長的公會
-  const managedGuildId = (managedGuildIds.length > 0 ? managedGuildIds[0] : null) || userGuildId;
+
+  // 非 admin 只能看「自己的公會」：以成員綁定（my_guild_ids）為準，
+  // 再併入 officer 的 managedGuildIds（正常情況下是子集）。
+  const ownGuildIds = useMemo(() => {
+    const ids = new Set<string>([...access.memberGuildIds, ...managedGuildIds]);
+    return [...ids];
+  }, [access.memberGuildIds, managedGuildIds]);
+
+  const managedGuildId = ownGuildIds[0] || userGuildId;
   const adminGuild = managedGuildId ? db.guilds[managedGuildId] : null;
   const targetTier = adminGuild?.tier || 1;
-  const allowedGuildIds = canManage && !isGlobalAdmin ? managedGuildIds : undefined;
+  // undefined = 全站（admin）；否則只顯示自己的公會
+  const allowedGuildIds = isGlobalAdmin ? undefined : ownGuildIds;
 
   const [isComparisonMode, setIsComparisonMode] = useState(false);
   const [selectedGuildIds, setSelectedGuildIds] = useState<string[]>([]);
@@ -53,7 +66,7 @@ export default function GuildRaidManager() {
   useEffect(() => { dbMembersRef.current = db.members; }, [db.members]);
 
   const { ghostRecords, fetchGhostRecordsForMember, fetchGhostRecordsForMembers, handleAddGhostRecord: addGhostRecord, handleDeleteGhostRecord } = useGhostRecords();
-  const { availableGuilds, guildsByTier, guildMemberCounts } = useGuildStats(canManage, targetTier, allowedGuildIds);
+  const { availableGuilds, guildsByTier, guildMemberCounts } = useGuildStats(true, targetTier, allowedGuildIds);
 
   const updateMemberNote = useCallback((memberId: string, payload: Record<string, any>) => {
     setDb(prev => {
@@ -338,7 +351,7 @@ export default function GuildRaidManager() {
 
   const error = raidData.error || editor.error || seasonManager.error;
 
-  if (!canManage) {
+  if (!canViewPage) {
     return (
       <div className="h-screen flex flex-col">
         <div className="flex-1 flex items-center justify-center bg-stone-100 dark:bg-stone-900">
@@ -346,6 +359,25 @@ export default function GuildRaidManager() {
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">{t('errors.permission')}</h2>
             <p className="text-stone-500 dark:text-stone-400 mb-6">{t('dashboard.no_permission')}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 非 admin 但沒有綁定任何公會 → 沒有可看的資料（不是權限錯誤）
+  if (!isGlobalAdmin && ownGuildIds.length === 0) {
+    return (
+      <div className="h-screen flex flex-col">
+        <div className="flex-1 flex items-center justify-center bg-stone-100 dark:bg-stone-900">
+          <div className="text-center p-8 bg-white dark:bg-stone-800 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-700 max-w-md">
+            <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-stone-800 dark:text-stone-200 mb-2">
+              {t('raid.no_guild_title', '尚未綁定公會成員')}
+            </h2>
+            <p className="text-stone-500 dark:text-stone-400 mb-6">
+              {t('raid.no_guild_desc', '這個頁面只顯示你所屬公會的資料；請先完成成員認領。')}
+            </p>
           </div>
         </div>
       </div>
@@ -362,14 +394,14 @@ export default function GuildRaidManager() {
           seasons={raidData.seasons}
           isComparisonMode={isComparisonMode}
           setIsComparisonMode={setIsComparisonMode}
-          canManage={canManage}
+          canManage={canEdit}
           onToggleSeasonPanel={() => seasonManager.setIsSeasonPanelOpen(!seasonManager.isSeasonPanelOpen)}
           onNavigateToRaid={() => navigate('/raid')}
           onNavigateToTeamAssign={() => navigate('/team')}
         />
 
         <SeasonActionsPanel
-          isOpen={seasonManager.isSeasonPanelOpen}
+          isOpen={canEdit && seasonManager.isSeasonPanelOpen}
           onClose={() => seasonManager.setIsSeasonPanelOpen(false)}
           activeTab={seasonManager.activeSeasonTab}
           onTabChange={seasonManager.setActiveSeasonTab}
@@ -433,6 +465,7 @@ export default function GuildRaidManager() {
             <GuildRaidTable
               key={guildId}
               guildId={guildId}
+              readOnly={!canEdit}
               guild={db.guilds[guildId]}
               sortedMembers={sortedMembersMap[guildId] ?? []}
               records={raidData.records}
@@ -448,6 +481,9 @@ export default function GuildRaidManager() {
               onSort={handleSort}
               onRecordChange={editor.handleRecordChange}
               onGuildNoteChange={editor.handleGuildNoteChange}
+              onCheckInChange={editor.handleCheckInChange}
+              onResetCheckIns={editor.handleResetCheckIns}
+              canCheckIn={canCheckIn}
               onBlur={editor.handleAutoSave}
               onBulkScoreFill={editor.handleBulkScoreFill}
               onClearAllPrevGuildTags={editor.handleClearAllPrevGuildTags}

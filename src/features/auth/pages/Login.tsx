@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/store';
 import { Shield, Users, ChevronRight, Lock, X, AlertCircle, Info } from 'lucide-react';
 import { getTierColor, getTierBorderHoverClass, getTierTextHoverClass } from '@/shared/lib/utils';
+import { isManagerOrAboveRole } from '@/shared/lib/access';
 import { useTranslation } from 'react-i18next';
 
 import { LoginModal } from '@/shared/ui/LoginModal';
@@ -58,7 +59,7 @@ export default function Login() {
    * （my_guild_ids）使用同一套歸屬關係。
    */
   const canViewGuild = React.useCallback((guildId: string) => {
-    if (userRole === 'creator' || userRole === 'admin' || userRole === 'manager') return true;
+    if (isManagerOrAboveRole(userRole)) return true;
     const target = String(db.guilds[guildId]?.name ?? '').trim().toLowerCase();
     if (!target) return false;
     return userGuildRoles.some(name => String(name).trim().toLowerCase() === target);

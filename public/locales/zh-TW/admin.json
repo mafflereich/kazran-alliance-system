@@ -210,8 +210,72 @@
   },
   "access": {
     "page": "頁面",
+    "actions": "操作",
+    "intro": "勾選代表該角色可以在 Header 看到連結並進入頁面；creator / admin 一律放行，不受本表限制。",
     "notice": "勾選後該職位的使用者將能在 Header 看到連結並進入該頁面。",
-    "notice_guild_pages": "公會聯合戰管理與 Team Assign Board 為公會幹部頁面：公會正/副會長視同 MANAGER，取消勾選 MANAGER 也會一併擋下他們；creator / admin 則不受本表限制。"
+    "notice_guild_pages": "公會聯合戰管理為公會幹部頁面：公會正/副會長視同 MANAGER，取消勾選 MANAGER 也會一併擋下他們。Team Assign Board 固定只有 creator / admin 可進入，不受本表影響。",
+    "legend_title": "角色來源與判斷方式",
+    "legend_admin": "creator / admin：後台帳號（admin_users）。一律可進入所有頁面，不受本表限制。",
+    "legend_manager": "manager：Discord 身分組。可進入本表勾選的頁面，但不是公會幹部。",
+    "legend_officer": "公會正/副會長：綁定成員的職位（leader / coleader）。在「公會聯合戰管理」視同 MANAGER；Team Assign Board 固定只有 creator / admin。",
+    "legend_member": "member：Discord 身分組。預設只能使用裝備表、服裝表與申請信箱。",
+    "group_alliance": "聯盟功能",
+    "group_guild": "公會管理",
+    "group_system": "系統設定",
+    "group_count": "{{count}} 個頁面",
+    "scope_global": "全站",
+    "scope_guild": "公會級",
+    "custom_badge": "已自訂",
+    "apply_defaults": "套用預設值",
+    "unsaved": "有未儲存的變更",
+    "restore": "還原未儲存變更",
+    "save": "儲存",
+    "reset_row": "重設為預設值",
+    "locked_hint": "creator / admin 一律放行，不需設定",
+    "admin_only_badge": "固定：僅 ADMIN / CREATOR",
+    "admin_only_hint": "此頁面固定只開放給 creator / admin，不受其他角色勾選影響。",
+    "role_member": "MEMBER",
+    "role_manager": "MANAGER",
+    "role_admin": "ADMIN",
+    "role_creator": "CREATOR",
+    "pages": {
+      "costume_list": {
+        "label": "裝備表",
+        "desc": "檢視公會成員的 23C / 24C 裝備與重要資源（依成員隱私設定遮蔽）。"
+      },
+      "my_costumes": {
+        "label": "服裝表",
+        "desc": "填寫自己的服裝練度與 UR 專用武器；管理者與公會幹部可切換全員矩陣。"
+      },
+      "application_mailbox": {
+        "label": "申請信箱",
+        "desc": "提出請假／升降梯隊等申請；公會幹部可檢視全部並更新狀態。"
+      },
+      "arcade": {
+        "label": "小遊戲",
+        "desc": "精煉模擬器等遊戲相關小工具。"
+      },
+      "toolbox": {
+        "label": "小工具",
+        "desc": "各類便利工具、試算表與批次作業。"
+      },
+      "guild_raid_manager": {
+        "label": "公會聯合戰管理",
+        "desc": "登錄分數、賽季操作與成員紀錄；正副會長只會管理自己公會。"
+      },
+      "member_board": {
+        "label": "Team Assign Board",
+        "desc": "拖拉編排成員、調整職位與封存成員（固定只有 creator / admin 可讀寫）。"
+      },
+      "admin_settings": {
+        "label": "後台設定",
+        "desc": "公會／成員／服裝主檔、存取控制、系統設定與日誌。"
+      },
+      "alliance_raid_record": {
+        "label": "聯盟戰記（舊版）",
+        "desc": "舊版頁面，已由「公會聯合戰管理」取代。"
+      }
+    }
   },
   "binding": {
     "title": "身份管理",

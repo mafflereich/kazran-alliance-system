@@ -22,8 +22,10 @@ Supabase Dashboard → SQL Editor（散落在 `docs/sql/*.sql`），因此無法
 | `20261102090000_seed_bd2db_catalog.sql` | **BD2DB 圖鑑補齊（僅 5 星）**：新增缺少的 3 位 5 星角色與 5 件服裝（可重複執行，不覆蓋既有資料） |
 | `20261102100000_equipment_guild_min_privacy_and_resource_privacy.sql` | **裝備表隱私 v4**：最低可見度改為「本公會正副會長」（舊 `public` 全部升級為 `guild_manager`）；新增 `members.resource_visibility` 與 `mask_equipment_resources()`，重要資源可逐項設定隱私；`mask_equipment` 補齊分拆後的單件 key |
 | `20261102110000_equipment_guild_leader_always_visible.sql` | **裝備表隱私 v5（設計初衷）**：本公會正／副會長與 creator/admin 一律可看到完整裝備與全部重要資源；部位／資源覆蓋不能排除他們；`admin` 級別併入 `guild_manager`，可選級別只剩 `guild_manager` / `all_manager` |
+| `20261102130000_permission_catalog_v2_foundation.sql` | **權限 v2 Phase 1（零行為變更）**：新增 `permissions` / `role_grants` / `user_grants` / `permission_meta`；`my_roles()` / `has_permission()` / `my_permissions()` / `get_my_access()`；把 `access_control` 等價搬成 `role_grants`（parity 驗證 0 差異）；`set_page_roles()` 供舊「存取控制」UI 雙寫 |
+| `20261102120000_member_board_admin_only_and_rls_alignment.sql` | **Team Assign Board 僅 admin/creator + 前後端對齊**：`members` 寫入限制為 admin/creator 或本人；`archive_members_bulk()` 加 admin 檢查；`save_raid_records_bulk()` / `can_edit_raid_record()` 移除 manager；trigger 禁止非 admin 修改成員身分欄位；賽季／封存歷史／申請信箱 policy 對齊 |
 
-十四支都可**重複執行**，且不刪改任何資料。
+十五支都可**重複執行**，且不刪改任何資料。
 
 ## 套用方式（擇一）
 

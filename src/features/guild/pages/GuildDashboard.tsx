@@ -14,6 +14,7 @@ import GuildSidebar from '../components/GuildSidebar';
 import GuildHeader from '../components/GuildHeader';
 import EquipmentTable from '../components/EquipmentTable';
 import { getSortedMembers, getSortedGuilds } from '../utils/sort';
+import { isManagerOrAboveRole } from '@/shared/lib/access';
 
 export default function GuildDashboard({ guildId }: { guildId: string }) {
   const { t } = useTranslation();
@@ -79,7 +80,7 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
     setEditingMemberId(id);
   };
 
-  const canSeeAllGuilds = userRole === 'admin' || userRole === 'creator' || userRole === 'manager';
+  const canSeeAllGuilds = isManagerOrAboveRole(userRole);
 
   // Draggable scroll state
   const scrollRef = useRef<HTMLDivElement>(null);

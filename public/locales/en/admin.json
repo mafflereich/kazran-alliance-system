@@ -210,8 +210,72 @@
   },
   "access": {
     "page": "Page",
+    "actions": "Actions",
+    "intro": "Checked roles can see the link in the header and open the page; creator / admin always bypass this table.",
     "notice": "Selected roles will be able to see the link in the header and access the page.",
-    "notice_guild_pages": "Guild Raid Manager and Team Assign Board are guild-officer pages: guild leaders / co-leaders count as MANAGER, so unchecking MANAGER also blocks them. creator / admin are not restricted by this table."
+    "notice_guild_pages": "Guild Raid Manager is a guild-officer page: guild leaders / co-leaders count as MANAGER, so unchecking MANAGER also blocks them. Team Assign Board is fixed to creator / admin and ignores this table.",
+    "legend_title": "Where roles come from",
+    "legend_admin": "creator / admin: backend accounts (admin_users). Always allowed on every page, regardless of this table.",
+    "legend_manager": "manager: Discord role. Can open the pages checked here, but is not a guild officer.",
+    "legend_officer": "Guild leader / co-leader: the bound member's role (leader / coleader). Counts as MANAGER on Guild Raid Manager; Team Assign Board is creator / admin only.",
+    "legend_member": "member: Discord role. By default only equipment, costumes and the application mailbox.",
+    "group_alliance": "Alliance",
+    "group_guild": "Guild management",
+    "group_system": "System",
+    "group_count": "{{count}} pages",
+    "scope_global": "Global",
+    "scope_guild": "Guild-level",
+    "custom_badge": "Customized",
+    "apply_defaults": "Apply defaults",
+    "unsaved": "Unsaved changes",
+    "restore": "Discard changes",
+    "save": "Save",
+    "reset_row": "Reset to default",
+    "locked_hint": "creator / admin always bypass this setting",
+    "admin_only_badge": "Fixed: ADMIN / CREATOR only",
+    "admin_only_hint": "This page is fixed to creator / admin and ignores the role checkboxes below.",
+    "role_member": "MEMBER",
+    "role_manager": "MANAGER",
+    "role_admin": "ADMIN",
+    "role_creator": "CREATOR",
+    "pages": {
+      "costume_list": {
+        "label": "Equipment table",
+        "desc": "View guild members' 23C / 24C equipment and key resources (masked by each member's privacy settings)."
+      },
+      "my_costumes": {
+        "label": "Costume table",
+        "desc": "Fill in your costume levels and UR exclusive weapons; managers and guild officers can open the guild-wide matrix."
+      },
+      "application_mailbox": {
+        "label": "Application mailbox",
+        "desc": "Submit leave / tier-change requests; guild officers can review all requests and update status."
+      },
+      "arcade": {
+        "label": "Arcade",
+        "desc": "Game-related tools such as the refinement simulator."
+      },
+      "toolbox": {
+        "label": "Toolbox",
+        "desc": "Utility tools, spreadsheets and batch operations."
+      },
+      "guild_raid_manager": {
+        "label": "Guild Raid Manager",
+        "desc": "Enter scores, manage seasons and member records; officers only manage their own guild."
+      },
+      "member_board": {
+        "label": "Team Assign Board",
+        "desc": "Drag-and-drop member assignments, change roles and archive members (creator / admin only)."
+      },
+      "admin_settings": {
+        "label": "Admin settings",
+        "desc": "Guild / member / costume masters, access control, site settings and logs."
+      },
+      "alliance_raid_record": {
+        "label": "Alliance raid record (legacy)",
+        "desc": "Legacy page, replaced by Guild Raid Manager."
+      }
+    }
   },
   "binding": {
     "title": "Profiles Manager",

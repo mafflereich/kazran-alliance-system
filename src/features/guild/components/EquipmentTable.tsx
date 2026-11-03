@@ -69,13 +69,15 @@ export default function EquipmentTable({
   // 「請貝拉發送」僅限：本公會正/副會長，或 admin / creator（不看 Discord manager 身分組）
   const canNotifyBella = canManageThisGuild && outdatedMembers.length > 0;
 
-  // 觀看者可管理的公會：從其綁定成員身分推得（此表為單一公會視圖）
+  // 觀看者可管理的公會：只認「綁定成員本人是該公會正/副會長」
+  // （一般成員綁定在公會內，不代表可管理該公會）
   const viewerManagedGuildIds = React.useMemo(() => {
     const ids = new Set<string>();
     if (!userProfileId) return ids;
     const bound = userProfileId.split(',').map(uid => uid.trim()).filter(Boolean);
     members.forEach(([, m]: [string, any]) => {
-      if (bound.includes(m.id) && m.guildId) ids.add(m.guildId);
+      const isOfficer = m.role === 'leader' || m.role === 'coleader';
+      if (bound.includes(m.id) && m.guildId && isOfficer) ids.add(m.guildId);
     });
     return ids;
   }, [members, userProfileId]);

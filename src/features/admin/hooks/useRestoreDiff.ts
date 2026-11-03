@@ -110,7 +110,10 @@ export function useRestoreDiff() {
           const chunkSize = 100;
           for (let i = 0; i < recordsToUpsert.length; i += chunkSize) {
             const chunk = recordsToUpsert.slice(i, i + chunkSize);
-            const { error } = await supabase.from(tableName).upsert(chunk);
+            // members 走 SECURITY DEFINER RPC：裝備欄位有 guard，只有這條路徑能整列覆寫
+            const { error } = tableName === 'members'
+              ? await supabase.rpc('restore_members_snapshot', { p_rows: chunk })
+              : await supabase.from(tableName).upsert(chunk);
             if (error) throw error;
           }
         }

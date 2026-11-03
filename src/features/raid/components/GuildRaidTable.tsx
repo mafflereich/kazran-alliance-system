@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Pencil, ArrowDownWideNarrow, ArrowDownNarrowWide, Copy, Check, Ghost, X, ListPlus } from 'lucide-react';
+import { Search, Pencil, ArrowDownWideNarrow, ArrowDownNarrowWide, Copy, Check, Ghost, X, ListPlus, ClipboardCheck, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Member, Guild } from '@/entities/member/types';
 import { deduceScore } from '../utils/scoreDeduction';
-import { getPrevGuildName, getCustomNote, setNoteSegment, removeNoteSegment, PREV_GUILD_TAG } from '@/shared/lib/noteUtils';
+import { getPrevGuildName, getCustomNote, setNoteSegment, removeNoteSegment, PREV_GUILD_TAG, CHECK_IN_TAG, getNoteSegment } from '@/shared/lib/noteUtils';
 import GhostRecordModal from './GhostRecordModal';
 import BulkScoreFillModal from './BulkScoreFillModal';
+import CheckInTracker from './CheckInTracker';
+import CheckInAnnounceModal from './CheckInAnnounceModal';
+import ConfirmModal from '@/shared/ui/ConfirmModal';
 import type { MemberRaidRecord, GuildRaidRecord } from '../types';
 
 interface GuildRaidTableProps {
@@ -25,6 +28,12 @@ interface GuildRaidTableProps {
   onSort: (key: 'default' | 'score') => void;
   onRecordChange: (memberId: string, field: 'score' | 'note' | 'season_note' | 'overkill', value: string | number | null) => void;
   onGuildNoteChange?: (guildId: string, note: string) => void;
+  /** 切換簽到記號（1~3 = 簽到回合，4 = 死） */
+  onCheckInChange?: (memberId: string, marks: number[]) => Promise<void> | void;
+  /** 重置本公會所有成員的簽到記號 */
+  onResetCheckIns?: (guildId: string, keepDead: boolean, memberIds: string[]) => Promise<void> | void;
+  /** 是否有 raid.checkin.write（與 raid.score.write 分開） */
+  canCheckIn?: boolean;
   onBlur: (memberId: string, guildId: string) => void;
   onBulkScoreFill?: (guildId: string, score: number, memberIds: string[]) => Promise<boolean>;
   onClearAllPrevGuildTags?: (entries: { id: string; note: string }[], guildId: string) => Promise<void>;
@@ -45,6 +54,8 @@ interface GuildRaidTableProps {
   showOverkill?: boolean;
   scoreThreshold?: number | null;
   forceHideOverkill?: boolean;
+  /** 唯讀模式（例如 manager 只能看自己公會）：保留表格與排序，但不能修改 */
+  readOnly?: boolean;
 }
 
 function GuildRaidTable({
@@ -64,6 +75,9 @@ function GuildRaidTable({
   onSort,
   onRecordChange,
   onGuildNoteChange,
+  onCheckInChange,
+  onResetCheckIns,
+  canCheckIn,
   onBlur,
   onBulkScoreFill,
   onClearAllPrevGuildTags,
@@ -83,11 +97,17 @@ function GuildRaidTable({
   showOverkill = false,
   scoreThreshold = null,
   forceHideOverkill = true,
+  readOnly = false,
 }: GuildRaidTableProps) {
   const { t } = useTranslation(['raid', 'translation']);
   const guildName = guild?.name || '';
   const guildSerial = guild?.serial ? `${t('common.guild_serial', { serial: guild.serial })} ` : '';
   const displayGuildName = `${guildSerial}${guildName}`;
+  // 封存賽季與唯讀模式共用「不可編輯」的渲染路徑
+  const locked = isArchived === true || readOnly;
+  // 簽到權限與分數編輯分開：有 raid.checkin.write 但沒有 raid.score.write 也能簽到。
+  const allowCheckIn = canCheckIn ?? !readOnly;
+  const checkInLocked = isArchived === true || !allowCheckIn;
 
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -98,7 +118,30 @@ function GuildRaidTable({
   const [copiedMemberId, setCopiedMemberId] = useState<string | null>(null);
   const [ghostModalMember, setGhostModalMember] = useState<Member | null>(null);
   const [isBulkFillOpen, setIsBulkFillOpen] = useState(false);
+  const [isCheckInAnnounceOpen, setIsCheckInAnnounceOpen] = useState(false);
+  const [isResetCheckInOpen, setIsResetCheckInOpen] = useState(false);
+  /** 重置時是否保留 4（死／永久失聯）；預設保留，避免清掉黑名單。 */
+  const [keepDeadOnReset, setKeepDeadOnReset] = useState(true);
   const displayGuildNote = guildRaidRecord?.note || '';
+
+  /** 表格目前顯示的完整備註（草稿優先，才能保留尚未送出的編輯）。 */
+  const noteOf = (member: Member) => draftRecords[member.id!]?.note ?? member.note ?? '';
+
+  const handleResetCheckIns = () => {
+    if (checkInLocked || !onResetCheckIns) return;
+    setIsResetCheckInOpen(false);
+    const memberIds = sortedMembers
+      .map(member => member.id)
+      .filter((id): id is string => !!id);
+    void onResetCheckIns(guildId, keepDeadOnReset, memberIds);
+  };
+
+  const checkInAnnounceMembers = useMemo(
+    () => sortedMembers
+      .filter(member => !!member.id)
+      .map(member => ({ id: member.id!, name: member.name, note: noteOf(member) })),
+    [sortedMembers, draftRecords],
+  );
 
   const handleCopyName = (e: React.MouseEvent, name: string, memberId: string) => {
     e.stopPropagation();
@@ -123,7 +166,7 @@ function GuildRaidTable({
   };
 
   const handleClearAllPrevGuildTags = () => {
-    if (isArchived || isComparisonMode || !onClearAllPrevGuildTags) return;
+    if (locked || isComparisonMode || !onClearAllPrevGuildTags) return;
     const entries = sortedMembers
       .map((member) => {
         if (!member.id) return null;
@@ -223,7 +266,7 @@ function GuildRaidTable({
                       {displayGuildNote}
                     </span>
                   )}
-                  {!isArchived && (
+                  {!locked && (
                     <button
                       onClick={handleGuildNoteEdit}
                       className="p-1 text-stone-400 hover:text-indigo-600 dark:hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -248,6 +291,48 @@ function GuildRaidTable({
           </button>
         )}
       </div>
+      {!isComparisonMode && !isArchived && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 bg-white px-4 py-2 dark:border-stone-700 dark:bg-stone-800">
+          <div className="flex items-center gap-1.5 text-xs text-stone-500 dark:text-stone-400">
+            <ClipboardCheck className="h-3.5 w-3.5 text-emerald-500" />
+            <span>{t('raid.checkin_legend', '1-3 = 簽到回合，4 = 死（永久失聯）')}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setIsCheckInAnnounceOpen(true)}
+              disabled={!allowCheckIn}
+              className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-indigo-700/50 dark:bg-indigo-900/30 dark:text-indigo-300 dark:hover:bg-indigo-900/50"
+              title={t('raid.checkin_announce_title', '簽到催辦名單')}
+            >
+              <ClipboardCheck className="h-3 w-3" />
+              {t('raid.checkin_announce', '簽到催辦名單')}
+            </button>
+            <label
+              className="inline-flex items-center gap-1 text-[11px] text-stone-500 dark:text-stone-400"
+              title={t('raid.checkin_reset_keep_dead_hint', '勾選時重置只清除 1/2/3，保留 4（死／永久失聯）')}
+            >
+              <input
+                type="checkbox"
+                checked={keepDeadOnReset}
+                onChange={(event) => setKeepDeadOnReset(event.target.checked)}
+                className="h-3 w-3 rounded border-stone-300 text-emerald-600 focus:ring-emerald-500 dark:border-stone-600"
+              />
+              {t('raid.checkin_reset_keep_dead', '保留死')}
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsResetCheckInOpen(true)}
+              disabled={checkInLocked || !onResetCheckIns}
+              className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-stone-50 px-2 py-1 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-stone-700 dark:bg-stone-700/40 dark:text-stone-300 dark:hover:bg-stone-700"
+              title={t('raid.checkin_reset', '重置簽到記號')}
+            >
+              <RotateCcw className="h-3 w-3" />
+              {t('raid.checkin_reset', '重置簽到記號')}
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex-1 overflow-auto">
         {loading ? (
           <div className="p-8 text-center text-stone-500">{t('common.loading', '載入中...')}</div>
@@ -264,6 +349,7 @@ function GuildRaidTable({
                 <col style={{ width: '80px' }} />
                 <col style={{ width: '150px' }} />
                 {showOverkill && scoreThreshold != null && !forceHideOverkill && <col style={{ width: '92px' }} />}
+                <col style={{ width: '108px' }} />
                 <col />
                 <col />
               </colgroup>
@@ -318,6 +404,14 @@ function GuildRaidTable({
                           : <ArrowDownNarrowWide className="w-3.5 h-3.5 text-indigo-500" />
                       )}
                     </div>
+                  </th>
+                )}
+                {!isComparisonMode && (
+                  <th
+                    className="p-3 text-xs font-semibold text-stone-600 dark:text-stone-300 border-b border-stone-200 dark:border-stone-600"
+                    title={t('raid.checkin_legend', '1-3 = 簽到回合，4 = 死（永久失聯）')}
+                  >
+                    {t('raid.column_checkin', '簽到')}
                   </th>
                 )}
                 {!isComparisonMode && (
@@ -377,6 +471,7 @@ function GuildRaidTable({
                           )}
                         </button>
                         <button
+                          disabled={locked}
                           onClick={() => { setGhostModalMember(member); onFetchGhostRecords?.(member.id!); }}
                           className={`p-1 rounded-md transition-all flex items-center gap-1 ${
                             (ghostRecords[member.id!]?.length || 0) > 0
@@ -395,7 +490,7 @@ function GuildRaidTable({
                       </div>
                     </td>
                     <td className="py-0.5 px-2">
-                      {(!isArchived && !isComparisonMode) ? (
+                      {(!locked && !isComparisonMode) ? (
                         <input
                           type="number"
                           min="0"
@@ -420,7 +515,7 @@ function GuildRaidTable({
                     )}
                     {!isComparisonMode && showOverkill && scoreThreshold != null && !forceHideOverkill && (
                       <td className="py-0.5 px-2">
-                        {!isArchived ? (
+                        {!locked ? (
                           (record.score || 0) >= scoreThreshold ? (
                             <div className="relative">
                               <input
@@ -451,7 +546,16 @@ function GuildRaidTable({
                     )}
                       {!isComparisonMode && (
                         <td className="py-0.5 px-2">
-                          {!isArchived ? (
+                          <CheckInTracker
+                            note={noteValue}
+                            disabled={checkInLocked || !onCheckInChange}
+                            onChange={(marks) => { void onCheckInChange?.(member.id!, marks); }}
+                          />
+                        </td>
+                      )}
+                      {!isComparisonMode && (
+                        <td className="py-0.5 px-2">
+                          {!locked ? (
                             <div className="flex items-center gap-1">
                               {(() => {
                                 const prevGuild = getPrevGuildName(noteValue);
@@ -478,9 +582,15 @@ function GuildRaidTable({
                                 value={getCustomNote(noteValue)}
                                 onChange={(e) => {
                                   const prevGuild = getPrevGuildName(noteValue);
-                                  const fullNote = prevGuild
-                                    ? `${setNoteSegment('', PREV_GUILD_TAG, prevGuild)}${e.target.value ? '\n' + e.target.value : ''}`
-                                    : e.target.value;
+                                  const checkInSegment = getNoteSegment(noteValue, CHECK_IN_TAG);
+                                  let fullNote = e.target.value;
+                                  if (prevGuild) {
+                                    fullNote = `${setNoteSegment('', PREV_GUILD_TAG, prevGuild)}${fullNote ? '\n' + fullNote : ''}`;
+                                  }
+                                  // 保留簽到記號，避免編輯成員備註時把 1/2/3/4 清掉
+                                  if (checkInSegment) {
+                                    fullNote = setNoteSegment(fullNote, CHECK_IN_TAG, checkInSegment);
+                                  }
                                   onRecordChange(member.id!, 'note', fullNote);
                                 }}
                                 onBlur={() => onBlur(member.id!, guildId)}
@@ -505,7 +615,7 @@ function GuildRaidTable({
                       )}
                       {!isComparisonMode && (
                         <td className="py-0.5 px-2">
-                          {!isArchived ? (
+                          {!locked ? (
                             <input
                               type="text"
                               value={record.season_note || ''}
@@ -531,7 +641,7 @@ function GuildRaidTable({
                 <td className="py-1 px-3 text-xs text-stone-500 dark:text-stone-400">
                   {medianScore}
                 </td>
-                {!isComparisonMode && <td colSpan={showOverkill && scoreThreshold != null && !forceHideOverkill ? 4 : 3}></td>}
+                {!isComparisonMode && <td colSpan={showOverkill && scoreThreshold != null && !forceHideOverkill ? 5 : 4}></td>}
               </tr>
             </tbody>
           </table>
@@ -542,7 +652,7 @@ function GuildRaidTable({
         <div className="px-4 py-2 border-t border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800">
           <button
             onClick={() => setIsBulkFillOpen(true)}
-            disabled={loading}
+            disabled={loading || locked}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-indigo-200 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <ListPlus className="w-3.5 h-3.5" />
@@ -573,6 +683,33 @@ function GuildRaidTable({
           onClose={() => setGhostModalMember(null)}
         />
       )}
+
+      {isCheckInAnnounceOpen && (
+        <CheckInAnnounceModal
+          guildId={guildId}
+          guildName={displayGuildName}
+          members={checkInAnnounceMembers}
+          onClose={() => setIsCheckInAnnounceOpen(false)}
+        />
+      )}
+
+      <ConfirmModal
+        isOpen={isResetCheckInOpen}
+        title={t('raid.checkin_reset_confirm_title', '確認重置簽到記號？')}
+        message={t(
+          keepDeadOnReset ? 'raid.checkin_reset_confirm_desc' : 'raid.checkin_reset_confirm_desc_all',
+          {
+            guild: displayGuildName,
+            defaultValue: keepDeadOnReset
+              ? '將清除【{{guild}}】所有成員的簽到 1/2/3 記號；4（死／永久失聯）會保留。成員備註與其他公會的記號不受影響。'
+              : '將清除【{{guild}}】所有成員的簽到 1/2/3/4 記號。成員備註與其他公會的記號不受影響。',
+          },
+        )}
+        confirmText={t('raid.checkin_reset', '重置簽到記號')}
+        onConfirm={handleResetCheckIns}
+        onCancel={() => setIsResetCheckInOpen(false)}
+        isDanger
+      />
     </div>
   );
 }

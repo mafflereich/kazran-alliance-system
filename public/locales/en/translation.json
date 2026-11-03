@@ -495,11 +495,13 @@
     "equipment_loading": "{{name}} 24C: loading",
     "equipment_loading_short": "Loading 24C equipment",
     "equipment_load_failed": "Failed to load 24C equipment counts",
-    "equipment_retry": "Equipment load failed — retry"
+    "equipment_retry": "Equipment load failed — retry",
+    "checkin_dead_short": "Dead",
+    "checkin_marks": "Check-in marks: {{marks}}"
   },
   "my_costumes": {
     "title": "Costume Table",
-    "desc": "Fill in your output costume levels and UR exclusive weapons. Managers can view all members' costume status.",
+    "desc": "Fill in your output costume levels and UR exclusive weapons. Managers and guild officers can open the costume matrix.",
     "search_placeholder": "Type a character or costume name to add as tag...",
     "no_matching_costume": "No matching costume.",
     "remove_tag": "Remove tag",
@@ -528,6 +530,8 @@
     "retry": "Retry",
     "filter_guild": "Guild Filter",
     "selected_guilds": "{{count}} selected",
+    "masked_summary": "{{count}} members' costume data is masked due to permissions",
+    "masked_hint": "You do not have permission to view this member's costumes",
     "fill_all_5": "All +5",
     "fill_all_5_title": "Set all costume levels to +5",
     "grant_all_weapons": "All UR Exclusive",

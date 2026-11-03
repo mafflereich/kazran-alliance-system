@@ -58,14 +58,20 @@ src/features/{feature}/
 
 ## 4. 權限控制：角色基礎存取控制（RBAC）
 
-- **角色定義**：`src/shared/lib/access.ts`
-  - `getDefaultRoles(pageId)`（行 11）— 各頁面預設可存取角色
-  - `canUserAccessPage()`（行 32）— 檢查使用者權限（後台 `access_control` 為唯一依據，未設定才用預設值）
-  - `canUserAccessGuildPage()`（行 57）— 公會級頁面（`guild_raid_manager` / `member_board`）權限：
-    creator / admin 一律放行；其餘使用者依後台勾選的角色，公會正/副會長等同 MANAGER（需勾選 MANAGER 才放行）
+- **單一來源**：`src/shared/lib/access.ts`
+  - `PAGE_DEFINITIONS` — 頁面目錄（分組、範圍、預設角色、i18n 說明）；新增頁面只改這裡
+  - `getDefaultRoles()` / `getEffectiveRoles()` — 預設值 vs 後台 `access_control` 生效值
+  - `canUserAccessPage()` — 一般頁面
+  - `canUserAccessGuildPage()` — 公會級頁面（`guild_raid_manager` / `member_board`）：
+    creator / admin 一律放行；其餘依後台勾選角色，公會正/副會長在 MANAGER 有勾選時視同 manager
+  - `isGlobalAdminRole()` / `isManagerOrAboveRole()` — 角色輔助（`equipment.ts` 的 `isManagerRole` / `isAdminRole` 也改用這兩支）
+- **元件入口**：`src/shared/lib/usePermissions.ts`
+  - `isGlobalAdmin` / `isManager` / `isGuildOfficer` / `canManageGuild(guildId)` / `canAccessPage(pageId)` 等
+  - 不要在元件內重寫角色判斷
 - **角色層級**：`creator` > `admin` > `manager` > `member`
-- **路由保護**：`src/shared/ui/ProtectedRoute.tsx` 包裝受保護路由
-- **路由設定**：`src/app/routes.tsx:32-47` — 各路由指定 `pageId`
+- **路由保護**：`src/shared/ui/ProtectedRoute.tsx`
+- **路由設定**：`src/app/routes.tsx` — 各路由指定 `pageId`
+- **完整權限矩陣**：[docs/permissions.md](permissions.md)
 
 ---
 
