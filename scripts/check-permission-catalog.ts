@@ -18,6 +18,21 @@ keys.forEach((k, i) => {
 });
 
 PERMISSIONS.forEach(p => {
+  const access: string = p.access;
+  if (access !== 'read' && access !== 'write') problems.push(`${p.key}: bad access ${access}`);
+  if (!p.label?.zh || !p.label?.en) problems.push(`${p.key}: missing zh/en label`);
+  if (!p.description?.zh || !p.description?.en) problems.push(`${p.key}: missing zh/en description`);
+  if (!Array.isArray(p.enforcedBy)) problems.push(`${p.key}: enforcedBy must be an array`);
+  p.enforcedBy.forEach(enforcement => {
+    const source: string = enforcement;
+    if (source !== 'frontend' && source !== 'database') {
+      problems.push(`${p.key}: unknown enforcement ${source}`);
+    }
+  });
+  if (new Set(p.enforcedBy).size !== p.enforcedBy.length) {
+    problems.push(`${p.key}: duplicated enforcement`);
+  }
+
   p.defaults.forEach(d => {
     if (!roles.includes(d.role)) problems.push(`${p.key}: unknown role ${d.role}`);
     if (d.role === 'admin' && d.scope !== 'global') problems.push(`${p.key}: admin grant must be global`);

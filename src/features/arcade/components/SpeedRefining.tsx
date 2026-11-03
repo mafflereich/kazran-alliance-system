@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/shared/api/supabase';
 import { useAppContext } from '@/store';
+import { useCan } from '@/shared/lib/useCan';
 import { Gamepad2, AlertTriangle, Medal, ArrowLeft, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { logEvent } from '@/analytics';
@@ -84,6 +85,7 @@ const getRefiningPrediction = (isPerfect: boolean) => {
 export default function SpeedRefining() {
   const { t } = useTranslation('arcade');
   const { showToast } = useAppContext();
+  const { can } = useCan();
 
   // State
   const [playerName, setPlayerName] = useState('');
@@ -221,6 +223,18 @@ export default function SpeedRefining() {
 
   // Render Helpers
   const formatTime = (time: number) => time.toFixed(3);
+
+  // 寫入排行榜需要 arcade.speed_refining.use（DB policy 也會再擋一次）
+  if (!can('arcade.speed_refining.use')) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[600px] w-full bg-stone-900 text-stone-100 p-4 rounded-xl font-mono">
+        <AlertTriangle className="w-12 h-12 text-amber-500 mb-4" />
+        <p className="text-sm text-stone-300">
+          {t('speedRefining.no_permission', '你沒有「極速精煉」權限（arcade.speed_refining.use）。')}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[600px] w-full bg-stone-900 text-stone-100 p-4 rounded-xl font-mono relative overflow-hidden">

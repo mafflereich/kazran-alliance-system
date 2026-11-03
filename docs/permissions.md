@@ -69,7 +69,7 @@
 |---|---|---|
 | 管理某公會 | `canManageGuild(guildId)` | `creator/admin` 全部；其他人需綁定該公會 leader/coleader |
 | 檢視所有公會 | `isManager`（manager/admin/creator） | 只影響「看得到哪些公會」 |
-| 處理申請信箱 | `canManageGuild()` | 有任一個公會幹部身分即可 |
+| 處理申請信箱 | `can('mailbox.process')`（前端）＋ `has_permission('mailbox.process')`（DB） | 有任一個公會幹部身分即可；2026-11-03 起前後端同一個 key |
 | 請貝拉提醒 | `canManageGuild(guildId)` | 只限該公會幹部 |
 | 聯合戰分數／賽季 | `canManageGuild()` + 頁面權限 | 幹部只會管理 `managedGuildIds` |
 | 服裝表矩陣 | `isManager || canManageGuild()` | 幹部只看自己管理的公會 |
@@ -164,16 +164,16 @@
 
 | 項目 | 前端 | 資料庫 |
 |---|---|---|
-| Team Assign Board | `member_board` → `adminOnly`（只有 creator / admin） | `members_insert/update/delete` 只允許 admin/creator（update 另允許本人）；`archive_members_bulk()` 內建 admin 檢查 |
+| Team Assign Board | `member_board` → `adminOnly`（只有 creator / admin） | `members_insert/delete` 只允許 admin/creator；`update` 允許 admin、本人、或 `member.edit.managed`；`archive_members_bulk()` 檢查 `member.archive` |
 | `/raid` 聯盟戰記 | manager 唯讀；公會幹部只顯示 `managedGuildIds` | `can_edit_raid_record()` 與 `save_raid_records_bulk()` 都只允許 admin/creator 或公會幹部 |
-| 成員身分欄位 | UI 只開放裝備／服裝／備註 | trigger 禁止非 admin 修改 `name / guild_id / role / status / color`（本人也不行） |
-| 申請信箱 | 公會幹部可改狀態 / 刪除 | 新增 `公會幹部可更新申請` / `公會幹部可刪除申請` policy |
-| 賽季異動 | 只有 admin/creator 或幹部能看到操作 | `raid_seasons` 只允許 admin/creator 或幹部 |
-| 封存歷史 | 後台「封存成員」分頁（manager 可讀） | manager 可讀、只有 admin/creator 可寫 |
-| 裝備／服裝 | `canViewEquipmentForUI()` 鏡像 | `get_member_equipment()` 依 `can_view_equipment()` 遮蔽 |
+| 成員身分欄位 | UI 只開放裝備／服裝／備註 | trigger 預設禁止非 admin 修改 `name / guild_id / role / status / color`；例外：`member.edit.managed`（managed）可改身分欄位、`member.archive`（global）可封存 |
+| 申請信箱 | `can('mailbox.process')` 控制狀態／刪除按鈕 | `公會幹部可更新申請` / `公會幹部可刪除申請` policy 用 `has_permission('mailbox.process')` |
+| 賽季異動 | 賽季分頁各自用 `raid.season.manage` / `raid.score.write` / `raid.roster.move` | `raid_seasons` 用 `has_permission('raid.season.manage')`；成員紀錄用 `raid.score.write` |
+| 封存歷史 | 後台「封存成員」分頁用 `can('admin.archive.read')` | SELECT 用 `has_permission('admin.archive.read')`（manager / admin 預設可讀）、寫入仍限 admin |
+| 裝備／服裝 | `canViewEquipmentForUI()` 鏡像；本人編輯另需 `equipment.write.self` | `get_member_equipment()` 依 `equipment.read.managed` / `equipment.read.staff` 過濾；`can_view_equipment()` 同步 |
 | `/raid-manager`（2026-11-02 起） | `manager` 可進入，但**只顯示自己公會**（`access.memberGuildIds`）且表格 `readOnly` | 編輯需 `raid.score.write`（officer/admin）；寫入 policy 未變 |
 | 成員簽到（2026-11-02 起） | `/raid-manager` 的簽到欄與重置按鈕用 `can('raid.checkin.write')`，與分數編輯分開 | `set_member_checkin_marks()` / `reset_guild_checkin_marks()` 內建 `has_permission('raid.checkin.write', guild_id)`；貝拉 `/api/checkinTags` 也用同一權限 |
-| 裝備／服裝編輯（2026-11-02 決議） | 只有本人（`GuildDashboard.handleEditClick` / `MyCostumes`） | `members_equipment_guard`：非本人改裝備/服裝欄位 → `42501`；備份還原走 `restore_members_snapshot()` |
+| 裝備／服裝編輯（2026-11-02 決議） | 只有本人，且需 `equipment.write.self`（`GuildDashboard.handleEditClick` / `MyCostumes`） | `members_equipment_guard`：本人改內容需 `equipment.write.self`、改可見度需 `equipment.visibility.configure`；非本人 → `42501`；備份還原走 `restore_members_snapshot()` |
 
 對應 migration：`supabase/migrations/20261102120000_member_board_admin_only_and_rls_alignment.sql`
 
@@ -196,3 +196,79 @@
 | D2 | **任何人都不能編輯他人裝備／服裝**（含 admin） | `equipment.write.managed` 已從權限目錄移除；`members_equipment_guard` 擋下非本人寫入；備份還原改走 `restore_members_snapshot()` |
 | 額外 | `guilds` / `costumes` 寫入收回 admin-only | policy 改用 `has_permission('admin.guild.manage')` / `admin.costume.manage` |
 | 後台 | `/admin → 權限設定`：矩陣、例外授權、預覽、稽核 | `PermissionManager` + `preview_access()` + `role_grants`/`user_grants` 稽核 trigger |
+
+---
+
+## 10. 權限目錄重整（2026-11-03）
+
+### 10.1 單一來源與規則
+
+- 目錄唯一來源：`src/shared/lib/permissions.ts`（共 32 個 key）。後台只讀這份，不在 UI 另外寫清單或說明。
+- 每個權限**只能是讀取（`read`）或操作（`write`）其中一種**；不會出現「一次控制讀＋寫」的模糊項目。
+  - 讀取 = 看得到／進得去（`page.*.view`、`*.read.*`、`admin.logs.read`）。
+  - 操作 = 會寫入資料或執行（`*.write`、`*.manage`、`*.process`、`*.move`、`*.run`、`*.use`）。
+- 要讓某人有操作能力，仍需確認他有對應的讀取權限（例如：`raid.season.manage` + `page.raid_manage.view`）。
+
+### 10.2 後台控制面
+
+「後台 → 權限設定 → 角色權限」現在提供：
+
+- **分類**：頁面進出／裝備服裝／成員資料／聯合戰／申請信箱／後台管理／小遊戲。
+- **篩選**：分類、讀取或操作、接線狀態（已接線／尚未接線）、只看已開啟。
+- **搜尋**：中文名稱、英文名稱、權限 key、功能說明（例：`賽季`、`簽到`、`mailbox`）。
+- **每列直接顯示**：名稱、key、讀／寫標籤、是否需要指定公會、實際功能說明，以及「前端檢查／資料庫檢查／尚未接線」。
+- 讀取與操作在每個分類下**分區塊顯示**，不會混在同一張表。
+
+### 10.3 聯合戰的讀寫拆分（前端已接線）
+
+| 動作 | 權限 key |
+|---|---|
+| 進入 `/raid-manager`（唯讀） | `page.raid_manage.view` |
+| 編輯分數／擊殺／超殺／賽季備註 | `raid.score.write` |
+| 清除賽季分數／備註／超殺 | `raid.score.write` |
+| 開季／編輯賽季／封存賽季 | `raid.season.manage` |
+| 成員變動名冊／產生公告 | `raid.roster.move` |
+| 新增／刪除招魂紀錄 | `raid.ghost.manage` |
+| 簽到／重置簽到 | `raid.checkin.write` |
+
+- 賽季操作面板只顯示目前有 write 權限的分頁；`activeTab` 指到沒權限的分頁時會自動切到第一個可用分頁。
+- 只有 `page.raid_manage.view`、沒有任何 write key ⇒ 可進入但完全唯讀。
+- `raid.season.manage` 的預設授權由 officer=`managed` 改為 `global`：`raid_seasons` 沒有 `guild_id`，DB policy 也不帶公會，原本就是全站生效；改為 global 只是讓目錄與實際行為一致。
+- `mailbox.process` 同理改為 `global`：`apply_mail` 是全聯盟共用、沒有公會欄位，policy 也不帶公會。
+- `raid.ghost.manage` 前後端都已接線：前端控制「招魂／刪除」按鈕，DB 的 `ghost_records_write` 改用 `has_permission('raid.ghost.manage')`。
+
+### 10.4 接線狀態（2026-11-03：全部已接線）
+
+`enforcedBy` 會列出這個 key 目前真的被哪裡讀取：
+
+- `frontend`：路由或畫面會用 `can(key)` 擋。
+- `database`：RLS / RPC 會用 `has_permission(key, guild_id)` 擋。
+- 空陣列 = 目錄有 key、但沒有任何檢查點（後台會標紅「尚未接線」）。
+
+2026-11-03 已把原本標示「尚未接線」的 key 全部補上檢查點：
+
+| 權限 | 前端 | 資料庫 |
+|---|---|---|
+| `equipment.read.managed`／`equipment.read.staff` | — | `get_member_equipment()` / `get_member_equipment_showcase()` 權限不足時只回 null 欄位；`can_view_equipment()` 同步 |
+| `equipment.write.self` | `GuildDashboard` / `MyCostumes` 本人編輯 | `members_equipment_guard`（改內容） |
+| `equipment.visibility.configure` | — | `members_equipment_guard`（改可見度） |
+| `member.edit.managed` | — | `members_update` policy + `protect_member_identity_columns` trigger（managed） |
+| `member.archive` | — | `archive_members_bulk()` + trigger（global） |
+| `member.note.write.managed` | — | `member_notes` insert/update policy |
+| `admin.identity.manage` | 後台「身分綁定」分頁 | `profiles` trigger（`id` / `discord_id`）+ UPDATE policy |
+| `admin.role.assign` | 後台「角色設定」分頁 | `profiles` trigger（`user_role`）+ UPDATE policy |
+| `admin.logs.read` | 後台「系統日誌」/ 權限稽核分頁 | `system_logs` SELECT policy |
+| `admin.tools.run` | 後台「工具」分頁 | `restore_members_snapshot()` |
+| `admin.settings.manage` | 後台「系統設定」分頁 | `settings` INSERT/UPDATE/DELETE policy |
+| `admin.permission.manage` | 後台「權限設定」分頁 | `role_grants` / `user_grants` 寫入 policy |
+| `admin.archive.read`（新增） | 後台「封存成員」分頁 | `members_archive_history` SELECT policy |
+| `arcade.speed_refining.use` | `SpeedRefining` 元件 | `lb_speedrefining` 寫入 policy |
+
+### 10.5 新增的權限
+
+`admin.archive.read`（讀取，後台）是這次唯一新增的 key：
+
+- 用途：讀取「封存成員」清單與封存原因（`members_archive_history`）。
+- 預設：`manager` / `admin` 全站可讀（與原本後台分頁的可見度一致）。
+- 封存／還原成員仍是 `member.archive`（操作），兩者分開。
+- 既有環境由 `20261103140000_permission_wire_unwired.sql` 寫入，新環境由 `20261102130000` 的 generated seed 建立。

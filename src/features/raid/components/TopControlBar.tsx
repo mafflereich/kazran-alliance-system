@@ -9,6 +9,8 @@ interface TopControlBarProps {
   isComparisonMode: boolean;
   setIsComparisonMode: (val: boolean) => void;
   canManage: boolean;
+  /** 賽季操作面板：只要有 raid.score.write / raid.season.manage / raid.roster.move 任一即可 */
+  canOpenSeasonPanel: boolean;
   onToggleSeasonPanel: () => void;
   onNavigateToRaid: () => void;
   onNavigateToTeamAssign: () => void;
@@ -21,6 +23,7 @@ const TopControlBar: React.FC<TopControlBarProps> = ({
   isComparisonMode,
   setIsComparisonMode,
   canManage,
+  canOpenSeasonPanel,
   onToggleSeasonPanel,
   onNavigateToRaid,
   onNavigateToTeamAssign,
@@ -56,9 +59,9 @@ const TopControlBar: React.FC<TopControlBarProps> = ({
 
         <button
           onClick={onToggleSeasonPanel}
-          disabled={!canManage}
+          disabled={!canOpenSeasonPanel}
           className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm ${
-            !canManage
+            !canOpenSeasonPanel
               ? 'bg-stone-200 dark:bg-stone-800 text-stone-400 dark:text-stone-600 cursor-not-allowed'
               : 'bg-stone-800 dark:bg-stone-700 text-white hover:bg-stone-700 dark:hover:bg-stone-600'
           }`}

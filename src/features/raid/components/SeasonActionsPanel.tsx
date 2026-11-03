@@ -30,6 +30,12 @@ interface ManagerActionsModalProps {
   archiving: boolean;
   isDeleting: boolean;
   isSelectedSeasonArchived: boolean;
+  /** 賽季主檔的新增／編輯／封存（raid.season.manage） */
+  canManageSeason?: boolean;
+  /** 分數與賽季紀錄的編輯／清除（raid.score.write） */
+  canEditScores?: boolean;
+  /** 成員變動名冊與公告（raid.roster.move） */
+  canManageRoster?: boolean;
   members?: Member[];
   guilds?: Guild[];
   currentSeasonRecords?: Record<string, MemberRaidRecord>;
@@ -63,6 +69,9 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
   archiving,
   isDeleting,
   isSelectedSeasonArchived,
+  canManageSeason = true,
+  canEditScores = true,
+  canManageRoster = true,
   members = [],
   guilds = [],
   currentSeasonRecords = {},
@@ -81,6 +90,23 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
     guilds,
     isSelectedSeasonArchived
   );
+
+  type SeasonTab = ManagerActionsModalProps['activeTab'];
+
+  // 分頁依 write 權限顯示；activeTab 指到沒權限的分頁時自動切到第一個可用的。
+  const allowedTabs = React.useMemo<SeasonTab[]>(() => {
+    const tabs: SeasonTab[] = [];
+    if (canManageSeason) tabs.push('add', 'edit', 'archive');
+    if (canEditScores) tabs.push('delete');
+    if (canManageRoster) tabs.push('memberMove');
+    return tabs;
+  }, [canManageSeason, canEditScores, canManageRoster]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    if (allowedTabs.length === 0) return;
+    if (!allowedTabs.includes(activeTab)) onTabChange(allowedTabs[0]);
+  }, [isOpen, activeTab, allowedTabs, onTabChange]);
 
   if (!isOpen) return null;
 
@@ -114,68 +140,31 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
         </button>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs：只顯示目前 write 權限允許的分頁 */}
       <div className="flex border-b border-stone-200 dark:border-stone-700 overflow-x-auto">
-        <button
-          onClick={() => {
-            setConfirmType(null);
-            onTabChange('add');
-          }}
-          className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'add'
-              ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-              : 'border-transparent text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
-            }`}
-        >
-          {t('raid.tab_add_season', '新增賽季')}
-        </button>
-        <button
-          onClick={() => {
-            setConfirmType(null);
-            onTabChange('edit');
-          }}
-          className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'edit'
-              ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-              : 'border-transparent text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
-            }`}
-        >
-          {t('raid.tab_edit_season', '編輯賽季')}
-        </button>
-        <button
-          onClick={() => {
-            setConfirmType(null);
-            onTabChange('archive');
-          }}
-          className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'archive'
-              ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-              : 'border-transparent text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
-            }`}
-        >
-          {t('raid.tab_archive_season', '封存賽季')}
-        </button>
-        <button
-          onClick={() => {
-            setConfirmType(null);
-            onTabChange('delete');
-          }}
-          className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'delete'
-              ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-              : 'border-transparent text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
-            }`}
-        >
-          {t('raid.tab_delete_records', '刪除記錄')}
-        </button>
-        <button
-          onClick={() => {
-            setConfirmType(null);
-            onTabChange('memberMove');
-          }}
-          className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'memberMove'
-              ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-              : 'border-transparent text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
-            }`}
-        >
-          {t('raid.tab_member_moves', '成員變動名冊')}
-        </button>
+        {([
+          { id: 'add', label: t('raid.tab_add_season', '新增賽季'), visible: canManageSeason },
+          { id: 'edit', label: t('raid.tab_edit_season', '編輯賽季'), visible: canManageSeason },
+          { id: 'archive', label: t('raid.tab_archive_season', '封存賽季'), visible: canManageSeason },
+          { id: 'delete', label: t('raid.tab_delete_records', '刪除記錄'), visible: canEditScores },
+          { id: 'memberMove', label: t('raid.tab_member_moves', '成員變動名冊'), visible: canManageRoster },
+        ] satisfies { id: SeasonTab; label: string; visible: boolean }[])
+          .filter(tab => tab.visible)
+          .map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setConfirmType(null);
+                onTabChange(tab.id);
+              }}
+              className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === tab.id
+                  ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                  : 'border-transparent text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
+                }`}
+            >
+              {tab.label}
+            </button>
+          ))}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4">
@@ -212,7 +201,7 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
           </div>
         ) : (
           <>
-            {activeTab === 'add' && (
+            {activeTab === 'add' && canManageSeason && (
               <form onSubmit={handleSaveSeason} className="space-y-4 max-w-md mx-auto">
                 <div>
                   <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
@@ -346,7 +335,7 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
               </form>
             )}
 
-            {activeTab === 'edit' && (
+            {activeTab === 'edit' && canManageSeason && (
               <form onSubmit={handleEditSeason} className="space-y-4 max-w-md mx-auto">
                 <div>
                   <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
@@ -445,7 +434,7 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
               </form>
             )}
 
-            {activeTab === 'archive' && (
+            {activeTab === 'archive' && canManageSeason && (
               <div className="space-y-4 max-w-md mx-auto">
                 <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
                   <div className="flex gap-3">
@@ -486,7 +475,7 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
               </div>
             )}
 
-            {activeTab === 'delete' && (
+            {activeTab === 'delete' && canEditScores && (
               <div className="space-y-6 max-w-md mx-auto">
                 <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
                   <div className="flex gap-3">
@@ -562,7 +551,7 @@ const SeasonActionsPanel: React.FC<ManagerActionsModalProps> = ({
               </div>
             )}
 
-            {activeTab === 'memberMove' && (
+            {activeTab === 'memberMove' && canManageRoster && (
               prevSeasonRecordsLoading || prevSeasonRecords === null
                 ? (
                   <div className="flex items-center justify-center py-12 text-stone-400 dark:text-stone-500">

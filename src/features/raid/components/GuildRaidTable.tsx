@@ -51,6 +51,8 @@ interface GuildRaidTableProps {
   onFetchGhostRecords?: (memberId: string) => void;
   onAddGhostRecord?: (memberId: string) => void;
   onDeleteGhostRecord?: (memberId: string, record: any) => void;
+  /** 是否有 raid.ghost.manage；沒有時只能看招魂紀錄，不能新增／刪除 */
+  canManageGhost?: boolean;
   showOverkill?: boolean;
   scoreThreshold?: number | null;
   forceHideOverkill?: boolean;
@@ -94,6 +96,7 @@ function GuildRaidTable({
   onFetchGhostRecords,
   onAddGhostRecord,
   onDeleteGhostRecord,
+  canManageGhost = true,
   showOverkill = false,
   scoreThreshold = null,
   forceHideOverkill = true,
@@ -680,6 +683,7 @@ function GuildRaidTable({
         <GhostRecordModal
           member={ghostModalMember}
           ghostRecords={ghostRecords}
+          canManage={canManageGhost}
           onAddGhostRecord={onAddGhostRecord}
           onDeleteGhostRecord={onDeleteGhostRecord}
           onClose={() => setGhostModalMember(null)}

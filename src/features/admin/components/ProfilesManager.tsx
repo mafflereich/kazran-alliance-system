@@ -1,44 +1,68 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import IdentityBinding from './IdentityBinding';
 import RoleSetting from './RoleSetting';
+import { useCan } from '@/shared/lib/useCan';
+
+type ProfilesTab = 'binding' | 'role_setting';
 
 export default function ProfilesManager() {
   const { t } = useTranslation('admin');
-  const [activeTab, setActiveTab] = useState<'binding' | 'role_setting'>('binding');
+  const { can } = useCan();
+  const canIdentity = can('admin.identity.manage');
+  const canRole = can('admin.role.assign');
+  const [activeTab, setActiveTab] = useState<ProfilesTab>(canIdentity ? 'binding' : 'role_setting');
+
+  // 權限載入／變更後，確保停在目前允許的分頁
+  useEffect(() => {
+    if (activeTab === 'binding' && !canIdentity && canRole) setActiveTab('role_setting');
+    if (activeTab === 'role_setting' && !canRole && canIdentity) setActiveTab('binding');
+  }, [activeTab, canIdentity, canRole]);
+
+  if (!canIdentity && !canRole) {
+    return (
+      <p className="text-sm text-stone-500 dark:text-stone-400">
+        {t('binding.no_permission', '你沒有身分綁定或角色指派的權限。')}
+      </p>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-stone-800 dark:text-stone-200">{t('binding.title')}</h2>
         <div className="flex bg-stone-100 dark:bg-stone-800 p-1 rounded-lg">
-          <button
-            onClick={() => setActiveTab('binding')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              activeTab === 'binding'
-                ? 'bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 shadow-sm'
-                : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
-            }`}
-          >
-            {t('binding.tab_identity_binding', 'Identity Binding')}
-          </button>
-          <button
-            onClick={() => setActiveTab('role_setting')}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              activeTab === 'role_setting'
-                ? 'bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 shadow-sm'
-                : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
-            }`}
-          >
-            {t('role_setting.tab_title', 'Role Setting')}
-          </button>
+          {canIdentity && (
+            <button
+              onClick={() => setActiveTab('binding')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                activeTab === 'binding'
+                  ? 'bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
+              }`}
+            >
+              {t('binding.tab_identity_binding', 'Identity Binding')}
+            </button>
+          )}
+          {canRole && (
+            <button
+              onClick={() => setActiveTab('role_setting')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                activeTab === 'role_setting'
+                  ? 'bg-white dark:bg-stone-700 text-stone-800 dark:text-stone-100 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-700 dark:hover:text-stone-300'
+              }`}
+            >
+              {t('role_setting.tab_title', 'Role Setting')}
+            </button>
+          )}
         </div>
       </div>
 
-      {activeTab === 'binding' && (
+      {activeTab === 'binding' && canIdentity && (
         <IdentityBinding />
       )}
-      {activeTab === 'role_setting' && (
+      {activeTab === 'role_setting' && canRole && (
         <RoleSetting />
       )}
     </div>

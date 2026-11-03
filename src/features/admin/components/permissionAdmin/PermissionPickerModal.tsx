@@ -1,14 +1,15 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PERMISSIONS } from '@/shared/lib/permissions';
-import PickerModal, { type PickerFilter, type PickerOption } from './PickerModal';
 import {
-  DOMAIN_LABELS,
-  PERMISSION_DESCRIPTIONS,
-  PERMISSION_LABELS,
-  permissionDescription,
-  permissionLabel,
-} from './shared';
+  PERMISSIONS,
+  PERMISSION_ACCESS_LABELS,
+  PERMISSION_DOMAIN_LABELS,
+  PERMISSION_DOMAIN_ORDER,
+  PERMISSION_ENFORCEMENT_LABELS,
+  isPermissionWired,
+} from '@/shared/lib/permissions';
+import PickerModal, { type PickerFilter, type PickerOption } from './PickerModal';
+import { permissionDescription, permissionLabel } from './shared';
 
 interface PermissionPickerModalProps {
   isOpen: boolean;
@@ -36,25 +37,44 @@ export default function PermissionPickerModal({
   const options = useMemo<PickerOption[]>(
     () =>
       PERMISSIONS.map(permission => {
-        const zhLabel = PERMISSION_LABELS[permission.key]?.zh ?? permission.key;
-        const enLabel = PERMISSION_LABELS[permission.key]?.en ?? permission.key;
+        const isWired = isPermissionWired(permission.key);
+        const accessLabel = PERMISSION_ACCESS_LABELS[permission.access][isZh ? 'zh' : 'en'];
+        const wiredLabel = isWired
+          ? isZh
+            ? '已接線'
+            : 'Wired'
+          : PERMISSION_ENFORCEMENT_LABELS.none[isZh ? 'zh' : 'en'];
 
         return {
           id: permission.key,
-          label: isZh ? zhLabel : enLabel,
-          sublabel: `${permission.key}${permission.needsGuild ? (isZh ? ' · 需要指定公會' : ' · guild required') : ''}`,
+          label: permissionLabel(permission.key, isZh),
+          sublabel: [
+            permission.key,
+            accessLabel,
+            permission.needsGuild ? (isZh ? '需指定公會' : 'guild required') : null,
+          ]
+            .filter(Boolean)
+            .join(' · '),
           description: permissionDescription(permission.key, isZh),
-          group: DOMAIN_LABELS[permission.domain]?.[isZh ? 'zh' : 'en'] ?? permission.domain,
+          badge: wiredLabel,
+          group: PERMISSION_DOMAIN_LABELS[permission.domain][isZh ? 'zh' : 'en'],
           searchText: [
-            zhLabel,
-            enLabel,
-            PERMISSION_DESCRIPTIONS[permission.key]?.zh,
-            PERMISSION_DESCRIPTIONS[permission.key]?.en,
+            permission.label.zh,
+            permission.label.en,
+            permission.description.zh,
+            permission.description.en,
             permission.domain,
+            permission.access,
+            accessLabel,
+            isWired ? wiredLabel : '',
           ]
             .filter(Boolean)
             .join(' '),
-          filterValues: { domain: permission.domain },
+          filterValues: {
+            domain: permission.domain,
+            access: permission.access,
+            wired: isWired ? 'wired' : 'unwired',
+          },
         };
       }),
     [isZh],
@@ -64,12 +84,30 @@ export default function PermissionPickerModal({
     () => [
       {
         id: 'domain',
-        label: isZh ? '全部類別' : 'All categories',
-        shortLabel: isZh ? '類別' : 'Category',
-        options: Object.entries(DOMAIN_LABELS).map(([domain, labels]) => ({
+        label: isZh ? '全部分類' : 'All categories',
+        shortLabel: isZh ? '分類' : 'Category',
+        options: PERMISSION_DOMAIN_ORDER.map(domain => ({
           value: domain,
-          label: isZh ? labels.zh : labels.en,
+          label: PERMISSION_DOMAIN_LABELS[domain][isZh ? 'zh' : 'en'],
         })),
+      },
+      {
+        id: 'access',
+        label: isZh ? '讀取＋操作' : 'Read + write',
+        shortLabel: isZh ? '類型' : 'Type',
+        options: [
+          { value: 'read', label: PERMISSION_ACCESS_LABELS.read[isZh ? 'zh' : 'en'] },
+          { value: 'write', label: PERMISSION_ACCESS_LABELS.write[isZh ? 'zh' : 'en'] },
+        ],
+      },
+      {
+        id: 'wired',
+        label: isZh ? '全部狀態' : 'All status',
+        shortLabel: isZh ? '狀態' : 'Status',
+        options: [
+          { value: 'wired', label: isZh ? '已接線' : 'Wired' },
+          { value: 'unwired', label: isZh ? '尚未接線' : 'Not wired' },
+        ],
       },
     ],
     [isZh],

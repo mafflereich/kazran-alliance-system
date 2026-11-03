@@ -7,6 +7,8 @@ import ConfirmModal from '@shared/ui/ConfirmModal';
 interface GhostRecordModalProps {
   member: Member;
   ghostRecords: Record<string, any[]>;
+  /** 是否有 raid.ghost.manage；false 時只顯示紀錄，不顯示新增／刪除 */
+  canManage?: boolean;
   onAddGhostRecord?: (memberId: string) => void;
   onDeleteGhostRecord?: (memberId: string, record: any) => void;
   onClose: () => void;
@@ -15,6 +17,7 @@ interface GhostRecordModalProps {
 export default function GhostRecordModal({
   member,
   ghostRecords,
+  canManage = true,
   onAddGhostRecord,
   onDeleteGhostRecord,
   onClose,
@@ -39,13 +42,15 @@ export default function GhostRecordModal({
               {member.name} - {t('raid.ghost_log_title', '招魂紀錄')}
             </h3>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => onAddGhostRecord?.(member.id!)}
-                className="px-3 py-1.5 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-600 transition-colors flex items-center gap-1"
-              >
-                <Ghost className="w-4 h-4" />
-                {t('raid.ghost_log_button', '招魂')}
-              </button>
+              {canManage && (
+                <button
+                  onClick={() => onAddGhostRecord?.(member.id!)}
+                  className="px-3 py-1.5 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-600 transition-colors flex items-center gap-1"
+                >
+                  <Ghost className="w-4 h-4" />
+                  {t('raid.ghost_log_button', '招魂')}
+                </button>
+              )}
               <button
                 onClick={onClose}
                 className="p-2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-700 transition-colors"
@@ -81,23 +86,25 @@ export default function GhostRecordModal({
                           {new Date(record.created_at).toLocaleString()}
                         </td>
                         <td className="py-2 text-center">
-                          <button
-                            onClick={() => {
-                              setConfirmModal({
-                                isOpen: true,
-                                title: t('raid.ghost_log_delete_title', '刪除招魂紀錄'),
-                                message: t('raid.ghost_log_delete_desc', '確定要刪除這筆招魂紀錄嗎？此操作無法復原。'),
-                                onConfirm: () => {
-                                  onDeleteGhostRecord?.(member.id!, record);
-                                  closeConfirmModal();
-                                }
-                              });
-                            }}
-                            className="p-1 text-stone-400 hover:text-red-500 rounded hover:bg-red-50 dark:hover:bg-red-900/30 opacity-0 group-hover/ghost:opacity-100 transition-all"
-                            title={t('common.delete', '刪除')}
-                          >
-                            <Ban className="w-4 h-4" />
-                          </button>
+                          {canManage && (
+                            <button
+                              onClick={() => {
+                                setConfirmModal({
+                                  isOpen: true,
+                                  title: t('raid.ghost_log_delete_title', '刪除招魂紀錄'),
+                                  message: t('raid.ghost_log_delete_desc', '確定要刪除這筆招魂紀錄嗎？此操作無法復原。'),
+                                  onConfirm: () => {
+                                    onDeleteGhostRecord?.(member.id!, record);
+                                    closeConfirmModal();
+                                  }
+                                });
+                              }}
+                              className="p-1 text-stone-400 hover:text-red-500 rounded hover:bg-red-50 dark:hover:bg-red-900/30 opacity-0 group-hover/ghost:opacity-100 transition-all"
+                              title={t('common.delete', '刪除')}
+                            >
+                              <Ban className="w-4 h-4" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -108,6 +115,14 @@ export default function GhostRecordModal({
                 <Ghost className="w-12 h-12 mx-auto mb-3 opacity-20" />
                 <p>{t('raid.ghost_log_empty', '目前沒有招魂紀錄')}</p>
               </div>
+            )}
+            {!canManage && (
+              <p className="mt-3 rounded-lg bg-stone-100 px-3 py-2 text-xs text-stone-500 dark:bg-stone-900/50 dark:text-stone-400">
+                {t(
+                  'raid.ghost_log_read_only',
+                  '你沒有「幽靈紀錄」（raid.ghost.manage）權限，只能查看，不能新增或刪除。',
+                )}
+              </p>
             )}
           </div>
         </div>

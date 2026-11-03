@@ -15,11 +15,13 @@ import GuildHeader from '../components/GuildHeader';
 import EquipmentTable from '../components/EquipmentTable';
 import { getSortedMembers, getSortedGuilds } from '../utils/sort';
 import { isManagerOrAboveRole } from '@/shared/lib/access';
+import { useCan } from '@/shared/lib/useCan';
 
 export default function GuildDashboard({ guildId }: { guildId: string }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { db, isMembersLoading, userGuildRoles, userRole, fetchMembers, userProfileId, canManageGuild } = useAppContext();
+  const { can } = useCan();
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
   const [reminderMembers, setReminderMembers] = useState<{ id: string; name: string }[] | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -73,7 +75,7 @@ export default function GuildDashboard({ guildId }: { guildId: string }) {
 
   const handleEditClick = (id: string, memberName: string) => {
     const isCurrentUser = userProfileId && userProfileId.split(',').map(uid => uid.trim()).filter(Boolean).includes(id);
-    const canEdit = isCurrentUser;
+    const canEdit = isCurrentUser && can('equipment.write.self');
     if (!canEdit) return;
 
     logEvent('GuildDashboard', 'Edit Member Equipment', memberName);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/store';
+import { useCan } from '@/shared/lib/useCan';
 import { useTranslation } from 'react-i18next';
 import { logEvent } from '@/analytics';
 import { formatDate } from '@/shared/lib/utils';
@@ -22,7 +23,8 @@ type ApplicationStatus = 'pending' | 'acknowledged' | 'rejected' | 'discuss' | '
 
 export default function ApplicationMailbox() {
   const { t } = useTranslation(['mailbox', 'translation']);
-  const { db, fetchApplyMails, addApplyMail, updateApplyMail, deleteApplyMail, showToast, canManageGuild } = useAppContext();
+  const { db, fetchApplyMails, addApplyMail, updateApplyMail, deleteApplyMail, showToast } = useAppContext();
+  const { can } = useCan();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
@@ -53,8 +55,8 @@ export default function ApplicationMailbox() {
     return app.subject === filter;
   });
 
-  // 公會管理權限改按「正/副會長」判斷（creator/admin 亦為全域管理）
-  const isPrivileged = canManageGuild();
+  // 處理申請的寫入權限（mailbox.process）：前端與 DB policy 用同一個 key。
+  const isPrivileged = can('mailbox.process');
 
   const totalPages = Math.ceil(filteredApplications.length / itemsPerPage);
   const currentApplications = filteredApplications.slice(

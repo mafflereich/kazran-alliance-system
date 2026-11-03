@@ -25,8 +25,10 @@ Supabase Dashboard → SQL Editor（散落在 `docs/sql/*.sql`），因此無法
 | `20261102130000_permission_catalog_v2_foundation.sql` | **權限 v2 Phase 1（零行為變更）**：新增 `permissions` / `role_grants` / `user_grants` / `permission_meta`；`my_roles()` / `has_permission()` / `my_permissions()` / `get_my_access()`；把 `access_control` 等價搬成 `role_grants`（parity 驗證 0 差異）；`set_page_roles()` 供舊「存取控制」UI 雙寫 |
 | `20261102120000_member_board_admin_only_and_rls_alignment.sql` | **Team Assign Board 僅 admin/creator + 前後端對齊**：`members` 寫入限制為 admin/creator 或本人；`archive_members_bulk()` 加 admin 檢查；`save_raid_records_bulk()` / `can_edit_raid_record()` 移除 manager；trigger 禁止非 admin 修改成員身分欄位；賽季／封存歷史／申請信箱 policy 對齊 |
 | `20261103120000_discord_member_snapshot.sql` | **Discord 名單 DB 快取**：新增 `discord_member_snapshot`（單列 `id=1`，jsonb payload + `fetched_at`），供 GSD_Bella 的 `GET /api/discordMembers` 在多實例／重啟後仍能沿用快取，避免重複打 Discord API 撞 rate limit；僅 `service_role` 可讀寫 |
+| `20261103130000_permission_scope_normalization.sql` | **權限目錄對齊**：把 `role_grants` 中 officer 的 `raid.season.manage`／`mailbox.process` 由 `managed` 正規化為 `global`（兩者都沒有公會欄位，原本不帶公會的檢查就等同全站；不改變實際行為） |
+| `20261103140000_permission_wire_unwired.sql` | **權限全部接線**：新增 `admin.archive.read`；裝備讀寫、成員編輯／封存／備註、後台各分頁（身分、角色、日誌、工具、設定、權限）、幽靈紀錄、極速精煉全部補上前端與 RLS／RPC 檢查；預設授權不變 |
 
-十五支都可**重複執行**，且不刪改任何資料。
+以上 migration 都可**重複執行**，且不刪改任何資料。
 
 ## 套用方式（擇一）
 

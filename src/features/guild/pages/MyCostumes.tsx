@@ -6,6 +6,7 @@ import { getImageUrl, getTierColor } from '@/shared/lib/utils';
 import { canViewEquipmentForUI, isAdminRole, isManagerRole } from '@/shared/lib/equipment';
 import { getSortedCostumes, getSortedCharacters } from '../utils/sort';
 import CostumeMatrixTable from '../components/CostumeMatrixTable';
+import { useCan } from '@/shared/lib/useCan';
 
 const ATK_TYPE_FILTERS = ['物', '魔'];
 const ATTRIBUTE_FILTERS = ['火', '水', '風', '光', '暗'];
@@ -18,6 +19,7 @@ interface CostumeFilters {
 export default function MyCostumesPage() {
   const { t, i18n } = useTranslation();
   const { db, userProfileId, updateMember, showToast, isRoleLoading, userRole, fetchMembers, loadMembersByIds, isMembersLoading, managedGuildIds, canManageGuild } = useAppContext();
+  const { can } = useCan();
   const [saveState, setSaveState] = useState<Record<string, 'saving' | 'done'>>({});
   const [drafts, setDrafts] = useState<Record<string, { records: any; exclusiveWeapons: any }>>({});
   const [tagInput, setTagInput] = useState('');
@@ -662,7 +664,7 @@ export default function MyCostumesPage() {
                   <p>{t('my_costumes.no_member')}</p>
                 </div>
               ) : (
-                myMembers.length > 0 && (
+                myMembers.length > 0 && can('equipment.write.self') && (
                   <div className="mt-6 space-y-6">
                     {myMembers.map(member => (
                       <MemberCostumeEditor

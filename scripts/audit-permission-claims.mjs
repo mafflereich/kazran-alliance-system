@@ -62,11 +62,11 @@ const bulk = read('supabase/migrations/20261029090200_save_raid_records_bulk.sql
 const rlsEval = read('supabase/migrations/20261029090100_rls_single_eval.sql');
 
 // ── 1. 裝備 / 服裝編輯：UI 只有本人 ───────────────────────────────────
-check('GuildDashboard 的裝備編輯只允許本人（canEdit = isCurrentUser）', () => {
+check('GuildDashboard 的裝備編輯只允許本人且需 equipment.write.self', () => {
   const block = after(dashboard, 'const handleEditClick', 300);
-  return block.includes('const canEdit = isCurrentUser;') && block.includes('if (!canEdit) return;')
+  return block.includes("const canEdit = isCurrentUser && can('equipment.write.self');") && block.includes('if (!canEdit) return;')
     ? true
-    : `實際內容：${block.slice(0, 160)}`;
+    : `實際內容：${block.slice(0, 200)}`;
 });
 
 check('MyCostumes 的服裝編輯器只渲染自己綁定的成員（myMembers）', () => {
@@ -181,10 +181,13 @@ check('EQUIPMENT_VISIBILITY_OPTIONS 只有 guild_manager / all_manager', () => {
 });
 
 // ── 8. /raid-manager 的進入 / 編輯分離（D1） ─────────────────────────
-check('GuildRaidManager 用 page.raid_manage.view 進入、raid.score.write 編輯', () => {
+check('GuildRaidManager 用 page.raid_manage.view 進入、各 write key 分別控制', () => {
   if (!raidPage.includes("can('page.raid_manage.view')")) return '找不到 canViewPage';
-  if (!raidPage.includes("can('raid.score.write')")) return '找不到 canEdit';
-  if (!raidPage.includes('readOnly={!canEdit}')) return '找不到 readOnly';
+  if (!raidPage.includes("can('raid.score.write')")) return '找不到 raid.score.write';
+  if (!raidPage.includes("can('raid.season.manage')")) return '找不到 raid.season.manage';
+  if (!raidPage.includes("can('raid.roster.move')")) return '找不到 raid.roster.move';
+  if (!raidPage.includes("can('raid.checkin.write')")) return '找不到 raid.checkin.write';
+  if (!raidPage.includes('readOnly={!canEditScores}')) return '找不到 readOnly={!canEditScores}';
   return raidPage.includes('canManageGuild()') ? '頁面仍依賴 canManageGuild()' : true;
 });
 
@@ -212,8 +215,10 @@ check('fetchApplyMails 沒有依 loginId / 公會過濾', () => {
     : '發現過濾條件，文件說法需修正';
 });
 
-check('ApplicationMailbox 的 isPrivileged = canManageGuild()', () =>
-  mailbox.includes('const isPrivileged = canManageGuild();') ? true : '找不到 isPrivileged');
+check('ApplicationMailbox 的 isPrivileged = can(\'mailbox.process\')', () =>
+  mailbox.includes("const isPrivileged = can('mailbox.process');")
+    ? true
+    : '找不到 isPrivileged 或尚未改用 mailbox.process');
 
 // ── 10. 角色來源：admin_users 與寫死的 Discord role ID ────────────────
 check('admin_users 只被 Edge Function 查詢（src / migrations 沒有 .from 或 FROM），文件有記錄', () => {

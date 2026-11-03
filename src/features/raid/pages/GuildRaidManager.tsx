@@ -27,12 +27,16 @@ export default function GuildRaidManager() {
   const { db, setDb, userGuildRoles, managedGuildIds, fetchMembers, access } = useAppContext();
   const { can } = useCan();
 
-  // Phase 2：進入頁面（看）與編輯（寫）分開。
-  //   manager → 可以進、只能看自己公會
-  //   officer / admin → 可以編輯（officer 仍由 can('raid.score.write', guildId) 限縮到自己公會）
+  // 讀寫分離：看頁面、改分數、管賽季、移轉公告、簽到各有自己的 key。
+  //   manager → 可以進（page.raid_manage.view），但沒有任何 write key ⇒ 唯讀
+  //   officer / admin → 依各自被授權的 write key 決定能操作哪些部分
   const canViewPage = can('page.raid_manage.view');
-  const canEdit = can('raid.score.write');
+  const canEditScores = can('raid.score.write');
+  const canManageSeason = can('raid.season.manage');
+  const canManageRoster = can('raid.roster.move');
+  const canManageGhost = can('raid.ghost.manage');
   const canCheckIn = can('raid.checkin.write');
+  const canOpenActions = canEditScores || canManageSeason || canManageRoster;
   const isGlobalAdmin = access.isAdmin;
 
   const userGuilds = userGuildRoles.length > 0
@@ -394,14 +398,15 @@ export default function GuildRaidManager() {
           seasons={raidData.seasons}
           isComparisonMode={isComparisonMode}
           setIsComparisonMode={setIsComparisonMode}
-          canManage={canEdit}
+          canManage={canEditScores}
+          canOpenSeasonPanel={canOpenActions}
           onToggleSeasonPanel={() => seasonManager.setIsSeasonPanelOpen(!seasonManager.isSeasonPanelOpen)}
           onNavigateToRaid={() => navigate('/raid')}
           onNavigateToTeamAssign={() => navigate('/team')}
         />
 
         <SeasonActionsPanel
-          isOpen={canEdit && seasonManager.isSeasonPanelOpen}
+          isOpen={canOpenActions && seasonManager.isSeasonPanelOpen}
           onClose={() => seasonManager.setIsSeasonPanelOpen(false)}
           activeTab={seasonManager.activeSeasonTab}
           onTabChange={seasonManager.setActiveSeasonTab}
@@ -424,6 +429,9 @@ export default function GuildRaidManager() {
           archiving={seasonManager.archiving}
           isDeleting={seasonManager.isDeleting}
           isSelectedSeasonArchived={raidData.isSelectedSeasonArchived}
+          canManageSeason={canManageSeason}
+          canEditScores={canEditScores}
+          canManageRoster={canManageRoster}
           members={Object.values(db.members)}
           guilds={Object.values(db.guilds)}
           currentSeasonRecords={raidData.records}
@@ -465,7 +473,8 @@ export default function GuildRaidManager() {
             <GuildRaidTable
               key={guildId}
               guildId={guildId}
-              readOnly={!canEdit}
+              readOnly={!canEditScores}
+              canManageGhost={canManageGhost}
               guild={db.guilds[guildId]}
               sortedMembers={sortedMembersMap[guildId] ?? []}
               records={raidData.records}

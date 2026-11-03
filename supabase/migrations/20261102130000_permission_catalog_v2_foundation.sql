@@ -363,7 +363,7 @@ insert into public.permissions (key, domain, needs_guild, sort_order) values
   ('raid.ghost.manage', 'raid', true, 190),
   ('raid.roster.move', 'raid', true, 200),
   ('raid.checkin.write', 'raid', true, 210),
-  ('mailbox.process', 'mailbox', true, 220),
+  ('mailbox.process', 'mailbox', false, 220),
   ('admin.guild.manage', 'admin', false, 230),
   ('admin.costume.manage', 'admin', false, 240),
   ('admin.identity.manage', 'admin', false, 250),
@@ -372,7 +372,8 @@ insert into public.permissions (key, domain, needs_guild, sort_order) values
   ('admin.settings.manage', 'admin', false, 280),
   ('admin.permission.manage', 'admin', false, 290),
   ('admin.role.assign', 'admin', false, 300),
-  ('arcade.speed_refining.use', 'arcade', false, 310)
+  ('admin.archive.read', 'admin', false, 310),
+  ('arcade.speed_refining.use', 'arcade', false, 320)
 on conflict (key) do update
   set domain = excluded.domain,
       needs_guild = excluded.needs_guild,
@@ -421,7 +422,7 @@ insert into public.role_grants (role, permission, scope) values
   ('admin', 'member.note.write.managed', 'global'),
   ('officer', 'raid.score.write', 'managed'),
   ('admin', 'raid.score.write', 'global'),
-  ('officer', 'raid.season.manage', 'managed'),
+  ('officer', 'raid.season.manage', 'global'),
   ('admin', 'raid.season.manage', 'global'),
   ('officer', 'raid.ghost.manage', 'managed'),
   ('admin', 'raid.ghost.manage', 'global'),
@@ -429,7 +430,7 @@ insert into public.role_grants (role, permission, scope) values
   ('admin', 'raid.roster.move', 'global'),
   ('officer', 'raid.checkin.write', 'managed'),
   ('admin', 'raid.checkin.write', 'global'),
-  ('officer', 'mailbox.process', 'managed'),
+  ('officer', 'mailbox.process', 'global'),
   ('admin', 'mailbox.process', 'global'),
   ('admin', 'admin.guild.manage', 'global'),
   ('admin', 'admin.costume.manage', 'global'),
@@ -439,6 +440,9 @@ insert into public.role_grants (role, permission, scope) values
   ('admin', 'admin.settings.manage', 'global'),
   ('admin', 'admin.permission.manage', 'global'),
   ('admin', 'admin.role.assign', 'global'),
+  ('manager', 'admin.archive.read', 'global'),
+  ('admin', 'admin.archive.read', 'global'),
+  ('manager', 'arcade.speed_refining.use', 'global'),
   ('admin', 'arcade.speed_refining.use', 'global')
 on conflict (role, permission) do update set scope = excluded.scope;
 
@@ -475,6 +479,7 @@ where p.key not in (
   'admin.settings.manage',
   'admin.permission.manage',
   'admin.role.assign',
+  'admin.archive.read',
   'arcade.speed_refining.use'
 );
 
