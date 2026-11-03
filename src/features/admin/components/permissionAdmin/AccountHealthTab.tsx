@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, Download, Loader2, RefreshCw, Save, Trash2, Unlink } from 'lucide-react';
+import { AlertTriangle, Download, Loader2, RefreshCw, Save, Search, Trash2, Unlink, X } from 'lucide-react';
 import { supabase, fetchAllPaginated } from '@/shared/api/supabase';
 import ConfirmModal from '@shared/ui/ConfirmModal';
+import FilterSelect from '@shared/ui/FilterSelect';
 import { useAppContext } from '@/store';
 import {
   fetchDiscordMembers,
@@ -86,6 +87,13 @@ export default function AccountHealthTab() {
   const [members, setMembers] = useState<Record<string, MemberLite>>({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'issues' | 'pending' | IssueKind>('all');
+
+  /** 各欄位篩選：關鍵字 / 角色 / 公會 / Discord 狀態 */
+  const [query, setQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [guildFilter, setGuildFilter] = useState('');
+  const [discordFilter, setDiscordFilter] = useState('');
+  const [openFilterId, setOpenFilterId] = useState<string | null>(null);
 
   const [snapshot, setSnapshot] = useState<DiscordMemberSnapshot | null>(null);
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
@@ -242,12 +250,115 @@ export default function AccountHealthTab() {
 
   const pendingRows = useMemo(() => [...updateRows, ...deleteRows], [updateRows, deleteRows]);
 
+  /** 角色選項（只列實際存在的角色） */
+  const roleOptions = useMemo(
+    () =>
+      Array.from(new Set(profiles.map(profile => profile.user_role).filter((role): role is string => !!role)))
+        .sort((a, b) => a.localeCompare(b))
+        .map(role => ({ value: role, label: roleLabel(role, isZh) })),
+    [profiles, isZh],
+  );
+
+  /** 公會選項（依 Tier / 排序） */
+  const guildOptions = useMemo(
+    () =>
+      Object.entries(db.guilds)
+        .sort((a, b) => {
+          const tierA = a[1].tier ?? 99;
+          const tierB = b[1].tier ?? 99;
+          if (tierA !== tierB) return tierA - tierB;
+          const orderA = a[1].orderNum ?? 99;
+          const orderB = b[1].orderNum ?? 99;
+          if (orderA !== orderB) return orderA - orderB;
+          return a[1].name.localeCompare(b[1].name);
+        })
+        .map(([id, guild]) => ({
+          value: id,
+          label: guild.tier ? `${guild.name}（T${guild.tier}）` : guild.name,
+        })),
+    [db.guilds],
+  );
+
+  /** Discord 狀態選項 */
+  const discordStatusOptions = useMemo(
+    () => [
+      { value: 'left', label: isZh ? '不在伺服器' : 'Left server' },
+      { value: 'in_server', label: isZh ? '在伺服器' : 'In server' },
+      { value: 'no_discord', label: isZh ? '無 Discord 帳號' : 'No Discord account' },
+      { value: 'global_admin', label: isZh ? '全域管理員（略過）' : 'Global admin (skipped)' },
+      { value: 'unknown', label: isZh ? '尚未抓取名單' : 'No snapshot yet' },
+    ],
+    [isZh],
+  );
+
+  /** 關鍵字 + 欄位篩選（角色 / 公會 / Discord 狀態） */
+  const searchedRows = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    const guildName = guildFilter ? (db.guilds[guildFilter]?.name ?? '') : '';
+
+    return healthRows.filter(row => {
+      const { profile } = row;
+
+      if (normalized) {
+        const haystack = [
+          profile.display_name,
+          profile.discord_username,
+          profile.discord_id,
+          profile.auth_id,
+          profile.user_guilds,
+          ...row.boundIds,
+          ...row.activeMembers.map(member => member.name),
+          ...row.archivedMembers.map(member => member.name),
+          ...row.guildNames,
+          ...row.danglingIds,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+
+        if (!haystack.includes(normalized)) return false;
+      }
+
+      if (roleFilter && (profile.user_role ?? '') !== roleFilter) return false;
+
+      if (guildName) {
+        const profileGuilds = (profile.user_guilds ?? '')
+          .split(',')
+          .map(value => value.trim());
+        if (!row.guildNames.includes(guildName) && !profileGuilds.includes(guildName)) return false;
+      }
+
+      if (discordFilter) {
+        const diff = diffByKey[row.key];
+        const status: string = !diff ? 'unknown' : diff.leftServer ? 'left' : diff.status;
+        if (status !== discordFilter) return false;
+      }
+
+      return true;
+    });
+  }, [healthRows, query, roleFilter, guildFilter, discordFilter, db.guilds, diffByKey]);
+
   const visibleRows = useMemo(() => {
-    if (filter === 'all') return healthRows;
-    if (filter === 'issues') return healthRows.filter(row => row.issues[0] !== 'ok');
-    if (filter === 'pending') return pendingRows;
-    return healthRows.filter(row => row.issues.includes(filter));
-  }, [healthRows, filter, pendingRows]);
+    if (filter === 'all') return searchedRows;
+    if (filter === 'issues') return searchedRows.filter(row => row.issues[0] !== 'ok');
+    if (filter === 'pending') {
+      return searchedRows.filter(row => {
+        const diff = diffByKey[row.key];
+        return !!diff?.hasChanges || diff?.status === 'left';
+      });
+    }
+    return searchedRows.filter(row => row.issues.includes(filter));
+  }, [searchedRows, filter, diffByKey]);
+
+  const closeFilter = useCallback(() => setOpenFilterId(null), []);
+  const hasFieldFilters = !!query || !!roleFilter || !!guildFilter || !!discordFilter;
+  const clearFieldFilters = () => {
+    setQuery('');
+    setRoleFilter('');
+    setGuildFilter('');
+    setDiscordFilter('');
+    setOpenFilterId(null);
+  };
 
   const counts = useMemo(() => {
     const result: Record<string, number> = { total: healthRows.length };
@@ -458,6 +569,86 @@ export default function AccountHealthTab() {
           </span>
         </div>
       )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <input
+            type="text"
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            placeholder={
+              isZh
+                ? '搜尋帳號、Discord、成員、公會或 UUID…'
+                : 'Search account, Discord, member, guild or UUID…'
+            }
+            className="w-full pl-9 pr-8 py-1.5 text-xs rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              aria-label={isZh ? '清除關鍵字' : 'Clear search'}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-stone-400 hover:text-stone-600 dark:hover:text-stone-200"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        <FilterSelect
+          filter={{
+            id: 'role',
+            label: isZh ? '全部角色' : 'All roles',
+            shortLabel: isZh ? '角色' : 'Role',
+            options: roleOptions,
+          }}
+          value={roleFilter}
+          isOpen={openFilterId === 'role'}
+          onToggle={() => setOpenFilterId(current => (current === 'role' ? null : 'role'))}
+          onClose={closeFilter}
+          onChange={setRoleFilter}
+        />
+
+        <FilterSelect
+          filter={{
+            id: 'guild',
+            label: isZh ? '全部公會' : 'All guilds',
+            shortLabel: isZh ? '公會' : 'Guild',
+            options: guildOptions,
+          }}
+          value={guildFilter}
+          isOpen={openFilterId === 'guild'}
+          onToggle={() => setOpenFilterId(current => (current === 'guild' ? null : 'guild'))}
+          onClose={closeFilter}
+          onChange={setGuildFilter}
+        />
+
+        <FilterSelect
+          filter={{
+            id: 'discord',
+            label: isZh ? '全部 Discord 狀態' : 'All Discord states',
+            shortLabel: isZh ? 'Discord' : 'Discord',
+            options: discordStatusOptions,
+          }}
+          value={discordFilter}
+          isOpen={openFilterId === 'discord'}
+          onToggle={() => setOpenFilterId(current => (current === 'discord' ? null : 'discord'))}
+          onClose={closeFilter}
+          onChange={setDiscordFilter}
+        />
+
+        {hasFieldFilters && (
+          <button
+            type="button"
+            onClick={clearFieldFilters}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold rounded-lg border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700"
+          >
+            <X className="w-3.5 h-3.5" />
+            {isZh ? '清除篩選' : 'Clear'}
+          </button>
+        )}
+      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         {chip('all', `${isZh ? '全部' : 'All'} ${counts.total}`, 'bg-stone-100 text-stone-600 dark:bg-stone-700 dark:text-stone-300')}

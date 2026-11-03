@@ -121,6 +121,9 @@
      `trg_profiles_sync_members_delete` 自動清），成功後再清該帳號的 `user_grants`
      （此表沒有 FK，不主動清會留下永遠不會被套用的孤兒授權）。
      `creator` / `admin` 一律保留（即使已離開伺服器），避免把管理員鎖在門外；刪除前會列出名單並要求確認。
+  列表的篩選分兩層，可疊加：**關鍵字搜尋**（帳號、Discord 名稱、成員名稱、公會、auth/discord UUID）
+  ＋**欄位篩選**（角色／公會／Discord 狀態，使用 `src/shared/ui/FilterSelect.tsx`）
+  ＋**健檢 chips**（需處理、待同步、殘留綁定、已封存、未綁定、從未登入）。
   「解除殘留綁定」只從 `profiles.id` 移除不存在的 id（DB trigger 會同步 `profile_members`）。
   **刻意不提供刪除 profile**：`user_grants` 綁的是 `auth_id`，誤刪會連授權與稽核一起失去意義。
 - **`GET /api/discordMembers`（GSD_Bella）**：唯讀端點，回傳
