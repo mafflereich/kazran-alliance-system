@@ -81,6 +81,14 @@ export default function UserPickerModal({
         (profile.discord_username ? `@${profile.discord_username}` : '') ||
         profile.auth_id.slice(0, 8);
 
+      // profiles.id 有值但 db.members 找不到，代表那位成員不在目前的載入範圍（例如只載入了
+      // 某些公會）或已被封存；不要誤顯示成「尚未綁定」。封存成員的 guild_id 會被清成 NULL，
+      // 所以「有綁成員但沒有公會」通常就是封存，或成員目前未載入前端。
+      const missingMemberCount = memberIds.filter(memberId => !db.members[memberId]).length;
+      const archivedMemberCount = memberIds.filter(
+        memberId => db.members[memberId]?.status === 'archived',
+      ).length;
+
       const memberPreview =
         memberNames.length > 0
           ? memberNames.slice(0, NAME_PREVIEW_LIMIT).join(isZh ? '、' : ', ') +
@@ -89,15 +97,37 @@ export default function UserPickerModal({
                 ? ` 等 ${memberNames.length} 位`
                 : ` +${memberNames.length - NAME_PREVIEW_LIMIT} more`
               : '')
-          : isZh
-            ? '尚未綁定遊戲成員'
-            : 'No bound game member';
+          : memberIds.length > 0
+            ? isZh
+              ? `已綁定 ${memberIds.length} 位成員（目前未載入）`
+              : `${memberIds.length} bound member(s) not loaded`
+            : isZh
+              ? '尚未綁定遊戲成員'
+              : 'No bound game member';
+
+      const memberHint =
+        archivedMemberCount > 0
+          ? isZh
+            ? '（含已封存成員）'
+            : ' (includes archived)'
+          : missingMemberCount > 0 && memberIds.length > 0
+            ? isZh
+              ? '（成員目前未載入）'
+              : ' (member not loaded)'
+            : '';
+
+      const guildPreview =
+        displayGuildNames.length > 0
+          ? displayGuildNames.join(isZh ? '、' : ', ')
+          : memberIds.length > 0
+            ? isZh
+              ? '無（成員已封存或未載入）'
+              : 'None (archived or not loaded)'
+            : '';
 
       const sublabelParts = [
-        `${isZh ? '遊戲成員' : 'Members'}：${memberPreview}`,
-        displayGuildNames.length > 0
-          ? `${isZh ? '公會' : 'Guilds'}：${displayGuildNames.join(isZh ? '、' : ', ')}`
-          : '',
+        `${isZh ? '遊戲成員' : 'Members'}：${memberPreview}${memberHint}`,
+        guildPreview ? `${isZh ? '公會' : 'Guilds'}：${guildPreview}` : '',
         profile.discord_username ? `@${profile.discord_username}` : '',
       ].filter(Boolean);
 
@@ -105,7 +135,15 @@ export default function UserPickerModal({
         id: profile.auth_id,
         label,
         sublabel: sublabelParts.join(' · '),
-        group: displayGuildNames[0] ?? (isZh ? '未綁定公會' : 'No guild'),
+        group:
+          displayGuildNames[0] ??
+          (memberIds.length > 0
+            ? isZh
+              ? '無公會（已封存／未載入）'
+              : 'No guild (archived / not loaded)'
+            : isZh
+              ? '未綁定公會'
+              : 'No guild'),
         badge: roleLabel(profile.user_role, isZh),
         searchText: [
           profile.auth_id,
@@ -153,11 +191,13 @@ export default function UserPickerModal({
       {
         id: 'guild',
         label: isZh ? '全部公會' : 'All guilds',
+        shortLabel: isZh ? '公會' : 'Guild',
         options: guildOptions,
       },
       {
         id: 'role',
         label: isZh ? '全部角色' : 'All roles',
+        shortLabel: isZh ? '角色' : 'Role',
         options: roleValues.map(role => ({ value: role, label: roleLabel(role, isZh) })),
       },
     ];
@@ -169,8 +209,8 @@ export default function UserPickerModal({
       title={title ?? (isZh ? '選擇使用者' : 'Select user')}
       hint={
         isZh
-          ? '可以搜尋 Discord 名稱、遊戲成員名稱或公會；清單依公會分組。'
-          : 'Search by Discord name, in-game member name or guild; grouped by guild.'
+          ? '可以搜尋 Discord 名稱、遊戲成員名稱或公會；清單依公會分組。沒有公會的帳號也會列出：例外授權綁的是登入帳號，尚未綁定成員或成員已封存者一樣會出現。'
+          : 'Search by Discord name, in-game member name or guild; grouped by guild. Accounts without a guild are listed too: overrides apply to the login account, so unbound or archived-member accounts still show up.'
       }
       items={options}
       selectedId={selectedAuthId}

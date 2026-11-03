@@ -74,6 +74,7 @@ export default function GuildPickerModal({
       {
         id: 'tier',
         label: isZh ? '全部 Tier' : 'All tiers',
+        shortLabel: 'Tier',
         options: tiers.map(tier => ({ value: String(tier), label: `Tier ${tier}` })),
       },
     ];

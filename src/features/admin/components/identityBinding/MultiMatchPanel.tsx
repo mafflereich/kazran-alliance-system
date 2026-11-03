@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, Users, Save, Undo, X, Loader2 } from 'lucide-react';
+import { Search, Users, Save, Undo, X, Loader2, AlertTriangle } from 'lucide-react';
 import { Member, Guild } from '@/entities/member/types';
 import { Profile } from './types';
 
@@ -29,27 +29,44 @@ interface Props {
   onEditingDiscordUsernameChange: (v: string) => void;
   guilds: Record<string, Guild>;
   members: Record<string, Member>;
+  /** member_id → 已綁定的 profile（用來提示「將從哪個舊帳號轉移」） */
+  profileByMemberId: Map<string, Profile>;
+  /** 這次要綁過去的目標 Discord 帳號 */
+  targetDiscordId: string;
 }
 
 function StagedMembersList({
-  stagedIds, members, guilds, onUnbindStage, t,
+  stagedIds, members, guilds, onUnbindStage, t, profileByMemberId, targetDiscordId,
 }: {
   stagedIds: string[];
   members: Record<string, Member>;
   guilds: Record<string, Guild>;
   onUnbindStage: (id: string) => void;
-  t: (key: string, fallback?: string) => string;
+  t: (key: string, options?: any) => string;
+  profileByMemberId: Map<string, Profile>;
+  targetDiscordId: string;
 }) {
   return (
     <div className="space-y-2">
       {stagedIds.map(id => {
         const member = members[id];
         if (!member) return null;
+        const boundProfile = profileByMemberId.get(id);
+        const transferFrom = boundProfile && boundProfile.discord_id !== targetDiscordId
+          ? boundProfile
+          : null;
         return (
           <div key={id} className="flex items-center justify-between p-3 bg-stone-50 dark:bg-stone-900/50 rounded-lg border border-stone-100 dark:border-stone-800">
             <div>
               <p className="font-medium text-stone-800 dark:text-stone-200">{member.name}</p>
               <p className="text-xs text-stone-500">{guilds[member.guildId]?.name}</p>
+              {transferFrom && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  {t('binding.transfer_hint', {
+                    from: transferFrom.discord_username || transferFrom.display_name || transferFrom.discord_id,
+                  })}
+                </p>
+              )}
             </div>
             <button
               onClick={() => onUnbindStage(id)}
@@ -73,7 +90,7 @@ export default function MultiMatchPanel({
   hasUnsavedChanges, canSaveNewBinding, isBinding, onSave, onRestore, onSaveNewBinding,
   editingDiscordId, onEditingDiscordIdChange,
   editingDiscordUsername, onEditingDiscordUsernameChange,
-  guilds, members,
+  guilds, members, profileByMemberId, targetDiscordId,
 }: Props) {
   const { t } = useTranslation('admin');
 
@@ -206,7 +223,14 @@ export default function MultiMatchPanel({
             guilds={guilds}
             onUnbindStage={onUnbindStage}
             t={t as any}
+            profileByMemberId={profileByMemberId}
+            targetDiscordId={targetDiscordId || editingDiscordId.trim()}
           />
+          {stagedIds.length === 0 && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              {t('binding.need_one_member', '請至少加入一位成員才能建立綁定')}
+            </p>
+          )}
         </div>
 
         <button
@@ -271,7 +295,15 @@ export default function MultiMatchPanel({
           guilds={guilds}
           onUnbindStage={onUnbindStage}
           t={t as any}
+          profileByMemberId={profileByMemberId}
+          targetDiscordId={targetDiscordId || selectedProfile?.discord_id || ''}
         />
+        {stagedIds.length === 0 && hasUnsavedChanges && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-300">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{t('binding.unbind_all_hint', '儲存後將解除此帳號的所有成員綁定，這些成員會變成未綁定。')}</span>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-3 pt-2">

@@ -5,10 +5,12 @@ import { Archive, History, RotateCcw, ChevronDown, ChevronUp, X, AlertCircle, Se
 import { motion, AnimatePresence } from 'motion/react';
 import { formatDate } from '@/shared/lib/utils';
 import { ArchivedMember, ArchiveHistory } from '@/entities/member/types';
+import FilterSelect from '@shared/ui/FilterSelect';
 import { useTranslation } from 'react-i18next';
 
 export default function ArchivedMembersManager() {
-  const { t } = useTranslation(['admin', 'translation']);
+  const { t, i18n } = useTranslation(['admin', 'translation']);
+  const isZh = i18n.language.startsWith('zh');
   const { db, unarchiveMember, showToast } = useAppContext();
   const [archivedMembers, setArchivedMembers] = useState<ArchivedMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +29,26 @@ export default function ArchivedMembersManager() {
     targetGuildId: '',
   });
   const [isProcessing, setIsProcessing] = useState(false);
+  /** 解除封存時選公會的清單（公會上百個，不用 <select>） */
+  const [isGuildPickerOpen, setIsGuildPickerOpen] = useState(false);
+
+  const guildOptions = useMemo(
+    () =>
+      Object.entries(db.guilds)
+        .sort((a, b) => {
+          const tierA = a[1].tier || 0;
+          const tierB = b[1].tier || 0;
+          if (tierA !== tierB) return tierA - tierB;
+          const orderA = a[1].orderNum || 0;
+          const orderB = b[1].orderNum || 0;
+          return orderA - orderB;
+        })
+        .map(([id, guild]) => ({
+          value: id,
+          label: guild.tier ? `${guild.name}（T${guild.tier}）` : guild.name,
+        })),
+    [db.guilds],
+  );
 
   const fetchArchivedMembers = async () => {
     setLoading(true);
@@ -86,6 +108,7 @@ export default function ArchivedMembersManager() {
     const lastGuildId = member.membersArchiveHistory[0]?.fromGuildId;
     const defaultGuildId = (lastGuildId && db.guilds[lastGuildId]) ? lastGuildId : (Object.keys(db.guilds)[0] || '');
 
+    setIsGuildPickerOpen(false);
     setUnarchiveModal({
       isOpen: true,
       member,
@@ -94,6 +117,7 @@ export default function ArchivedMembersManager() {
   };
 
   const closeUnarchiveModal = () => {
+    setIsGuildPickerOpen(false);
     setUnarchiveModal({
       isOpen: false,
       member: null,
@@ -335,26 +359,21 @@ export default function ArchivedMembersManager() {
                 <label className="block text-sm font-medium text-stone-600 dark:text-stone-400 mb-1">
                   {t('archived.select_target_guild')}
                 </label>
-                <select
-                  className="w-full p-2.5 border border-stone-300 dark:border-stone-600 rounded-lg bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100 focus:ring-2 focus:ring-green-500 outline-none"
+                <FilterSelect
+                  fullWidth
+                  className="min-w-[200px]"
+                  filter={{
+                    id: 'targetGuild',
+                    label: t('archived.select_target_guild'),
+                    shortLabel: t('common.guild'),
+                    options: guildOptions,
+                  }}
                   value={unarchiveModal.targetGuildId}
-                  onChange={(e) => setUnarchiveModal(prev => ({ ...prev, targetGuildId: e.target.value }))}
-                >
-                  {Object.values(db.guilds)
-                    .sort((a, b) => {
-                      const tierA = a.tier || 0;
-                      const tierB = b.tier || 0;
-                      if (tierA !== tierB) return tierA - tierB;
-                      const orderA = a.orderNum || 0;
-                      const orderB = b.orderNum || 0;
-                      return orderA - orderB;
-                    })
-                    .map((guild) => (
-                      <option key={guild.id} value={guild.id}>
-                        {guild.name}
-                      </option>
-                    ))}
-                </select>
+                  isOpen={isGuildPickerOpen}
+                  onToggle={() => setIsGuildPickerOpen(open => !open)}
+                  onClose={() => setIsGuildPickerOpen(false)}
+                  onChange={targetGuildId => setUnarchiveModal(prev => ({ ...prev, targetGuildId }))}
+                />
               </div>
 
               <div className="pt-4 flex gap-3">

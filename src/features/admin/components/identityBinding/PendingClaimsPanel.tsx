@@ -69,7 +69,21 @@ export default function PendingClaimsPanel() {
       );
       if (error) {
         console.error('[PendingClaimsPanel] 審核失敗:', error);
-        showToast(t('binding.claim_review_failed', '審核失敗，請稍後再試'), 'error');
+        const message = error.message || '';
+        if (message.includes('already_bound')) {
+          // 對方換了 DC 帳號、舊帳號卻還綁著時，approve_member_claim 會把申請自動標成
+          // rejected 並拋出 already_bound。提示管理員先到「多重匹配」解除舊綁定。
+          showToast(
+            t(
+              'binding.claim_already_bound',
+              '此成員仍綁定在其他 Discord 帳號，申請已自動取消。請先解除舊綁定，再請對方重新送出認領。'
+            ),
+            'error'
+          );
+        } else {
+          showToast(t('binding.claim_review_failed', '審核失敗，請稍後再試'), 'error');
+        }
+        await load();
         return;
       }
       showToast(

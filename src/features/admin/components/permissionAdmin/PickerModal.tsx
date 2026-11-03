@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import FilterSelect, { type FilterSelectFilter } from '@shared/ui/FilterSelect';
 
 export interface PickerOption {
   /** 回傳給 onSelect 的值（使用者 auth_id / 權限 key / 公會 id） */
@@ -20,11 +21,7 @@ export interface PickerOption {
   filterValues?: Record<string, string>;
 }
 
-export interface PickerFilter {
-  id: string;
-  label: string;
-  options: { value: string; label: string }[];
-}
+export type PickerFilter = FilterSelectFilter;
 
 interface PickerModalProps {
   isOpen: boolean;
@@ -67,6 +64,8 @@ export default function PickerModal({
   const [query, setQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
+  /** 目前展開的篩選器（一次只開一個；Esc 只關這一層） */
+  const [openFilterId, setOpenFilterId] = useState<string | null>(null);
 
   // 每次開啟都回到乾淨狀態（不要沿用上一次的搜尋字）
   useEffect(() => {
@@ -74,6 +73,7 @@ export default function PickerModal({
     setQuery('');
     setActiveFilters({});
     setPage(1);
+    setOpenFilterId(null);
   }, [isOpen]);
 
   const onCloseRef = useRef(onClose);
@@ -82,7 +82,13 @@ export default function PickerModal({
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCloseRef.current();
+      if (event.key !== 'Escape') return;
+      // 有展開的篩選器 → 先收起它，不要整個 modal 一起關掉
+      if (openFilterId) {
+        setOpenFilterId(null);
+        return;
+      }
+      onCloseRef.current();
     };
     window.addEventListener('keydown', handleKeyDown);
     const previousOverflow = document.body.style.overflow;
@@ -91,7 +97,14 @@ export default function PickerModal({
       window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [isOpen]);
+  }, [isOpen, openFilterId]);
+
+  const closeFilter = useCallback(() => setOpenFilterId(null), []);
+
+  const changeFilter = useCallback((filterId: string, value: string) => {
+    setActiveFilters(prev => ({ ...prev, [filterId]: value }));
+    setPage(1);
+  }, []);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -163,24 +176,17 @@ export default function PickerModal({
           </div>
 
           {filters && filters.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {filters.map(filter => (
-                <select
+                <FilterSelect
                   key={filter.id}
+                  filter={filter}
                   value={activeFilters[filter.id] ?? ''}
-                  onChange={event => {
-                    setActiveFilters(prev => ({ ...prev, [filter.id]: event.target.value }));
-                    setPage(1);
-                  }}
-                  className="px-2 py-1.5 text-xs rounded-lg border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-900 text-stone-700 dark:text-stone-200"
-                >
-                  <option value="">{filter.label}</option>
-                  {filter.options.map(option => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                  isOpen={openFilterId === filter.id}
+                  onToggle={() => setOpenFilterId(current => (current === filter.id ? null : filter.id))}
+                  onClose={closeFilter}
+                  onChange={value => changeFilter(filter.id, value)}
+                />
               ))}
             </div>
           )}

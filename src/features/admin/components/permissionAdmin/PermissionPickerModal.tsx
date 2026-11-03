@@ -65,6 +65,7 @@ export default function PermissionPickerModal({
       {
         id: 'domain',
         label: isZh ? '全部類別' : 'All categories',
+        shortLabel: isZh ? '類別' : 'Category',
         options: Object.entries(DOMAIN_LABELS).map(([domain, labels]) => ({
           value: domain,
           label: isZh ? labels.zh : labels.en,

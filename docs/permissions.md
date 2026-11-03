@@ -104,8 +104,35 @@
 - **例外授權**：使用者 × 權限 × allow/deny × 公會 × 到期時間 × 原因（`user_grants`）。
   使用者、權限、公會都是**可搜尋／可篩選的 modal 選擇器**（上千成員、上百帳號也不會卡），
   權限顯示中文名稱＋白話說明；公會用名稱挑選，不需要貼 guild id。
+- **選擇器內的篩選器**（`src/shared/ui/FilterSelect.tsx`）：公會／角色／權限類別一律是可搜尋的
+  popover，**不是原生 `<select>`**——公會數量會到上百個，原生下拉選單無法搜尋也很難定位；
+  選項 ≥ 8 個時自動出現搜尋框、清單限高可滾動、已選值可一鍵清除（Esc 只收這一層）。
+  面板以 portal 掛在 `<body>`（fixed 定位），因此表格的 `overflow-x-auto` 與 modal 的
+  `overflow-hidden` 都不會把它裁掉；「成員移轉」「解除封存選公會」也共用這支元件。
+- **帳號健檢**：把 `profiles`（登入帳號）與 `members`（遊戲成員）對照，標出
+  ①殘留綁定（`profiles.id` 指向已刪除成員）②綁到已封存成員 ③未綁定成員 ④從未登入（`auth_id` 為空）。
+  同步流程是「**抓一次名單 → 本機比對 → 套用差異**」：
+  1. 按「抓取 Discord 名單」呼叫貝拉（`GSD_Bella`）的 `GET /api/discordMembers`，
+     一次取回整個伺服器的成員與角色（bot 端快取 10 分鐘，前端只發 1 次請求）；
+  2. 前端用 `discordMembersShared.ts` 把角色 id 換成 `manager` / `member`、
+     把「`公會名稱-公會成員 (棕色2)`」身分組換成公會名稱，再與 `profiles` 比對；
+  3. 只有在按下「套用差異」時才寫入 `profiles.user_role` / `user_guilds`（每批 10 筆並行），
+     並**刪除已離開伺服器的 profile**：先刪 `profiles`（`profile_members` 由
+     `trg_profiles_sync_members_delete` 自動清），成功後再清該帳號的 `user_grants`
+     （此表沒有 FK，不主動清會留下永遠不會被套用的孤兒授權）。
+     `creator` / `admin` 一律保留（即使已離開伺服器），避免把管理員鎖在門外；刪除前會列出名單並要求確認。
+  「解除殘留綁定」只從 `profiles.id` 移除不存在的 id（DB trigger 會同步 `profile_members`）。
+  **刻意不提供刪除 profile**：`user_grants` 綁的是 `auth_id`，誤刪會連授權與稽核一起失去意義。
+- **`GET /api/discordMembers`（GSD_Bella）**：唯讀端點，回傳
+  `{ guildId, fetchedAt, cached, memberCount, members: [{ id, username, displayName, roleIds, roleNames, … }] }`；
+  需要 admin / creator 的 Supabase access token。程式在 `GSD_Bella/routes/discordMembers.ts`
+  （可用 `DISCORD_MEMBERS_REQUIRE_AUTH=false` 暫時關閉驗證）。
+  這支取代了原本「每個帳號打一次 `sync-discord-roles`」的做法（300 個帳號 = 600 次 Discord API）。
 - **預覽視角**：`preview_access(auth_id)`，顯示該使用者實際的 roles / 公會 / 權限。
-- **稽核**：`system_logs`（`source='permissions'`）最近 50 筆，含 before/after JSON。
+- **稽核**：`system_logs`（`source='permissions'`）最近 50 筆。列表直接寫成人話
+  （「角色權限｜幹部 → 編輯戰記分數 · 更新 · 允許範圍：全站 → 只在自己管理的公會」），
+  操作者以 `profiles` 的顯示名稱＋角色呈現（查到不 profile 才退回 uuid 前 8 碼）；
+  點箭頭展開「欄位／變更前／變更後」對照表，原始 `details` JSON 收在「顯示原始紀錄」裡。
 
 > 舊的 `access_control` 表仍在資料庫中（回滾用），但已沒有任何 UI 會寫它；
 > `role_grants` 是唯一生效來源。

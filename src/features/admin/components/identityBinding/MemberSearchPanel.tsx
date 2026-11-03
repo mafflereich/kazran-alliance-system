@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, Link as LinkIcon, User as UserIcon, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Search, Link as LinkIcon, User as UserIcon, Loader2, CheckCircle2, AlertCircle, ArrowLeftRight } from 'lucide-react';
 import { Member, Guild } from '@/entities/member/types';
 import { Profile } from './types';
 
@@ -18,19 +18,23 @@ interface Props {
   profileByMemberId: Map<string, Profile>;
   onBindClick: (member: Member) => void;
   guilds: Record<string, Guild>;
+  /** 這次要綁過去的目標 Discord 帳號（已選 profile 或正在輸入的新 Discord ID） */
+  targetDiscordId: string;
 }
 
 export default function MemberSearchPanel({
   isSearchActive, selectedProfile, searchQuery, onSearch, searchResults,
   isBinding, mode, stagedIds, allProfiles, profileByMemberId, onBindClick, guilds,
+  targetDiscordId,
 }: Props) {
   const { t } = useTranslation('admin');
 
   const renderBindAction = (member: Member) => {
     const isStaged = mode === 'multi' && stagedIds.includes(member.id!);
     const boundProfile = member.id ? profileByMemberId.get(member.id) : undefined;
+    // 已綁在「別的」帳號（換 DC 帳號 / 轉讓）→ 允許轉綁，由確認視窗提示會從舊帳號移轉
     const boundToOther =
-      boundProfile && boundProfile.discord_id !== selectedProfile?.discord_id
+      boundProfile && boundProfile.discord_id !== targetDiscordId
         ? boundProfile
         : undefined;
 
@@ -44,13 +48,21 @@ export default function MemberSearchPanel({
     }
 
     if (boundToOther) {
+      const fromLabel = boundToOther.discord_username || boundToOther.display_name || boundToOther.discord_id;
       return (
-        <div
-          className="flex items-center gap-2 px-4 py-2 bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 rounded-lg text-sm font-bold"
-          title={t('binding.already_bound_to_other', '已被其他帳號綁定')}
-        >
-          <AlertCircle className="w-4 h-4" />
-          {t('binding.already_bound_to_other', '已被其他帳號綁定')}
+        <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={() => onBindClick(member)}
+            disabled={isBinding}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-stone-400 text-white rounded-lg text-sm font-bold transition-all shadow-lg shadow-amber-500/20 active:scale-95"
+            title={t('binding.transfer_hint', { from: fromLabel })}
+          >
+            {isBinding ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowLeftRight className="w-4 h-4" />}
+            {t('binding.transfer', '轉綁')}
+          </button>
+          <span className="text-[11px] text-amber-600 dark:text-amber-400 max-w-[180px] truncate">
+            {t('binding.bound_to', '目前綁定')}：@{fromLabel}
+          </span>
         </div>
       );
     }

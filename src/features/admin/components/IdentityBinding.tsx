@@ -85,6 +85,8 @@ export default function IdentityBinding() {
             onEditingDiscordUsernameChange={binding.setEditingDiscordUsername}
             guilds={binding.db.guilds}
             members={binding.db.members}
+            profileByMemberId={binding.profileByMemberId}
+            targetDiscordId={binding.selectedProfile?.discord_id ?? binding.editingDiscordId.trim()}
           />
         )}
 
@@ -101,15 +103,39 @@ export default function IdentityBinding() {
           profileByMemberId={binding.profileByMemberId}
           onBindClick={binding.handleBindClick}
           guilds={binding.db.guilds}
+          targetDiscordId={binding.selectedProfile?.discord_id ?? binding.editingDiscordId.trim()}
         />
       </div>
 
       <ConfirmModal
         isOpen={binding.confirmModal.isOpen}
-        title={t('binding.bind')}
-        message={t('binding.confirm_bind', { name: binding.confirmModal.member?.name })}
-        onConfirm={binding.executeSingleBind}
-        onCancel={() => binding.setConfirmModal({ isOpen: false, member: null })}
+        title={binding.confirmModal.fromProfile
+          ? t('binding.transfer_title', '轉移綁定')
+          : t('binding.bind')}
+        message={
+          binding.confirmModal.fromProfile
+            ? t(
+                binding.confirmModal.kind === 'stage'
+                  ? 'binding.confirm_transfer_stage'
+                  : 'binding.confirm_transfer',
+                {
+                  name: binding.confirmModal.member?.name,
+                  from:
+                    binding.confirmModal.fromProfile.discord_username ||
+                    binding.confirmModal.fromProfile.display_name ||
+                    binding.confirmModal.fromProfile.discord_id,
+                }
+              )
+            : t('binding.confirm_bind', { name: binding.confirmModal.member?.name })
+        }
+        onConfirm={
+          binding.confirmModal.kind === 'stage'
+            ? binding.confirmStageTransfer
+            : binding.executeSingleBind
+        }
+        onCancel={() =>
+          binding.setConfirmModal({ isOpen: false, kind: 'bind', member: null, fromProfile: null })
+        }
       />
 
       <ConfirmModal

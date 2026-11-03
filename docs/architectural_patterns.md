@@ -87,6 +87,8 @@ src/features/{feature}/
 
 ### Modal 表單
 - **共用元件**：`src/shared/ui/ConfirmModal.tsx`、`src/shared/ui/InputModal.tsx`
+- **可搜尋選擇器**：`src/shared/ui/FilterSelect.tsx`（公會／角色／權限…選項很多時一律用它，不要用 `<select>`；
+  面板以 portal 掛在 `<body>`，放表格或 modal 內都不會被 `overflow` 裁掉）
 - **功能 Modal**：`src/features/guild/components/MemberEditModal.tsx`、`src/features/raid/components/MemberStatsModal.tsx`
 - **流程**：開啟 Modal → 本地 state 管理表單值 → 呼叫 Context 方法儲存 → Toast 回饋
 

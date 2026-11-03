@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '@/store';
 import { ChevronLeft, Plus, Save, X, Edit2, Archive, Trash2, AlertCircle } from 'lucide-react';
 import ConfirmModal from '@shared/ui/ConfirmModal';
+import FilterSelect from '@shared/ui/FilterSelect';
 import { Role } from '@/entities/member/types';
 import { useTranslation } from 'react-i18next';
 export default function GuildMembersManager({ guildId, onBack }: { guildId: string, onBack: () => void }) {
-  const { t } = useTranslation(['admin', 'translation']);
+  const { t, i18n } = useTranslation(['admin', 'translation']);
+  const isZh = i18n.language.startsWith('zh');
   const { db, addMember, deleteMember, updateMember, fetchMembers, archiveMember, showToast: showGlobalToast } = useAppContext();
   const [isAdding, setIsAdding] = useState(false);
   const [isBatchAdding, setIsBatchAdding] = useState(false);
@@ -39,6 +41,8 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
     reason: ''
   });
   const [isArchiving, setIsArchiving] = useState(false);
+  /** 「移轉公會」的篩選器（公會上百個，用可搜尋清單而不是 <select>） */
+  const [isGuildPickerOpen, setIsGuildPickerOpen] = useState(false);
 
   const closeConfirmModal = () => setConfirmModal(prev => ({ ...prev, isOpen: false }));
   const closeArchiveModal = () => setArchiveModal(prev => ({ ...prev, isOpen: false }));
@@ -54,14 +58,24 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
     fetchMembers(guildId);
   }, [guildId]);
 
-  const sortedGuilds = (Object.entries(db.guilds) as [string, any][]).sort((a, b) => {
-    const tierA = a[1].tier || 99;
-    const tierB = b[1].tier || 99;
-    if (tierA !== tierB) return tierA - tierB;
-    const orderA = a[1].orderNum || 99;
-    const orderB = b[1].orderNum || 99;
-    return orderA - orderB;
-  });
+  const guildOptions = useMemo(
+    () =>
+      Object.entries(db.guilds)
+        .sort((a, b) => {
+          const tierA = a[1].tier || 99;
+          const tierB = b[1].tier || 99;
+          if (tierA !== tierB) return tierA - tierB;
+          const orderA = a[1].orderNum || 99;
+          const orderB = b[1].orderNum || 99;
+          if (orderA !== orderB) return orderA - orderB;
+          return a[1].name.localeCompare(b[1].name);
+        })
+        .map(([id, guild]) => ({
+          value: id,
+          label: guild.tier ? `${guild.name}（T${guild.tier}）` : guild.name,
+        })),
+    [db.guilds],
+  );
 
   const guild = db.guilds[guildId];
   const members = Object.entries(db.members)
@@ -124,6 +138,7 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
         showGlobalToast(t('members.add_success'), 'success');
       }
       setFormData({ name: '', role: 'member', note: '', targetGuildId: guildId });
+      setIsGuildPickerOpen(false);
     } catch (error: any) {
       console.error("Error saving member:", error);
       showGlobalToast(`${t('members.update_failed')}: ${error.message}`, 'error');
@@ -181,6 +196,7 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
 
   const startEdit = (id: string) => {
     setEditingId(id);
+    setIsGuildPickerOpen(false);
     setFormData({
       name: db.members[id].name,
       role: db.members[id].role,
@@ -192,6 +208,7 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
   const cancelEdit = () => {
     setIsAdding(false);
     setEditingId(null);
+    setIsGuildPickerOpen(false);
     setFormData({ name: '', role: 'member', note: '', targetGuildId: guildId });
   };
 
@@ -356,15 +373,21 @@ export default function GuildMembersManager({ guildId, onBack }: { guildId: stri
                     </td>
                     <td className="p-2">
                       <div className="flex flex-col gap-1">
-                        <select
-                          className="w-full p-1.5 border border-stone-300 dark:border-stone-600 rounded bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100 text-xs mb-1"
+                        <FilterSelect
+                          fullWidth
+                          className="min-w-[170px] mb-1"
+                          filter={{
+                            id: 'targetGuild',
+                            label: t('members.target_guild'),
+                            shortLabel: isZh ? '公會' : 'Guild',
+                            options: guildOptions,
+                          }}
                           value={formData.targetGuildId}
-                          onChange={(e) => setFormData({ ...formData, targetGuildId: e.target.value })}
-                        >
-                          {(sortedGuilds as [string, any][]).map(([gId, g]) => (
-                            <option key={gId} value={gId}>{g.name}</option>
-                          ))}
-                        </select>
+                          isOpen={isGuildPickerOpen}
+                          onToggle={() => setIsGuildPickerOpen(open => !open)}
+                          onClose={() => setIsGuildPickerOpen(false)}
+                          onChange={targetGuildId => setFormData(prev => ({ ...prev, targetGuildId }))}
+                        />
                         <input
                           type="text"
                           className="w-full p-1.5 border border-stone-300 dark:border-stone-600 rounded bg-white text-stone-800 dark:bg-stone-700 dark:text-stone-100 text-sm"

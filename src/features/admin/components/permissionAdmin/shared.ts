@@ -21,6 +21,8 @@ export interface ProfileRow {
   /** profiles.id：以逗號分隔的遊戲成員 id（Discord 帳號才有） */
   id?: string | null;
   discord_username?: string | null;
+  /** Discord 使用者 id（sync-discord-roles 需要） */
+  discord_id?: string | null;
   /** 以逗號分隔的公會名稱（由 DB trigger 同步） */
   user_guilds?: string | null;
 }
@@ -31,6 +33,7 @@ export interface AuditRow {
   message: string;
   user_id: string | null;
   details: any;
+  action?: string | null;
 }
 
 export const DOMAIN_LABELS: Record<string, { zh: string; en: string }> = {
@@ -248,19 +251,35 @@ const PROFILES_PAGE_SIZE = 1000;
  * 避免例外授權的使用者清單漏人。
  */
 export async function fetchGrantableProfiles(): Promise<ProfileRow[]> {
+  return fetchProfiles(true);
+}
+
+/**
+ * 帳號健檢用：連「從未登入（auth_id 為 null）」的 profiles 一起抓。
+ * 這些列不會出現在例外授權清單，但一樣會佔住 Discord 綁定，需要被看見。
+ */
+export async function fetchAllProfilesForAudit(): Promise<ProfileRow[]> {
+  return fetchProfiles(false);
+}
+
+async function fetchProfiles(onlyWithAuth: boolean): Promise<ProfileRow[]> {
   if (!supabase) return [];
 
   const rows: ProfileRow[] = [];
   for (let from = 0; ; from += PROFILES_PAGE_SIZE) {
-    const { data, error } = await supabase
+    let query = supabase
       .from('profiles')
-      .select('auth_id, display_name, user_role, id, discord_username, user_guilds')
-      .not('auth_id', 'is', null)
+      .select('auth_id, display_name, user_role, id, discord_username, discord_id, user_guilds')
       .order('display_name', { ascending: true })
-      .order('auth_id', { ascending: true })
-      .range(from, from + PROFILES_PAGE_SIZE - 1);
+      .order('auth_id', { ascending: true });
 
+    if (onlyWithAuth) {
+      query = query.not('auth_id', 'is', null);
+    }
+
+    const { data, error } = await query.range(from, from + PROFILES_PAGE_SIZE - 1);
     if (error) throw error;
+
     const page = (data as ProfileRow[]) || [];
     rows.push(...page);
     if (page.length < PROFILES_PAGE_SIZE) break;
